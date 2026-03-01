@@ -1,0 +1,12 @@
+# AUTARCH Adult Site Scanner - Bulk Import File
+# Add one domain per line (without http:// or https://)
+# Lines starting with # are comments
+#
+# Example:
+# example.com
+# another-site.net
+# subdomain.site.org
+#
+# After adding domains, run Bulk Import [B] again
+# and provide a test username that exists on these sites.
+

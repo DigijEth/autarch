@@ -1,0 +1,39 @@
+# AUTARCH - Core Dependencies
+flask>=3.0
+bcrypt>=4.0
+requests>=2.31
+msgpack>=1.0
+
+# OSINT & Networking
+# (nmap, tcpdump, tshark are system packages)
+
+# Hardware / Serial
+pyserial>=3.5
+esptool>=4.0
+
+# Packet Analysis
+pyshark>=0.6
+
+# UPnP
+# (miniupnpc is a system package, provides upnpc CLI)
+
+# Reports
+qrcode>=7.0
+Pillow>=10.0
+
+# ── Optional LLM Backends ──────────────────────────────
+# Uncomment the backend(s) you want to use:
+
+# Local GGUF models (CPU-friendly):
+llama-cpp-python>=0.3.16
+# For CUDA GPU acceleration, reinstall with:
+#   CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+
+# HuggingFace SafeTensors models (GPU-recommended):
+# transformers>=4.35
+# torch>=2.1
+# accelerate>=0.25
+bitsandbytes>=0.41  # for 4-bit/8-bit quantization (Linux/CUDA only; skip on Windows if unavailable)
+
+# Anthropic Claude API:
+# anthropic>=0.40

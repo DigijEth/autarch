@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}OSINT - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>OSINT Search Engine</h1>
+    <div style="font-size:0.82rem;color:var(--text-secondary)">
+        {% if db_stats and db_stats.total_sites %}
+            {{ db_stats.total_sites }} sites in database
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search Box -->
+<div class="section">
+    <h2>Search</h2>
+    <div class="search-box">
+        <select id="osint-type" class="btn">
+            <option value="username">Username</option>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="domain">Domain</option>
+        </select>
+        <input type="text" id="osint-query" placeholder="Enter search query..." onkeypress="if(event.key==='Enter')startOsintSearch()">
+        <button id="search-btn" class="btn btn-primary" onclick="startOsintSearch()">Search</button>
+        <button id="stop-btn" class="btn btn-stop btn-small" onclick="stopOsintSearch()" style="display:none">Stop</button>
+    </div>
+
+    <!-- Basic Options Row -->
+    <div class="search-options">
+        <div class="form-group" style="margin-bottom:0;min-width:120px">
+            <select id="osint-max">
+                <option value="100">Quick (100)</option>
+                <option value="500" selected>Standard (500)</option>
+                <option value="0">Full (All)</option>
+            </select>
+        </div>
+        <label class="checkbox-label">
+            <input type="checkbox" id="osint-nsfw" {{ 'checked' if osint_settings.include_nsfw }}>
+            Include NSFW
+        </label>
+    </div>
+
+    <!-- Category Filter -->
+    {% if categories %}
+    <div style="margin-bottom:12px">
+        <div class="cat-select-all">
+            <label class="checkbox-label">
+                <input type="checkbox" id="cat-all" checked onchange="toggleAllCategories(this.checked)">
+                <strong>All Categories</strong> <span class="cat-count">({{ categories|length }})</span>
+            </label>
+        </div>
+        <div class="category-checkboxes" id="category-checkboxes">
+            {% for cat_name, cat_count in categories %}
+            <label>
+                <input type="checkbox" class="cat-checkbox" value="{{ cat_name }}" checked>
+                {{ cat_name }} <span class="cat-count">({{ cat_count }})</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Advanced Options -->
+    <div class="advanced-panel">
+        <span class="advanced-toggle" onclick="toggleAdvanced()">
+            <span class="arrow" id="adv-arrow">&#9654;</span> Advanced Options
+        </span>
+        <div class="advanced-body" id="advanced-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Threads</label>
+                    <input type="range" id="osint-threads" min="1" max="20" value="{{ osint_settings.max_threads }}" oninput="document.getElementById('threads-val').textContent=this.value">
+                    <span id="threads-val" style="font-size:0.8rem;color:var(--text-secondary)">{{ osint_settings.max_threads }}</span>
+                </div>
+                <div class="form-group">
+                    <label>Timeout (seconds)</label>
+                    <input type="number" id="osint-timeout" value="{{ osint_settings.timeout }}" min="3" max="30">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>User-Agent</label>
+                    <select id="osint-ua">
+                        <option value="">Auto-rotate (recommended)</option>
+                        <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0">Chrome/Windows</option>
+                        <option value="Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0">Firefox/Linux</option>
+                        <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15">Safari/Mac</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Proxy (optional)</label>
+                    <input type="text" id="osint-proxy" placeholder="http://host:port">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress -->
+<div class="progress-text" id="progress-text"></div>
+<div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+<!-- Summary Stats -->
+<div class="osint-summary" id="osint-summary" style="display:none">
+    <div class="stat"><span class="stat-num" id="sum-checked">0</span><span class="stat-label">Checked</span></div>
+    <div class="stat"><span class="stat-num" style="color:var(--success)" id="sum-found">0</span><span class="stat-label">Found</span></div>
+    <div class="stat"><span class="stat-num" style="color:var(--warning)" id="sum-maybe">0</span><span class="stat-label">Possible</span></div>
+    <div class="stat"><span class="stat-num" style="color:var(--text-muted)" id="sum-filtered">0</span><span class="stat-label">Filtered</span></div>
+</div>
+
+<!-- Results -->
+<div class="section" id="results-section" style="display:none">
+    <h2>Results</h2>
+
+    <!-- Result Filters -->
+    <div class="result-filters" id="result-filters">
+        <button class="filter-btn active" data-filter="all" onclick="filterResults('all')">All</button>
+        <button class="filter-btn" data-filter="good" onclick="filterResults('good')">Found</button>
+        <button class="filter-btn" data-filter="maybe" onclick="filterResults('maybe')">Possible</button>
+        <button class="filter-btn" data-filter="filtered" onclick="filterResults('filtered')">Filtered</button>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div class="tool-actions" id="result-actions" style="display:none">
+        <button class="btn btn-small btn-success" onclick="openAllFound()">Open All Found</button>
+        <button class="btn btn-small" onclick="exportResults('json')">Export JSON</button>
+        <button class="btn btn-small" onclick="exportResults('csv')">Export CSV</button>
+        <button class="btn btn-small" onclick="showSaveToDossier()">Save to Dossier</button>
+    </div>
+
+    <div class="results-stream" id="osint-results"></div>
+</div>
+
+<!-- Save to Dossier Modal (inline) -->
+<div class="section" id="save-dossier-panel" style="display:none">
+    <h2>Save to Dossier</h2>
+    <div id="dossier-select-list" style="margin-bottom:12px"></div>
+    <div class="input-row">
+        <input type="text" id="new-dossier-name" placeholder="New dossier name...">
+        <button class="btn btn-primary btn-small" onclick="createAndSaveDossier()">Create & Save</button>
+    </div>
+    <div id="dossier-save-status" style="font-size:0.82rem;color:var(--text-secondary);margin-top:8px"></div>
+</div>
+
+<!-- Dossier Management -->
+<div class="section">
+    <h2>Dossiers</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="loadDossiers()">Refresh</button>
+    </div>
+    <div class="dossier-grid" id="dossier-list">
+        <div class="empty-state">Click "Refresh" to load dossiers.</div>
+    </div>
+</div>
+
+<!-- Dossier Detail View -->
+<div class="section" id="dossier-detail" style="display:none">
+    <h2 id="dossier-detail-name"></h2>
+    <div class="form-group">
+        <label>Notes</label>
+        <textarea id="dossier-notes" rows="3" style="width:100%"></textarea>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-small btn-primary" onclick="saveDossierNotes()">Save Notes</button>
+        <button class="btn btn-small" onclick="exportDossier('json')">Export JSON</button>
+        <button class="btn btn-small" onclick="exportDossier('csv')">Export CSV</button>
+        <button class="btn btn-small btn-danger" onclick="deleteDossier()">Delete</button>
+        <button class="btn btn-small" onclick="closeDossierDetail()">Close</button>
+    </div>
+    <div id="dossier-results-list" style="margin-top:16px"></div>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>OSINT Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

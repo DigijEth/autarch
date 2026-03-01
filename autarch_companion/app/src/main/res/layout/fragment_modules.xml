@@ -1,0 +1,655 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ARCHON MODULES"
+            android:textColor="@color/terminal_green"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Server Status -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:id="@+id/server_status_dot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/server_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Server: checking..."
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <!-- ═══ Archon Server Card ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Title row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <View
+                        android:id="@+id/archon_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Archon Server"
+                        android:textColor="@color/terminal_green"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:id="@+id/archon_uid_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="UID 2000"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Privileged shell daemon — enables modules without root"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/archon_info_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: checking..."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Quick command -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_archon_cmd"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:hint="shell command..."
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_secondary"
+                        android:textSize="13sp"
+                        android:fontFamily="monospace"
+                        android:inputType="text"
+                        android:background="@color/surface_dark"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:singleLine="true" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_archon_run"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:text="RUN"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green" />
+                </LinearLayout>
+
+                <!-- Server control buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_archon_info"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="INFO"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_archon_ping"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="PING"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_archon_packages"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="APPS"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ Protection Shield Card ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Title row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <View
+                        android:id="@+id/shield_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Protection Shield"
+                        android:textColor="@color/terminal_green"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="v1.0"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Scan &amp; remove stalkerware"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Scan buttons row 1 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_shield_full_scan"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="FULL SCAN"
+                        android:textColor="@color/background"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_shield_scan_packages"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="PACKAGES"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- Scan buttons row 2 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_shield_scan_admins"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="ADMINS"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_shield_scan_certs"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="CERTS"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_shield_scan_network"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="NETWORK"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- Shield status -->
+                <TextView
+                    android:id="@+id/shield_status_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Last: no scan run"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ Tracking Honeypot Card ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Title row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <View
+                        android:id="@+id/honeypot_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Tracking Honeypot"
+                        android:textColor="@color/terminal_green"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="v1.0"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Block trackers &amp; fake data"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Honeypot buttons row 1 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_honeypot_harden"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="HARDEN ALL"
+                        android:textColor="@color/background"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_honeypot_reset_ad"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="RESET AD ID"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- Honeypot buttons row 2 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_honeypot_dns"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="PRIVATE DNS"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_honeypot_restrict"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="RESTRICT"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_honeypot_revoke"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="REVOKE"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- Honeypot status -->
+                <TextView
+                    android:id="@+id/honeypot_status_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: idle"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ Reverse Shell Card ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Title row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="4dp">
+
+                    <View
+                        android:id="@+id/revshell_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Reverse Shell"
+                        android:textColor="@color/terminal_green"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="v1.0"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Remote shell to AUTARCH server"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- RevShell enable/disable row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_revshell_enable"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="ENABLE"
+                        android:textColor="@color/background"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="#FFFF6600" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_revshell_disable"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="DISABLE"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- RevShell connect/disconnect/status row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_revshell_connect"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="CONNECT"
+                        android:textColor="@color/background"
+                        android:textSize="11sp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_revshell_disconnect"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="DISCONNECT"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_revshell_status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="STATUS"
+                        android:textSize="11sp"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:backgroundTint="@color/terminal_green_dim" />
+                </LinearLayout>
+
+                <!-- RevShell status -->
+                <TextView
+                    android:id="@+id/revshell_status_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: Disabled"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ Output Log ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Output:"
+                    android:textColor="@color/terminal_green_dim"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/modules_output_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="> ready_"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:minLines="8" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

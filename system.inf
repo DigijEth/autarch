@@ -1,0 +1,146 @@
+{
+  "audit_date": "2026-02-02T13:51:09.453236",
+  "system_info": {
+    "os_type": "linux",
+    "os_name": "Ubuntu 22.04.5 LTS",
+    "os_version": "22.04",
+    "os_id": "ubuntu",
+    "kernel": "5.10.0-1012-rockchip",
+    "arch": "aarch64",
+    "cpe_prefix": "cpe:2.3:o:canonical:ubuntu_linux",
+    "hostname": "snake-desktop",
+    "uptime": "up 2 days, 53 minutes",
+    "current_user": "root",
+    "memory_kb": 16337212,
+    "memory_gb": 15.6,
+    "cpu_cores": 8
+  },
+  "security_score": 15,
+  "audit_results": {
+    "firewall": {
+      "status": "enabled",
+      "type": "iptables",
+      "rules": 19
+    },
+    "ssh": {
+      "status": "installed",
+      "issues": []
+    },
+    "ports": {
+      "listening": 37,
+      "high_risk": [
+        "139",
+        "445",
+        "139",
+        "445"
+      ]
+    },
+    "users": {
+      "issues": [],
+      "shell_users": 5
+    },
+    "permissions": {
+      "checked": 7,
+      "issues": 2
+    },
+    "services": {
+      "dangerous_running": []
+    },
+    "updates": {
+      "available": 11,
+      "security": 0
+    },
+    "fail2ban": {
+      "status": "running"
+    },
+    "cves": {
+      "total": 0,
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "items": [],
+      "db_stats": {
+        "db_path": "/home/snake/dh_framework/data/cve/cve.db",
+        "db_size_mb": 0.07,
+        "total_cves": 0,
+        "total_cpes": 0,
+        "last_sync": null,
+        "last_modified": null,
+        "by_severity": {}
+      }
+    }
+  },
+  "issues": [
+    {
+      "name": "High-Risk Port Open: 139 (NetBIOS)",
+      "description": "NetBIOS session service",
+      "severity": "HIGH",
+      "category": "network",
+      "fix_command": null,
+      "fix_instructions": "Disable the NetBIOS service if not needed:\n  sudo systemctl stop <service>\n  sudo systemctl disable <service>",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "High-Risk Port Open: 445 (SMB)",
+      "description": "SMB - common attack target",
+      "severity": "HIGH",
+      "category": "network",
+      "fix_command": null,
+      "fix_instructions": "Disable the SMB service if not needed:\n  sudo systemctl stop <service>\n  sudo systemctl disable <service>",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "High-Risk Port Open: 139 (NetBIOS)",
+      "description": "NetBIOS session service",
+      "severity": "HIGH",
+      "category": "network",
+      "fix_command": null,
+      "fix_instructions": "Disable the NetBIOS service if not needed:\n  sudo systemctl stop <service>\n  sudo systemctl disable <service>",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "High-Risk Port Open: 445 (SMB)",
+      "description": "SMB - common attack target",
+      "severity": "HIGH",
+      "category": "network",
+      "fix_command": null,
+      "fix_instructions": "Disable the SMB service if not needed:\n  sudo systemctl stop <service>\n  sudo systemctl disable <service>",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "Insecure Permissions: /etc/ssh/sshd_config",
+      "description": "SSH configuration has mode 644 (should be 600 or less)",
+      "severity": "MEDIUM",
+      "category": "permissions",
+      "fix_command": "sudo chmod 600 /etc/ssh/sshd_config",
+      "fix_instructions": "Fix permissions:\n  sudo chmod 600 /etc/ssh/sshd_config",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "Insecure Permissions: /etc/crontab",
+      "description": "System crontab has mode 644 (should be 600 or less)",
+      "severity": "MEDIUM",
+      "category": "permissions",
+      "fix_command": "sudo chmod 600 /etc/crontab",
+      "fix_instructions": "Fix permissions:\n  sudo chmod 600 /etc/crontab",
+      "cve_ids": [],
+      "status": "open"
+    },
+    {
+      "name": "No Antivirus Installed",
+      "description": "No antivirus solution detected",
+      "severity": "LOW",
+      "category": "security",
+      "fix_command": "sudo apt install clamav clamav-daemon -y && sudo freshclam",
+      "fix_instructions": "Install ClamAV:\n  sudo apt install clamav clamav-daemon\n  sudo freshclam",
+      "cve_ids": [],
+      "status": "open"
+    }
+  ]
+}

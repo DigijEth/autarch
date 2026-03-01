@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Counter Intelligence - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Counter Intelligence</h1>
+</div>
+
+<!-- Full Threat Scan -->
+<div class="section">
+    <h2>Full Threat Scan</h2>
+    <div class="tool-actions">
+        <button id="btn-scan" class="btn btn-primary" onclick="runCounterScan()">Run Scan</button>
+    </div>
+    <div id="scan-summary" style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:8px"></div>
+    <div id="scan-results">
+        <div class="empty-state">Click "Run Scan" to check for threats.</div>
+    </div>
+</div>
+
+<!-- Quick Checks -->
+<div class="section">
+    <h2>Quick Checks</h2>
+    <div class="tool-grid">
+        <div class="tool-card">
+            <h4>Suspicious Processes</h4>
+            <p>Scan for known malicious process names</p>
+            <button class="btn btn-small" onclick="runCounterCheck('processes')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-processes"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Network Analysis</h4>
+            <p>Check for suspicious connections</p>
+            <button class="btn btn-small" onclick="runCounterCheck('network')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-network"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Login Anomalies</h4>
+            <p>Quick failed login check</p>
+            <button class="btn btn-small" onclick="runCounterCheck('logins')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-logins"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>File Integrity</h4>
+            <p>Check recently modified critical files</p>
+            <button class="btn btn-small" onclick="runCounterCheck('integrity')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-integrity"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Scheduled Tasks</h4>
+            <p>Check cron jobs for suspicious commands</p>
+            <button class="btn btn-small" onclick="runCounterCheck('tasks')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-tasks"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Rootkit Detection</h4>
+            <p>Basic rootkit and hidden process checks</p>
+            <button class="btn btn-small" onclick="runCounterCheck('rootkits')">Run</button>
+            <pre class="output-panel tool-result" id="counter-result-rootkits"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Login Analysis -->
+<div class="section">
+    <h2>Login Analysis</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px">Detailed failed login analysis with GeoIP enrichment (top 15 IPs)</p>
+    <div class="tool-actions">
+        <button id="btn-logins" class="btn btn-primary" onclick="loadLogins()">Analyze Logins</button>
+    </div>
+    <div id="login-results">
+        <div class="empty-state">Click "Analyze Logins" to view failed login attempts.</div>
+    </div>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Counter Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

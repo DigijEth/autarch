@@ -1,0 +1,11 @@
+{
+  "active": true,
+  "tier": 2,
+  "protections": {
+    "private_dns": "adguard",
+    "ad_opt_out": true,
+    "location_accuracy": true,
+    "diagnostics": true
+  },
+  "activated_at": "2026-02-21T02:55:28.439016"
+}

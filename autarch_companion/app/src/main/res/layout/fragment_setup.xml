@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ARCHON SETUP"
+            android:textColor="@color/terminal_green"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Privilege Status -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <View
+                android:id="@+id/privilege_status_dot"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/privilege_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Checking privileges..."
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <!-- ═══ STEP 1: Wireless Debugging (Shizuku-style) ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green"
+            app:strokeWidth="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STEP 1: Wireless Debugging"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Self-contained ADB — no PC needed"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1. Tap START PAIRING below\n2. A notification will appear\n3. Open Developer Options > Wireless Debugging\n4. Tap 'Pair with pairing code'\n5. Enter the code in Archon's notification"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="4dp"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_start_pairing"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="START PAIRING"
+                    android:textColor="@color/background"
+                    android:textSize="16sp"
+                    style="@style/Widget.Material3.Button"
+                    app:backgroundTint="@color/terminal_green" />
+
+                <TextView
+                    android:id="@+id/local_adb_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: not paired"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ STEP 2: Archon Server ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STEP 2: Archon Server"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Shell-level server (UID 2000) via app_process"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Status -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+
+                    <View
+                        android:id="@+id/archon_server_status_dot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:id="@+id/archon_server_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Status: checking..."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Modules (Shield, Honeypot, RevShell) run through\nthe Archon Server on localhost:17321."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Server buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_start_archon_server"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="START SERVER"
+                        android:textColor="@color/background"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_stop_archon_server"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="STOP SERVER"
+                        android:textColor="@color/text_primary"
+                        android:layout_marginStart="8dp"
+                        android:enabled="false"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        app:strokeColor="@color/danger" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_show_command"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="SHOW ADB COMMAND"
+                    android:textSize="11sp"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    app:backgroundTint="@color/terminal_green_dim" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ ALT: USB via AUTARCH ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ALT: USB via AUTARCH"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Connect phone to AUTARCH via USB cable"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/server_adb_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Server: not configured"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_bootstrap_usb"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="BOOTSTRAP VIA USB"
+                    android:textColor="@color/background"
+                    style="@style/Widget.Material3.Button"
+                    app:backgroundTint="@color/terminal_green" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ ALT: Root Access ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ALT: Root Access"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace" />
+
+                <TextView
+                    android:id="@+id/root_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Status: checking..."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_check_root"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="CHECK ROOT"
+                        android:textColor="@color/background"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/terminal_green_dim" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_root_exploit"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="ROOT VIA EXPLOIT"
+                        android:textColor="@color/background"
+                        android:layout_marginStart="8dp"
+                        style="@style/Widget.Material3.Button"
+                        app:backgroundTint="@color/warning" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ═══ Output Log ═══ -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Output Log:"
+                    android:textColor="@color/terminal_green_dim"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/setup_output_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="> ready_"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp"
+                    android:minLines="5" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>

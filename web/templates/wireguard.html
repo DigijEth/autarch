@@ -1,0 +1,665 @@
+{% extends "base.html" %}
+{% block title %}WireGuard - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>WireGuard VPN Manager</h1>
+</div>
+
+<!-- Status Cards -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="stat-card">
+        <div class="stat-label">Interface</div>
+        <div class="stat-value small">
+            <span id="wg-status-dot" class="status-dot inactive"></span>
+            <span id="wg-status-text">Checking...</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Endpoint</div>
+        <div class="stat-value small" id="wg-endpoint">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Clients</div>
+        <div class="stat-value small">
+            <span id="wg-client-count">0</span> total,
+            <span id="wg-online-count">0</span> online
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">USB/IP</div>
+        <div class="stat-value small">
+            <span id="wg-usbip-dot" class="status-dot {{ 'active' if usbip_status.available else 'inactive' }}"></span>
+            {{ 'Available' if usbip_status.available else 'Not found' }}
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="wg-main" data-tab="dashboard" onclick="showTab('wg-main','dashboard')">Dashboard</button>
+    <button class="tab" data-tab-group="wg-main" data-tab="clients" onclick="showTab('wg-main','clients')">Clients</button>
+    <button class="tab" data-tab-group="wg-main" data-tab="adb" onclick="showTab('wg-main','adb')">Remote ADB</button>
+    <button class="tab" data-tab-group="wg-main" data-tab="settings" onclick="showTab('wg-main','settings')">Settings</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- DASHBOARD TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" data-tab-group="wg-main" data-tab="dashboard">
+    <div class="section">
+        <h2>Server Controls</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="wgStartInterface()">Start</button>
+            <button class="btn" onclick="wgStopInterface()">Stop</button>
+            <button class="btn" onclick="wgRestartInterface()">Restart</button>
+            <button class="btn" onclick="wgServerStatus()">Refresh Status</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Server Info</h2>
+        <table class="data-table" id="wg-server-info">
+            <tbody>
+                <tr><td>Interface</td><td id="wg-si-iface">-</td></tr>
+                <tr><td>Status</td><td id="wg-si-status">-</td></tr>
+                <tr><td>Public Key</td><td id="wg-si-pubkey" style="word-break:break-all">-</td></tr>
+                <tr><td>Endpoint</td><td id="wg-si-endpoint">-</td></tr>
+                <tr><td>Listen Port</td><td id="wg-si-port">-</td></tr>
+                <tr><td>Active Peers</td><td id="wg-si-peers">-</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Recent Peers</h2>
+        <div id="wg-peers-table" style="overflow-x:auto">
+            <span class="text-muted">Loading...</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="wg-dashboard-results" class="output-box" style="min-height:60px;max-height:300px;overflow-y:auto">
+            <span class="text-muted">Server status will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- CLIENTS TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="wg-main" data-tab="clients">
+    <div class="section">
+        <h2>Create Client</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <div>
+                <label>Name</label>
+                <input id="wg-new-name" type="text" class="input" placeholder="client-name" style="width:180px">
+            </div>
+            <div>
+                <label>DNS <small>(optional)</small></label>
+                <input id="wg-new-dns" type="text" class="input" placeholder="1.1.1.1, 8.8.8.8" style="width:180px">
+            </div>
+            <div>
+                <label>Allowed IPs <small>(optional)</small></label>
+                <input id="wg-new-allowed" type="text" class="input" placeholder="0.0.0.0/0, ::/0" style="width:200px">
+            </div>
+            <button class="btn btn-primary" onclick="wgCreateClient()">Create</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Clients</h2>
+        <div style="margin-bottom:8px">
+            <button class="btn btn-sm" onclick="wgRefreshClients()">Refresh</button>
+        </div>
+        <div id="wg-clients-table" style="overflow-x:auto">
+            <span class="text-muted">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Client Detail Modal Area -->
+    <div id="wg-client-detail" class="section" style="display:none">
+        <h2>Client Detail: <span id="wg-detail-name"></span></h2>
+        <div id="wg-detail-content"></div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="wg-clients-results" class="output-box" style="min-height:60px;max-height:300px;overflow-y:auto">
+            <span class="text-muted">Client operations will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- REMOTE ADB TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="wg-main" data-tab="adb">
+    <!-- TCP/IP Section -->
+    <div class="section">
+        <h2>ADB over TCP/IP</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <div>
+                <label>Client IP</label>
+                <select id="wg-adb-ip" class="input" style="width:200px">
+                    <option value="">Select client...</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="wgAdbConnect()">Connect</button>
+            <button class="btn" onclick="wgAdbDisconnect()">Disconnect</button>
+            <button class="btn" onclick="wgAdbAutoConnect()">Auto-Connect All</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Connected ADB Devices</h2>
+        <div style="margin-bottom:8px">
+            <button class="btn btn-sm" onclick="wgAdbDevices()">Refresh</button>
+        </div>
+        <div id="wg-adb-devices" style="overflow-x:auto">
+            <span class="text-muted">Click Refresh to list connected devices.</span>
+        </div>
+    </div>
+
+    <!-- USB/IP Section -->
+    <div class="section">
+        <h2>USB/IP</h2>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">
+            <div class="stat-card">
+                <div class="stat-label">vhci-hcd Module</div>
+                <div class="stat-value small">
+                    <span id="wg-vhci-dot" class="status-dot inactive"></span>
+                    <span id="wg-vhci-text">Unknown</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Imports</div>
+                <div class="stat-value small" id="wg-usbip-imports">0</div>
+            </div>
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button class="btn" onclick="wgUsbipStatus()">Refresh Status</button>
+            <button class="btn" onclick="wgUsbipLoadModules()">Load Modules</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Remote USB Devices</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px">
+            <div>
+                <label>Client IP</label>
+                <select id="wg-usbip-ip" class="input" style="width:200px">
+                    <option value="">Select client...</option>
+                </select>
+            </div>
+            <button class="btn" onclick="wgUsbipListRemote()">List Devices</button>
+        </div>
+        <div id="wg-usbip-remote-devices">
+            <span class="text-muted">Select a client and list devices.</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Attached Ports</h2>
+        <div style="margin-bottom:8px">
+            <button class="btn btn-sm" onclick="wgUsbipPorts()">Refresh</button>
+        </div>
+        <div id="wg-usbip-ports">
+            <span class="text-muted">No attached ports.</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="wg-adb-results" class="output-box" style="min-height:60px;max-height:300px;overflow-y:auto">
+            <span class="text-muted">ADB/USB/IP operations will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SETTINGS TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="wg-main" data-tab="settings">
+    <div class="section">
+        <h2>Server Configuration</h2>
+        <table class="data-table">
+            <tbody>
+                <tr><td>WG Binary</td><td>{{ 'Found' if wg_available else 'Not found' }}</td></tr>
+                <tr><td>USB/IP Binary</td><td>{{ 'Found' if usbip_status.available else 'Not found' }}</td></tr>
+                <tr><td>vhci-hcd Module</td><td>{{ 'Loaded' if usbip_status.modules_loaded else 'Not loaded' }}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>Actions</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="wgImportPeers()">Import Existing Peers</button>
+            <button class="btn" onclick="wgRefreshUpnp()">Refresh UPnP Mapping</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="wg-settings-results" class="output-box" style="min-height:60px;max-height:300px;overflow-y:auto">
+            <span class="text-muted">Settings actions will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── WireGuard JS ── */
+var wgClients = [];
+
+function wgPost(url, body) {
+    return fetch('/wireguard' + url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body || {})
+    }).then(function(r) { return r.json(); });
+}
+
+function wgResult(boxId, html) {
+    document.getElementById(boxId).innerHTML = html;
+}
+
+function wgOk(msg) { return '<p style="color:#27ae60">' + msg + '</p>'; }
+function wgErr(msg) { return '<span style="color:#e74c3c">' + msg + '</span>'; }
+
+/* ── Dashboard ── */
+function wgServerStatus() {
+    wgPost('/server/status').then(function(data) {
+        var running = data.running || false;
+        document.getElementById('wg-status-dot').className = 'status-dot ' + (running ? 'active' : 'inactive');
+        document.getElementById('wg-status-text').textContent = running ? 'Running' : 'Stopped';
+        document.getElementById('wg-endpoint').textContent = data.endpoint || '-';
+
+        document.getElementById('wg-si-iface').textContent = data.interface || 'wg0';
+        document.getElementById('wg-si-status').innerHTML = running
+            ? '<span style="color:#27ae60">Running</span>'
+            : '<span style="color:#e74c3c">Stopped</span>';
+        document.getElementById('wg-si-pubkey').textContent = data.public_key || '-';
+        document.getElementById('wg-si-endpoint').textContent = data.endpoint || '-';
+        document.getElementById('wg-si-port').textContent = data.listen_port || '-';
+        document.getElementById('wg-si-peers').textContent = data.peer_count || '0';
+
+        if (data.error) {
+            wgResult('wg-dashboard-results', wgErr(data.error));
+        } else {
+            wgResult('wg-dashboard-results', wgOk('Server status refreshed.'));
+        }
+    });
+}
+
+function wgStartInterface() {
+    wgResult('wg-dashboard-results', '<span class="text-muted">Starting...</span>');
+    wgPost('/server/start').then(function(data) {
+        wgResult('wg-dashboard-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgServerStatus();
+    });
+}
+
+function wgStopInterface() {
+    wgResult('wg-dashboard-results', '<span class="text-muted">Stopping...</span>');
+    wgPost('/server/stop').then(function(data) {
+        wgResult('wg-dashboard-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgServerStatus();
+    });
+}
+
+function wgRestartInterface() {
+    wgResult('wg-dashboard-results', '<span class="text-muted">Restarting...</span>');
+    wgPost('/server/restart').then(function(data) {
+        wgResult('wg-dashboard-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgServerStatus();
+    });
+}
+
+function wgRefreshPeers() {
+    wgPost('/clients/list').then(function(data) {
+        wgClients = data.clients || [];
+        var online = 0;
+        wgClients.forEach(function(c) { if (c.online) online++; });
+        document.getElementById('wg-client-count').textContent = wgClients.length;
+        document.getElementById('wg-online-count').textContent = online;
+        wgPopulateIpDropdowns();
+        wgRenderPeersTable();
+    });
+}
+
+function wgRenderPeersTable() {
+    var el = document.getElementById('wg-peers-table');
+    if (!wgClients.length) {
+        el.innerHTML = '<span class="text-muted">No clients configured.</span>';
+        return;
+    }
+    var h = '<table class="data-table"><thead><tr><th>Name</th><th>IP</th><th>Status</th><th>Last Handshake</th><th>RX / TX</th></tr></thead><tbody>';
+    wgClients.forEach(function(c) {
+        var ps = c.peer_status || {};
+        var hs = ps.latest_handshake;
+        var status, color;
+        if (!c.enabled) { status = 'disabled'; color = '#888'; }
+        else if (hs !== null && hs !== undefined && hs < 180) { status = 'online'; color = '#27ae60'; }
+        else if (hs !== null && hs !== undefined) { status = 'idle'; color = '#e67e22'; }
+        else { status = 'offline'; color = '#888'; }
+        var rx = ps.transfer_rx_str || '-';
+        var tx = ps.transfer_tx_str || '-';
+        var hsStr = ps.latest_handshake_str || 'never';
+        h += '<tr>';
+        h += '<td>' + c.name + '</td>';
+        h += '<td><code>' + c.assigned_ip + '</code></td>';
+        h += '<td><span class="status-dot" style="background:' + color + '"></span> ' + status + '</td>';
+        h += '<td>' + hsStr + '</td>';
+        h += '<td>' + rx + ' / ' + tx + '</td>';
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    el.innerHTML = h;
+}
+
+function wgPopulateIpDropdowns() {
+    var selects = ['wg-adb-ip', 'wg-usbip-ip'];
+    selects.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var val = el.value;
+        var opts = '<option value="">Select client...</option>';
+        wgClients.forEach(function(c) {
+            var online = c.online ? ' (online)' : '';
+            opts += '<option value="' + c.assigned_ip + '">' + c.name + ' - ' + c.assigned_ip + online + '</option>';
+        });
+        el.innerHTML = opts;
+        if (val) el.value = val;
+    });
+}
+
+/* ── Clients ── */
+function wgRefreshClients() {
+    wgPost('/clients/list').then(function(data) {
+        wgClients = data.clients || [];
+        wgPopulateIpDropdowns();
+        wgRenderClientsTable();
+    });
+}
+
+function wgRenderClientsTable() {
+    var el = document.getElementById('wg-clients-table');
+    if (!wgClients.length) {
+        el.innerHTML = '<span class="text-muted">No clients configured. Create one above.</span>';
+        return;
+    }
+    var h = '<table class="data-table"><thead><tr><th>Name</th><th>IP</th><th>Status</th><th>Handshake</th><th>Transfer</th><th>Actions</th></tr></thead><tbody>';
+    wgClients.forEach(function(c) {
+        var ps = c.peer_status || {};
+        var hs = ps.latest_handshake;
+        var status, color;
+        if (!c.enabled) { status = 'disabled'; color = '#888'; }
+        else if (hs !== null && hs !== undefined && hs < 180) { status = 'online'; color = '#27ae60'; }
+        else if (hs !== null && hs !== undefined) { status = 'idle'; color = '#e67e22'; }
+        else { status = 'offline'; color = '#888'; }
+        var rx = ps.transfer_rx_str || '-';
+        var tx = ps.transfer_tx_str || '-';
+        var hsStr = ps.latest_handshake_str || 'never';
+        h += '<tr>';
+        h += '<td>' + c.name + '</td>';
+        h += '<td><code>' + c.assigned_ip + '</code></td>';
+        h += '<td><span class="status-dot" style="background:' + color + '"></span> ' + status + '</td>';
+        h += '<td>' + hsStr + '</td>';
+        h += '<td>' + rx + ' / ' + tx + '</td>';
+        h += '<td style="white-space:nowrap">';
+        h += '<button class="btn btn-sm" onclick="wgViewClient(\'' + c.id + '\')">View</button> ';
+        h += '<button class="btn btn-sm" onclick="wgToggleClient(\'' + c.id + '\',' + (!c.enabled) + ')">' + (c.enabled ? 'Disable' : 'Enable') + '</button> ';
+        h += '<button class="btn btn-sm btn-danger" onclick="wgDeleteClient(\'' + c.id + '\',\'' + c.name + '\')">Delete</button>';
+        h += '</td>';
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    el.innerHTML = h;
+}
+
+function wgCreateClient() {
+    var name = document.getElementById('wg-new-name').value.trim();
+    if (!name) { alert('Enter a client name'); return; }
+    var dns = document.getElementById('wg-new-dns').value.trim();
+    var allowed = document.getElementById('wg-new-allowed').value.trim();
+    wgResult('wg-clients-results', '<span class="text-muted">Creating client...</span>');
+    wgPost('/clients/create', {name: name, dns: dns, allowed_ips: allowed}).then(function(data) {
+        if (data.ok) {
+            var c = data.client;
+            wgResult('wg-clients-results', wgOk('Created: ' + c.name + ' (' + c.assigned_ip + ')'));
+            document.getElementById('wg-new-name').value = '';
+            wgRefreshClients();
+        } else {
+            wgResult('wg-clients-results', wgErr(data.error || 'Failed'));
+        }
+    });
+}
+
+function wgViewClient(id) {
+    wgPost('/clients/' + id).then(function(data) {
+        if (data.error) { wgResult('wg-clients-results', wgErr(data.error)); return; }
+        var el = document.getElementById('wg-client-detail');
+        el.style.display = 'block';
+        document.getElementById('wg-detail-name').textContent = data.name;
+        var ps = data.peer_status || {};
+        var h = '<table class="data-table"><tbody>';
+        h += '<tr><td>ID</td><td><code>' + data.id + '</code></td></tr>';
+        h += '<tr><td>IP</td><td><code>' + data.assigned_ip + '</code></td></tr>';
+        h += '<tr><td>Public Key</td><td style="word-break:break-all"><code>' + data.public_key + '</code></td></tr>';
+        h += '<tr><td>PSK</td><td>' + (data.preshared_key ? 'Yes' : 'No') + '</td></tr>';
+        h += '<tr><td>DNS</td><td>' + (data.dns || 'default') + '</td></tr>';
+        h += '<tr><td>Allowed IPs</td><td>' + (data.allowed_ips || 'default') + '</td></tr>';
+        h += '<tr><td>Enabled</td><td>' + (data.enabled ? '<span style="color:#27ae60">Yes</span>' : '<span style="color:#e74c3c">No</span>') + '</td></tr>';
+        h += '<tr><td>Created</td><td>' + (data.created_at || 'N/A') + '</td></tr>';
+        if (ps.latest_handshake_str) h += '<tr><td>Last Handshake</td><td>' + ps.latest_handshake_str + '</td></tr>';
+        if (ps.endpoint) h += '<tr><td>Endpoint</td><td>' + ps.endpoint + '</td></tr>';
+        if (ps.transfer_rx_str) h += '<tr><td>Transfer</td><td>RX: ' + ps.transfer_rx_str + ' / TX: ' + ps.transfer_tx_str + '</td></tr>';
+        h += '</tbody></table>';
+        h += '<div style="margin-top:10px;display:flex;gap:8px">';
+        h += '<button class="btn btn-sm" onclick="wgShowConfig(\'' + data.id + '\')">Show Config</button>';
+        h += '<a class="btn btn-sm" href="/wireguard/clients/' + data.id + '/download" target="_blank">Download .conf</a>';
+        h += '<a class="btn btn-sm" href="/wireguard/clients/' + data.id + '/qr" target="_blank">QR Code</a>';
+        h += '<button class="btn btn-sm" onclick="document.getElementById(\'wg-client-detail\').style.display=\'none\'">Close</button>';
+        h += '</div>';
+        h += '<div id="wg-config-box" style="display:none;margin-top:10px"></div>';
+        document.getElementById('wg-detail-content').innerHTML = h;
+    });
+}
+
+function wgShowConfig(id) {
+    wgPost('/clients/' + id + '/config').then(function(data) {
+        if (data.error) return;
+        var box = document.getElementById('wg-config-box');
+        box.style.display = 'block';
+        box.innerHTML = '<h4>Config: ' + data.name + '</h4>'
+            + '<pre style="background:var(--bg-darker);padding:10px;border-radius:4px;overflow-x:auto;user-select:all">' + data.config + '</pre>'
+            + '<button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.querySelector(\'#wg-config-box pre\').textContent)">Copy</button>';
+    });
+}
+
+function wgToggleClient(id, enabled) {
+    wgPost('/clients/' + id + '/toggle', {enabled: enabled}).then(function(data) {
+        wgResult('wg-clients-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgRefreshClients();
+    });
+}
+
+function wgDeleteClient(id, name) {
+    if (!confirm('Delete client "' + name + '"? This cannot be undone.')) return;
+    wgPost('/clients/' + id + '/delete').then(function(data) {
+        wgResult('wg-clients-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        document.getElementById('wg-client-detail').style.display = 'none';
+        wgRefreshClients();
+    });
+}
+
+/* ── Remote ADB ── */
+function wgAdbConnect() {
+    var ip = document.getElementById('wg-adb-ip').value;
+    if (!ip) { alert('Select a client'); return; }
+    wgResult('wg-adb-results', '<span class="text-muted">Connecting to ' + ip + ':5555...</span>');
+    wgPost('/adb/connect', {ip: ip}).then(function(data) {
+        wgResult('wg-adb-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgAdbDevices();
+    });
+}
+
+function wgAdbDisconnect() {
+    var ip = document.getElementById('wg-adb-ip').value;
+    if (!ip) { alert('Select a client'); return; }
+    wgPost('/adb/disconnect', {ip: ip}).then(function(data) {
+        wgResult('wg-adb-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgAdbDevices();
+    });
+}
+
+function wgAdbAutoConnect() {
+    wgResult('wg-adb-results', '<span class="text-muted">Auto-connecting to active peers...</span>');
+    wgPost('/adb/auto-connect').then(function(data) {
+        var results = data.results || [];
+        if (!results.length) {
+            wgResult('wg-adb-results', '<span class="text-muted">No active peers found.</span>');
+            return;
+        }
+        var h = '<h4>Auto-Connect Results</h4>';
+        results.forEach(function(r) {
+            var ok = r.result && r.result.ok;
+            h += '<div>' + (ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[FAIL]</span>');
+            h += ' ' + r.name + ' (' + r.ip + '): ' + (r.result.message || r.result.error || '') + '</div>';
+        });
+        wgResult('wg-adb-results', h);
+        wgAdbDevices();
+    });
+}
+
+function wgAdbDevices() {
+    wgPost('/adb/devices').then(function(data) {
+        var devices = data.devices || [];
+        var el = document.getElementById('wg-adb-devices');
+        if (!devices.length) {
+            el.innerHTML = '<span class="text-muted">No remote ADB devices connected via WireGuard.</span>';
+            return;
+        }
+        var h = '<table class="data-table"><thead><tr><th>Serial</th><th>State</th><th>Model</th></tr></thead><tbody>';
+        devices.forEach(function(d) {
+            h += '<tr><td><code>' + d.serial + '</code></td><td>' + d.state + '</td><td>' + (d.model || '-') + '</td></tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    });
+}
+
+/* ── USB/IP ── */
+function wgUsbipStatus() {
+    wgPost('/usbip/status').then(function(data) {
+        var dot = document.getElementById('wg-vhci-dot');
+        var txt = document.getElementById('wg-vhci-text');
+        dot.className = 'status-dot ' + (data.modules_loaded ? 'active' : 'inactive');
+        txt.textContent = data.modules_loaded ? 'Loaded' : 'Not loaded';
+        document.getElementById('wg-usbip-imports').textContent = data.active_imports || '0';
+        wgUsbipPorts();
+    });
+}
+
+function wgUsbipLoadModules() {
+    wgPost('/usbip/load-modules').then(function(data) {
+        wgResult('wg-adb-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgUsbipStatus();
+    });
+}
+
+function wgUsbipListRemote() {
+    var ip = document.getElementById('wg-usbip-ip').value;
+    if (!ip) { alert('Select a client'); return; }
+    var el = document.getElementById('wg-usbip-remote-devices');
+    el.innerHTML = '<span class="text-muted">Listing devices on ' + ip + '...</span>';
+    wgPost('/usbip/list-remote', {ip: ip}).then(function(data) {
+        if (!data.ok) {
+            el.innerHTML = wgErr(data.error || 'Failed');
+            return;
+        }
+        var devices = data.devices || [];
+        if (!devices.length) {
+            el.innerHTML = '<span class="text-muted">No exportable USB devices found.</span>';
+            return;
+        }
+        var h = '<table class="data-table"><thead><tr><th>Bus ID</th><th>Description</th><th>Action</th></tr></thead><tbody>';
+        devices.forEach(function(d) {
+            h += '<tr>';
+            h += '<td><code>' + d.busid + '</code></td>';
+            h += '<td>' + d.description + '</td>';
+            h += '<td><button class="btn btn-sm btn-primary" onclick="wgUsbipAttach(\'' + ip + '\',\'' + d.busid + '\')">Attach</button></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    });
+}
+
+function wgUsbipAttach(ip, busid) {
+    wgResult('wg-adb-results', '<span class="text-muted">Attaching ' + busid + ' from ' + ip + '...</span>');
+    wgPost('/usbip/attach', {ip: ip, busid: busid}).then(function(data) {
+        wgResult('wg-adb-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgUsbipPorts();
+    });
+}
+
+function wgUsbipDetach(port) {
+    wgPost('/usbip/detach', {port: port}).then(function(data) {
+        wgResult('wg-adb-results', data.ok ? wgOk(data.message) : wgErr(data.error || 'Failed'));
+        wgUsbipPorts();
+    });
+}
+
+function wgUsbipPorts() {
+    wgPost('/usbip/ports').then(function(data) {
+        var el = document.getElementById('wg-usbip-ports');
+        var ports = data.ports || [];
+        if (!ports.length) {
+            el.innerHTML = '<span class="text-muted">No attached USB/IP ports.</span>';
+            return;
+        }
+        var h = '<table class="data-table"><thead><tr><th>Port</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        ports.forEach(function(p) {
+            h += '<tr>';
+            h += '<td>' + p.port + '</td>';
+            h += '<td>' + p.status + (p.detail ? ' - ' + p.detail : '') + '</td>';
+            h += '<td><button class="btn btn-sm btn-danger" onclick="wgUsbipDetach(\'' + p.port + '\')">Detach</button></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    });
+}
+
+/* ── Settings ── */
+function wgImportPeers() {
+    wgResult('wg-settings-results', '<span class="text-muted">Importing peers from wg0.conf...</span>');
+    wgPost('/clients/import').then(function(data) {
+        if (data.ok) {
+            wgResult('wg-settings-results', wgOk('Imported ' + data.imported + ' peers.'));
+            wgRefreshClients();
+            wgRefreshPeers();
+        } else {
+            wgResult('wg-settings-results', wgErr(data.error || 'Failed'));
+        }
+    });
+}
+
+function wgRefreshUpnp() {
+    wgResult('wg-settings-results', '<span class="text-muted">Refreshing UPnP mapping...</span>');
+    wgPost('/upnp/refresh').then(function(data) {
+        wgResult('wg-settings-results', data.ok ? wgOk('UPnP mapping refreshed.') : wgErr(data.error || 'Failed'));
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    wgServerStatus();
+    wgRefreshPeers();
+});
+</script>
+{% endblock %}

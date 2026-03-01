@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}Targets - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Targets</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Manage scope — IPs, CIDRs, domains, and URLs for your engagement.
+        </p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn btn-sm btn-primary" onclick="toggleAddForm()">+ Add Target</button>
+        <button class="btn btn-sm" onclick="exportTargets()">Export JSON</button>
+        <label class="btn btn-sm" style="cursor:pointer" title="Import targets from JSON file">
+            Import JSON
+            <input type="file" accept=".json" style="display:none" onchange="importTargets(this)">
+        </label>
+    </div>
+</div>
+
+<!-- Add Target Form -->
+<div id="add-form" class="section" style="display:none">
+    <h2>Add Target</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem 1rem">
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-host">Host / IP / CIDR <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="add-host" placeholder="192.168.1.1 or example.com">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-name">Name / Label</label>
+            <input type="text" id="add-name" placeholder="Corp Web Server">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-type">Type</label>
+            <select id="add-type">
+                <option value="ip">IP Address</option>
+                <option value="cidr">CIDR / Range</option>
+                <option value="domain">Domain</option>
+                <option value="url">URL</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-os">OS</label>
+            <select id="add-os">
+                <option>Unknown</option>
+                <option>Linux</option>
+                <option>Windows</option>
+                <option>macOS</option>
+                <option>Android</option>
+                <option>iOS</option>
+                <option>Network Device</option>
+                <option>Other</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-status">Status</label>
+            <select id="add-status">
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="out-of-scope">Out of Scope</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-ports">Known Ports</label>
+            <input type="text" id="add-ports" placeholder="22,80,443,8080">
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1rem;margin-top:0.75rem">
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-tags">Tags (comma-separated)</label>
+            <input type="text" id="add-tags" placeholder="web, internal, critical">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label for="add-notes">Notes</label>
+            <input type="text" id="add-notes" placeholder="Brief notes about this target">
+        </div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1rem">
+        <button class="btn btn-primary" onclick="addTarget()">Add Target</button>
+        <button class="btn btn-sm" onclick="toggleAddForm()">Cancel</button>
+        <span id="add-status-msg" style="font-size:0.82rem;color:var(--text-secondary);align-self:center"></span>
+    </div>
+</div>
+
+<!-- Filter / Search -->
+<div class="section" style="padding:0.6rem 1rem">
+    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+        <input type="text" id="filter-input" placeholder="Filter by host, name, tag…"
+               oninput="filterTargets()" style="flex:1;max-width:320px">
+        <select id="filter-status" onchange="filterTargets()" style="width:150px">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="out-of-scope">Out of Scope</option>
+        </select>
+        <select id="filter-type" onchange="filterTargets()" style="width:140px">
+            <option value="">All Types</option>
+            <option value="ip">IP</option>
+            <option value="cidr">CIDR</option>
+            <option value="domain">Domain</option>
+            <option value="url">URL</option>
+        </select>
+        <span id="filter-count" style="font-size:0.8rem;color:var(--text-secondary)"></span>
+    </div>
+</div>
+
+<!-- Targets Table -->
+<div class="section" style="padding:0">
+    <div style="overflow-x:auto">
+        <table id="targets-table" style="width:100%;border-collapse:collapse;font-size:0.85rem">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border)">
+                    <th style="padding:0.6rem 1rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">#</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Host</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Name</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Type</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">OS</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Status</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Ports</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:left;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Tags</th>
+                    <th style="padding:0.6rem 0.75rem;text-align:right;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary)">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="targets-body">
+                {% if targets %}
+                    {% for t in targets %}
+                    <tr class="target-row" data-id="{{ t.id }}"
+                        data-host="{{ t.host }}" data-name="{{ t.name }}"
+                        data-type="{{ t.type }}" data-status="{{ t.status }}"
+                        data-tags="{{ t.tags | join(',') }}"
+                        style="border-bottom:1px solid var(--border)">
+                        <td style="padding:0.55rem 1rem;color:var(--text-muted);font-size:0.75rem">{{ loop.index }}</td>
+                        <td style="padding:0.55rem 0.75rem;font-family:monospace;font-weight:600">{{ t.host }}</td>
+                        <td style="padding:0.55rem 0.75rem;color:var(--text-secondary)">{{ t.name if t.name != t.host else '' }}</td>
+                        <td style="padding:0.55rem 0.75rem"><span class="type-badge type-{{ t.type }}">{{ t.type }}</span></td>
+                        <td style="padding:0.55rem 0.75rem;color:var(--text-secondary);font-size:0.8rem">{{ t.os }}</td>
+                        <td style="padding:0.55rem 0.75rem">
+                            <span class="status-badge status-{{ t.status | replace('-','_') }}"
+                                  onclick="cycleStatus('{{ t.id }}', this)"
+                                  title="Click to cycle status" style="cursor:pointer">{{ t.status }}</span>
+                        </td>
+                        <td style="padding:0.55rem 0.75rem;font-family:monospace;font-size:0.78rem;color:var(--text-secondary)">{{ t.ports or '—' }}</td>
+                        <td style="padding:0.55rem 0.75rem">
+                            {% for tag in t.tags %}<span class="tag-chip">{{ tag }}</span>{% endfor %}
+                        </td>
+                        <td style="padding:0.55rem 0.75rem;text-align:right;white-space:nowrap">
+                            <button class="btn btn-xs" onclick="copyHost('{{ t.host }}')" title="Copy host">&#x2398;</button>
+                            <a href="/osint?target={{ t.host | urlencode }}" class="btn btn-xs" title="OSINT scan">&#x1F50D;</a>
+                            <button class="btn btn-xs" onclick="toggleEdit('{{ t.id }}')" title="Edit">&#x270E;</button>
+                            <button class="btn btn-xs btn-danger" onclick="deleteTarget('{{ t.id }}')" title="Delete">&#x2715;</button>
+                        </td>
+                    </tr>
+                    <!-- Edit row (hidden) -->
+                    <tr id="edit-{{ t.id }}" style="display:none;background:var(--bg-card)">
+                        <td colspan="9" style="padding:0.75rem 1rem;border-bottom:2px solid var(--accent)">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.5rem 0.75rem">
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">Host</label>
+                                    <input type="text" id="e-host-{{ t.id }}" value="{{ t.host }}">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">Name</label>
+                                    <input type="text" id="e-name-{{ t.id }}" value="{{ t.name }}">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">Type</label>
+                                    <select id="e-type-{{ t.id }}">
+                                        <option value="ip" {{ 'selected' if t.type=='ip' }}>IP</option>
+                                        <option value="cidr" {{ 'selected' if t.type=='cidr' }}>CIDR</option>
+                                        <option value="domain" {{ 'selected' if t.type=='domain' }}>Domain</option>
+                                        <option value="url" {{ 'selected' if t.type=='url' }}>URL</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">OS</label>
+                                    <select id="e-os-{{ t.id }}">
+                                        {% for os in ['Unknown','Linux','Windows','macOS','Android','iOS','Network Device','Other'] %}
+                                        <option {{ 'selected' if t.os==os }}>{{ os }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">Status</label>
+                                    <select id="e-status-{{ t.id }}">
+                                        {% for s in ['active','pending','completed','out-of-scope'] %}
+                                        <option value="{{ s }}" {{ 'selected' if t.status==s }}>{{ s }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label style="font-size:0.72rem">Ports</label>
+                                    <input type="text" id="e-ports-{{ t.id }}" value="{{ t.ports }}">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;grid-column:span 2">
+                                    <label style="font-size:0.72rem">Tags (comma-separated)</label>
+                                    <input type="text" id="e-tags-{{ t.id }}" value="{{ t.tags | join(', ') }}">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;grid-column:span 2">
+                                    <label style="font-size:0.72rem">Notes</label>
+                                    <input type="text" id="e-notes-{{ t.id }}" value="{{ t.notes }}">
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:0.5rem;margin-top:0.6rem">
+                                <button class="btn btn-primary btn-sm" onclick="saveEdit('{{ t.id }}')">Save</button>
+                                <button class="btn btn-sm" onclick="toggleEdit('{{ t.id }}')">Cancel</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr id="empty-row">
+                        <td colspan="9" style="padding:2rem;text-align:center;color:var(--text-muted)">
+                            No targets yet — click <strong>+ Add Target</strong> to add your first one.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+/* Status badges */
+.status-badge {
+    display:inline-block; padding:2px 8px; border-radius:10px;
+    font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;
+}
+.status-active      { background:rgba(52,199,89,0.15);  color:#34c759; border:1px solid rgba(52,199,89,0.3); }
+.status-pending     { background:rgba(255,159,10,0.15); color:#ff9f0a; border:1px solid rgba(255,159,10,0.3); }
+.status-completed   { background:rgba(10,132,255,0.15); color:#0a84ff; border:1px solid rgba(10,132,255,0.3); }
+.status-out_of_scope{ background:rgba(142,142,147,0.15);color:#8e8e93; border:1px solid rgba(142,142,147,0.3); }
+/* Type badges */
+.type-badge {
+    display:inline-block; padding:1px 6px; border-radius:3px;
+    font-size:0.7rem; font-weight:600; text-transform:uppercase;
+}
+.type-ip     { background:#1a3a6e; color:#5ac8fa; }
+.type-cidr   { background:#3a1a6e; color:#bf5af2; }
+.type-domain { background:#1a6e2e; color:#30d158; }
+.type-url    { background:#6e3a1a; color:#ff9f0a; }
+/* Tags */
+.tag-chip {
+    display:inline-block; margin:1px 2px; padding:1px 6px;
+    background:rgba(var(--accent-rgb,10,132,255),0.12);
+    color:var(--accent); border-radius:3px;
+    font-size:0.7rem; font-weight:500;
+}
+/* Micro button */
+.btn-xs {
+    padding:2px 7px; font-size:0.75rem; border-radius:3px;
+    background:var(--bg-input); border:1px solid var(--border);
+    color:var(--text-secondary); cursor:pointer;
+}
+.btn-xs:hover { background:var(--hover); color:var(--text-primary); }
+.btn-xs.btn-danger:hover { background:rgba(255,59,48,0.15); color:#ff3b30; border-color:#ff3b30; }
+/* Row hover */
+.target-row:hover { background:var(--hover); }
+</style>
+
+<script>
+var _targets = {{ targets | tojson }};
+var _STATUS_CYCLE = ['active','pending','completed','out-of-scope'];
+
+// ── Add form toggle ────────────────────────────────────────────────────────────
+function toggleAddForm() {
+    var f = document.getElementById('add-form');
+    f.style.display = f.style.display === 'none' ? '' : 'none';
+    if (f.style.display !== 'none') document.getElementById('add-host').focus();
+}
+
+// ── Add target ────────────────────────────────────────────────────────────────
+function addTarget() {
+    var host = document.getElementById('add-host').value.trim();
+    if (!host) { document.getElementById('add-host').focus(); return; }
+    var msg = document.getElementById('add-status-msg');
+    msg.textContent = 'Saving…';
+
+    fetch('/targets/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host:   host,
+            name:   document.getElementById('add-name').value,
+            type:   document.getElementById('add-type').value,
+            os:     document.getElementById('add-os').value,
+            status: document.getElementById('add-status').value,
+            ports:  document.getElementById('add-ports').value,
+            tags:   document.getElementById('add-tags').value,
+            notes:  document.getElementById('add-notes').value,
+        })
+    }).then(function(r){ return r.json(); })
+    .then(function(d) {
+        if (!d.ok) { msg.textContent = 'Error: ' + d.error; return; }
+        msg.textContent = '✓ Added';
+        // Clear form
+        ['add-host','add-name','add-ports','add-tags','add-notes'].forEach(function(id){
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('add-type').value   = 'ip';
+        document.getElementById('add-os').value     = 'Unknown';
+        document.getElementById('add-status').value = 'active';
+        // Reload page to show new row
+        location.reload();
+    }).catch(function(e){ msg.textContent = 'Error: ' + e.message; });
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+function deleteTarget(id) {
+    if (!confirm('Delete this target?')) return;
+    fetch('/targets/delete/' + id, {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok) { location.reload(); } else { alert(d.error); } });
+}
+
+// ── Edit toggle ────────────────────────────────────────────────────────────────
+function toggleEdit(id) {
+    var row = document.getElementById('edit-' + id);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function saveEdit(id) {
+    fetch('/targets/update/' + id, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host:   document.getElementById('e-host-'  + id).value,
+            name:   document.getElementById('e-name-'  + id).value,
+            type:   document.getElementById('e-type-'  + id).value,
+            os:     document.getElementById('e-os-'    + id).value,
+            status: document.getElementById('e-status-'+ id).value,
+            ports:  document.getElementById('e-ports-' + id).value,
+            tags:   document.getElementById('e-tags-'  + id).value,
+            notes:  document.getElementById('e-notes-' + id).value,
+        })
+    }).then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok) { location.reload(); } else { alert(d.error); } });
+}
+
+// ── Status cycle ───────────────────────────────────────────────────────────────
+function cycleStatus(id, badgeEl) {
+    var cur = badgeEl.textContent.trim();
+    var idx = _STATUS_CYCLE.indexOf(cur);
+    var next = _STATUS_CYCLE[(idx + 1) % _STATUS_CYCLE.length];
+    fetch('/targets/status/' + id, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: next})
+    }).then(function(r){ return r.json(); })
+    .then(function(d){
+        if (!d.ok) { alert(d.error); return; }
+        badgeEl.textContent = next;
+        badgeEl.className = 'status-badge status-' + next.replace('-','_');
+        var row = badgeEl.closest('tr');
+        if (row) row.dataset.status = next;
+        filterTargets();
+    });
+}
+
+// ── Copy host ─────────────────────────────────────────────────────────────────
+function copyHost(host) {
+    navigator.clipboard.writeText(host).then(function(){
+        // brief visual feedback handled by browser
+    });
+}
+
+// ── Filter ─────────────────────────────────────────────────────────────────────
+function filterTargets() {
+    var q      = document.getElementById('filter-input').value.toLowerCase();
+    var status = document.getElementById('filter-status').value;
+    var type   = document.getElementById('filter-type').value;
+    var rows   = document.querySelectorAll('#targets-body .target-row');
+    var shown  = 0;
+    rows.forEach(function(row) {
+        var host  = (row.dataset.host  || '').toLowerCase();
+        var name  = (row.dataset.name  || '').toLowerCase();
+        var tags  = (row.dataset.tags  || '').toLowerCase();
+        var rtype = row.dataset.type  || '';
+        var rstat = row.dataset.status|| '';
+
+        var matchQ = !q || host.includes(q) || name.includes(q) || tags.includes(q);
+        var matchS = !status || rstat === status;
+        var matchT = !type   || rtype === type;
+        var visible = matchQ && matchS && matchT;
+        row.style.display = visible ? '' : 'none';
+        // Hide corresponding edit row too
+        var editRow = document.getElementById('edit-' + row.dataset.id);
+        if (editRow && !visible) editRow.style.display = 'none';
+        if (visible) shown++;
+    });
+    document.getElementById('filter-count').textContent =
+        shown + ' of ' + rows.length + ' targets';
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────────
+function exportTargets() {
+    window.location.href = '/targets/export';
+}
+
+// ── Import ─────────────────────────────────────────────────────────────────────
+function importTargets(input) {
+    var file = input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var data;
+        try { data = JSON.parse(e.target.result); } catch(err) { alert('Invalid JSON: ' + err.message); return; }
+        var targets = Array.isArray(data) ? data : (data.targets || []);
+        fetch('/targets/import', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({targets: targets})
+        }).then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.ok) {
+                alert('Imported ' + d.added + ' new targets (' + d.total + ' total).');
+                location.reload();
+            } else { alert('Import error: ' + d.error); }
+        });
+    };
+    reader.readAsText(file);
+    input.value = '';
+}
+
+// Init filter count on load
+document.addEventListener('DOMContentLoaded', function(){
+    var rows = document.querySelectorAll('#targets-body .target-row');
+    if (rows.length > 0) {
+        document.getElementById('filter-count').textContent = rows.length + ' targets';
+    }
+    // Enter key in add form
+    document.getElementById('add-notes').addEventListener('keypress', function(e){
+        if (e.key === 'Enter') addTarget();
+    });
+});
+</script>
+{% endblock %}

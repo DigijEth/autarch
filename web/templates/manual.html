@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}User Manual — AUTARCH{% endblock %}
+
+{% block extra_head %}
+<style>
+    .manual-content {
+        max-width: 900px;
+        line-height: 1.7;
+        font-size: 15px;
+    }
+    .manual-content h1 { color: #00ff41; font-size: 28px; margin: 30px 0 15px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+    .manual-content h2 { color: #00ff41; font-size: 22px; margin: 28px 0 12px; border-bottom: 1px solid #222; padding-bottom: 6px; }
+    .manual-content h3 { color: #00cc33; font-size: 18px; margin: 22px 0 10px; }
+    .manual-content h4 { color: #00aa22; font-size: 16px; margin: 18px 0 8px; }
+    .manual-content p { margin: 8px 0; color: #ccc; }
+    .manual-content code {
+        background: #1a1a2e;
+        color: #00ff41;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+    }
+    .manual-content pre {
+        background: #0a0a1a;
+        border: 1px solid #333;
+        border-radius: 6px;
+        padding: 14px;
+        overflow-x: auto;
+        margin: 12px 0;
+    }
+    .manual-content pre code {
+        background: transparent;
+        padding: 0;
+        font-size: 13px;
+    }
+    .manual-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0;
+    }
+    .manual-content th {
+        background: #1a1a2e;
+        color: #00ff41;
+        text-align: left;
+        padding: 8px 12px;
+        border: 1px solid #333;
+        font-size: 13px;
+    }
+    .manual-content td {
+        padding: 8px 12px;
+        border: 1px solid #222;
+        color: #ccc;
+        font-size: 13px;
+    }
+    .manual-content tr:nth-child(even) { background: #111122; }
+    .manual-content ul, .manual-content ol { margin: 8px 0; padding-left: 24px; color: #ccc; }
+    .manual-content li { margin: 4px 0; }
+    .manual-content strong { color: #fff; }
+    .manual-content em { color: #aaa; }
+    .manual-content hr { border: none; border-top: 1px solid #333; margin: 24px 0; }
+    .manual-content a { color: #00cc99; text-decoration: none; }
+    .manual-content a:hover { text-decoration: underline; }
+    .manual-content blockquote {
+        border-left: 3px solid #00ff41;
+        margin: 12px 0;
+        padding: 8px 16px;
+        background: #111122;
+        color: #aaa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="manual-content">
+    {{ manual_html }}
+</div>
+{% endblock %}

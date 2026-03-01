@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}UPnP - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>UPnP Port Manager</h1>
+    {% if available %}
+    <form method="POST" action="{{ url_for('upnp.refresh') }}">
+        <button type="submit" class="btn btn-primary">Refresh All</button>
+    </form>
+    {% endif %}
+</div>
+
+{% if not available %}
+<div class="section">
+    <div class="empty-state">
+        <p>upnpc (miniupnpc) is not installed.</p>
+        <p style="margin-top:8px"><code>sudo apt install miniupnpc</code></p>
+    </div>
+</div>
+{% else %}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">External IP</div>
+        <div class="stat-value small">{{ external_ip }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Internal IP</div>
+        <div class="stat-value small">{{ internal_ip }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Configured Ports</div>
+        <div class="stat-value">{{ mappings|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Cron Job</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if cron.installed else 'inactive' }}"></span>
+            {{ cron.interval if cron.installed else 'Not installed' }}
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Configured Mappings</h2>
+    {% if mappings %}
+    <table class="data-table">
+        <thead><tr><th>Port</th><th>Protocol</th><th>Actions</th></tr></thead>
+        <tbody>
+        {% for m in mappings %}
+        <tr>
+            <td>{{ m.port }}</td>
+            <td>{{ m.protocol }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('upnp.remove') }}" style="display:inline">
+                    <input type="hidden" name="port" value="{{ m.port }}">
+                    <input type="hidden" name="protocol" value="{{ m.protocol }}">
+                    <button type="submit" class="btn btn-small btn-danger">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No port mappings configured.</div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Add Mapping</h2>
+    <form method="POST" action="{{ url_for('upnp.add') }}" class="form-inline">
+        <div class="form-group">
+            <label>Port</label>
+            <input type="number" name="port" placeholder="443" min="1" max="65535" required>
+        </div>
+        <div class="form-group">
+            <label>Protocol</label>
+            <select name="protocol">
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-success">Add</button>
+    </form>
+</div>
+
+<div class="section">
+    <h2>Cron Job</h2>
+    {% if cron.installed %}
+    <p style="margin-bottom:12px">Running every <strong>{{ cron.interval }}</strong></p>
+    <p style="margin-bottom:12px;color:var(--text-muted);font-size:0.85rem"><code>{{ cron.line }}</code></p>
+    <form method="POST" action="{{ url_for('upnp.cron') }}">
+        <input type="hidden" name="action" value="uninstall">
+        <button type="submit" class="btn btn-danger">Uninstall Cron Job</button>
+    </form>
+    {% else %}
+    <p style="margin-bottom:12px;color:var(--text-secondary)">No cron job installed for automatic UPnP refresh.</p>
+    <form method="POST" action="{{ url_for('upnp.cron') }}" class="form-inline">
+        <input type="hidden" name="action" value="install">
+        <div class="form-group">
+            <label>Interval (hours)</label>
+            <input type="number" name="hours" value="12" min="1" max="24">
+        </div>
+        <button type="submit" class="btn btn-success">Install Cron Job</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Current Router Mappings</h2>
+    <pre>{{ current_mappings }}</pre>
+</div>
+
+{% endif %}
+{% endblock %}

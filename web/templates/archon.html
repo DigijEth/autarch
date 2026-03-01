@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block title %}Archon - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Archon Server</h1>
+    <p class="text-muted">Privileged Android device management (UID 2000 / shell)</p>
+</div>
+
+<!-- Status -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="stat-card">
+        <div class="stat-label">Device</div>
+        <div class="stat-value small">
+            <span id="archon-device-dot" class="status-dot inactive"></span>
+            <span id="archon-device-text">Checking...</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">ArchonServer</div>
+        <div class="stat-value small">
+            <span id="archon-server-dot" class="status-dot inactive"></span>
+            <span id="archon-server-text">Unknown</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Privilege Level</div>
+        <div class="stat-value small" id="archon-privilege">Shell (UID 2000)</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="archon" data-tab="shell" onclick="showTab('archon','shell')">Shell</button>
+    <button class="tab" data-tab-group="archon" data-tab="files" onclick="showTab('archon','files')">Files</button>
+    <button class="tab" data-tab-group="archon" data-tab="packages" onclick="showTab('archon','packages')">Packages</button>
+    <button class="tab" data-tab-group="archon" data-tab="permissions" onclick="showTab('archon','permissions')">Permissions</button>
+    <button class="tab" data-tab-group="archon" data-tab="settings" onclick="showTab('archon','settings')">Settings DB</button>
+    <button class="tab" data-tab-group="archon" data-tab="bootstrap" onclick="showTab('archon','bootstrap')">Bootstrap</button>
+</div>
+
+<!-- ══ Shell Tab ══ -->
+<div class="tab-content active" data-tab-group="archon" data-tab="shell">
+    <div class="section">
+        <h2>Privileged Shell</h2>
+        <p class="text-muted">Commands run as shell (UID 2000) via ADB — same as Shizuku privilege level.</p>
+        <div class="input-row">
+            <input type="text" id="archon-shell-cmd" placeholder="pm list packages -3 | head -20" onkeydown="if(event.key==='Enter')archonShell()">
+            <button class="btn btn-primary" onclick="archonShell()">Run</button>
+        </div>
+        <div class="tool-actions" style="margin:8px 0">
+            <button class="btn btn-small" onclick="archonQuick('id')">whoami</button>
+            <button class="btn btn-small" onclick="archonQuick('getprop ro.build.display.id')">Build</button>
+            <button class="btn btn-small" onclick="archonQuick('dumpsys battery')">Battery</button>
+            <button class="btn btn-small" onclick="archonQuick('pm list packages -3')">User Apps</button>
+            <button class="btn btn-small" onclick="archonQuick('dumpsys device_policy')">Device Admin</button>
+            <button class="btn btn-small" onclick="archonQuick('dumpsys notification --noredact')">Notifications</button>
+            <button class="btn btn-small" onclick="archonQuick('settings list secure')">Secure Settings</button>
+            <button class="btn btn-small" onclick="archonQuick('cmd connectivity airplane-mode')">Airplane</button>
+        </div>
+        <div id="archon-shell-output" class="output-panel scrollable" style="max-height:500px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+</div>
+
+<!-- ══ Files Tab ══ -->
+<div class="tab-content" data-tab-group="archon" data-tab="files">
+    <div class="section">
+        <h2>File Browser</h2>
+        <p class="text-muted">Browse and copy files with shell privileges — access protected directories.</p>
+        <div class="input-row" style="margin-bottom:8px">
+            <input type="text" id="archon-file-path" value="/" placeholder="/data/local/tmp/" onkeydown="if(event.key==='Enter')archonListFiles()">
+            <button class="btn btn-primary" onclick="archonListFiles()">List</button>
+        </div>
+        <div class="tool-actions" style="margin-bottom:8px">
+            <button class="btn btn-small" onclick="document.getElementById('archon-file-path').value='/';archonListFiles()">/</button>
+            <button class="btn btn-small" onclick="document.getElementById('archon-file-path').value='/sdcard/';archonListFiles()">/sdcard</button>
+            <button class="btn btn-small" onclick="document.getElementById('archon-file-path').value='/data/local/tmp/';archonListFiles()">/data/local/tmp</button>
+            <button class="btn btn-small" onclick="document.getElementById('archon-file-path').value='/data/data/';archonListFiles()">/data/data</button>
+            <button class="btn btn-small" onclick="document.getElementById('archon-file-path').value='/system/app/';archonListFiles()">/system/app</button>
+        </div>
+        <div id="archon-file-list" class="output-panel scrollable" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+
+        <h3 style="margin-top:16px">Copy File (on device)</h3>
+        <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+                <label>Source</label>
+                <input type="text" id="archon-copy-src" placeholder="/data/data/com.app/databases/db">
+            </div>
+            <div class="form-group">
+                <label>Destination</label>
+                <input type="text" id="archon-copy-dst" placeholder="/sdcard/Download/db_copy">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="archonCopyFile()">Copy</button>
+        </div>
+        <div id="archon-copy-msg" class="progress-text"></div>
+
+        <h3 style="margin-top:16px">Pull to Server / Push to Device</h3>
+        <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+                <label>Remote Path (device)</label>
+                <input type="text" id="archon-transfer-remote" placeholder="/sdcard/Download/file">
+            </div>
+            <div class="form-group">
+                <label>Local Path (AUTARCH)</label>
+                <input type="text" id="archon-transfer-local" placeholder="/home/snake/pulled_file">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="archonPull()">Pull from Device</button>
+            <button class="btn btn-small" onclick="archonPush()">Push to Device</button>
+        </div>
+        <div id="archon-transfer-msg" class="progress-text"></div>
+    </div>
+</div>
+
+<!-- ══ Packages Tab ══ -->
+<div class="tab-content" data-tab-group="archon" data-tab="packages">
+    <div class="section">
+        <h2>Package Manager</h2>
+        <div class="tool-actions" style="margin-bottom:12px">
+            <button class="btn btn-primary" onclick="archonLoadPackages(false)">User Apps</button>
+            <button class="btn btn-small" onclick="archonLoadPackages(true)">System Apps</button>
+        </div>
+        <div id="archon-pkg-count" class="progress-text"></div>
+        <div id="archon-pkg-list" class="output-panel scrollable" style="max-height:500px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+</div>
+
+<!-- ══ Permissions Tab ══ -->
+<div class="tab-content" data-tab-group="archon" data-tab="permissions">
+    <div class="section">
+        <h2>Permission Manager</h2>
+        <p class="text-muted">Grant or revoke runtime permissions and appops for any package.</p>
+
+        <h3>Runtime Permissions</h3>
+        <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+                <label>Package</label>
+                <input type="text" id="archon-perm-pkg" placeholder="com.example.app">
+            </div>
+            <div class="form-group">
+                <label>Permission</label>
+                <input type="text" id="archon-perm-name" placeholder="android.permission.CAMERA">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-bottom:8px">
+            <button class="btn btn-primary btn-small" onclick="archonGrant()">Grant</button>
+            <button class="btn btn-danger btn-small" onclick="archonRevoke()">Revoke</button>
+            <button class="btn btn-small" onclick="archonDumpsysPerm()">Show All Perms</button>
+        </div>
+
+        <h3 style="margin-top:16px">AppOps</h3>
+        <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+                <label>Package</label>
+                <input type="text" id="archon-appops-pkg" placeholder="com.example.app">
+            </div>
+            <div class="form-group">
+                <label>Operation</label>
+                <input type="text" id="archon-appops-op" placeholder="CAMERA or RUN_IN_BACKGROUND">
+            </div>
+            <div class="form-group">
+                <label>Mode</label>
+                <select id="archon-appops-mode">
+                    <option value="allow">Allow</option>
+                    <option value="deny">Deny</option>
+                    <option value="ignore">Ignore</option>
+                    <option value="default">Default</option>
+                </select>
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="archonAppOps()">Set AppOp</button>
+        </div>
+        <div id="archon-perm-output" class="output-panel scrollable" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+</div>
+
+<!-- ══ Settings DB Tab ══ -->
+<div class="tab-content" data-tab-group="archon" data-tab="settings">
+    <div class="section">
+        <h2>Android Settings Database</h2>
+        <p class="text-muted">Read and write system/secure/global settings with shell privileges.</p>
+        <div class="form-row" style="margin-bottom:8px">
+            <div class="form-group">
+                <label>Namespace</label>
+                <select id="archon-settings-ns">
+                    <option value="system">system</option>
+                    <option value="secure" selected>secure</option>
+                    <option value="global">global</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Key</label>
+                <input type="text" id="archon-settings-key" placeholder="install_non_market_apps">
+            </div>
+            <div class="form-group">
+                <label>Value (for put)</label>
+                <input type="text" id="archon-settings-val" placeholder="1">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-bottom:8px">
+            <button class="btn btn-primary btn-small" onclick="archonSettingsGet()">Get</button>
+            <button class="btn btn-warning btn-small" onclick="archonSettingsPut()">Put</button>
+            <button class="btn btn-small" onclick="archonSettingsList()">List All</button>
+        </div>
+        <div id="archon-settings-output" class="output-panel scrollable" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+</div>
+
+<!-- ══ Bootstrap Tab ══ -->
+<div class="tab-content" data-tab-group="archon" data-tab="bootstrap">
+    <div class="section">
+        <h2>ArchonServer Bootstrap</h2>
+        <p class="text-muted">Start/stop the ArchonServer privileged process on the connected device.</p>
+        <div class="tool-actions" style="margin-bottom:12px">
+            <button class="btn btn-primary" onclick="hwArchonBootstrap()">Bootstrap ArchonServer</button>
+            <button class="btn btn-small" onclick="hwArchonStatus()">Check Status</button>
+            <button class="btn btn-stop btn-small" onclick="hwArchonStop()">Stop Server</button>
+        </div>
+        <div id="hw-archon-output" class="output-panel scrollable" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+</div>
+
+<script>
+// ── Status Check ──
+function archonCheckStatus() {
+    fetchJSON('/hardware/adb/devices').then(function(d) {
+        var devices = d.devices || [];
+        var dot = document.getElementById('archon-device-dot');
+        var txt = document.getElementById('archon-device-text');
+        if (devices.length > 0) {
+            dot.className = 'status-dot active';
+            txt.textContent = devices[0].serial + ' (' + (devices[0].model || 'device') + ')';
+        } else {
+            dot.className = 'status-dot inactive';
+            txt.textContent = 'No device';
+        }
+    });
+
+    // Check ArchonServer via log
+    archonShellSilent('cat /data/local/tmp/archon_server.log 2>/dev/null | tail -3', function(out) {
+        var dot = document.getElementById('archon-server-dot');
+        var txt = document.getElementById('archon-server-text');
+        if (out.indexOf('Listening on') >= 0) {
+            dot.className = 'status-dot active';
+            txt.textContent = 'Running';
+        } else {
+            dot.className = 'status-dot inactive';
+            txt.textContent = 'Not running';
+        }
+    });
+}
+
+// ── Shell ──
+function archonShell() {
+    var cmd = document.getElementById('archon-shell-cmd').value.trim();
+    if (!cmd) return;
+    var out = document.getElementById('archon-shell-output');
+    out.textContent = '$ ' + cmd + '\n...';
+    fetchJSON('/archon/shell', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: cmd})
+    }).then(function(r) {
+        out.textContent = '$ ' + cmd + '\n' + (r.stdout || r.stderr || r.error || 'no output');
+        out.scrollTop = out.scrollHeight;
+    });
+}
+
+function archonQuick(cmd) {
+    document.getElementById('archon-shell-cmd').value = cmd;
+    archonShell();
+}
+
+function archonShellSilent(cmd, callback) {
+    fetchJSON('/archon/shell', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: cmd})
+    }).then(function(r) {
+        callback(r.stdout || '');
+    });
+}
+
+// ── Files ──
+function archonListFiles() {
+    var path = document.getElementById('archon-file-path').value.trim() || '/';
+    var out = document.getElementById('archon-file-list');
+    out.textContent = 'Loading...';
+    fetchJSON('/archon/file-list', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path})
+    }).then(function(r) {
+        out.textContent = r.output || r.error || 'empty';
+    });
+}
+
+function archonCopyFile() {
+    var src = document.getElementById('archon-copy-src').value.trim();
+    var dst = document.getElementById('archon-copy-dst').value.trim();
+    var msg = document.getElementById('archon-copy-msg');
+    if (!src || !dst) { msg.textContent = 'Enter source and destination'; return; }
+    msg.textContent = 'Copying...';
+    fetchJSON('/archon/file-copy', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({src: src, dst: dst})
+    }).then(function(r) {
+        msg.textContent = r.success ? 'Copied successfully' : ('Failed: ' + (r.output || r.error));
+    });
+}
+
+function archonPull() {
+    var remote = document.getElementById('archon-transfer-remote').value.trim();
+    var msg = document.getElementById('archon-transfer-msg');
+    if (!remote) { msg.textContent = 'Enter remote path'; return; }
+    msg.textContent = 'Pulling...';
+    fetchJSON('/archon/pull', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({remote: remote})
+    }).then(function(r) {
+        msg.textContent = r.local_path ? ('Pulled to: ' + r.local_path) : ('Result: ' + JSON.stringify(r));
+    });
+}
+
+function archonPush() {
+    var local = document.getElementById('archon-transfer-local').value.trim();
+    var remote = document.getElementById('archon-transfer-remote').value.trim();
+    var msg = document.getElementById('archon-transfer-msg');
+    if (!local || !remote) { msg.textContent = 'Enter both paths'; return; }
+    msg.textContent = 'Pushing...';
+    fetchJSON('/archon/push', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({local: local, remote: remote})
+    }).then(function(r) {
+        msg.textContent = r.success ? 'Pushed successfully' : ('Result: ' + JSON.stringify(r));
+    });
+}
+
+// ── Packages ──
+function archonLoadPackages(system) {
+    var out = document.getElementById('archon-pkg-list');
+    var cnt = document.getElementById('archon-pkg-count');
+    out.textContent = 'Loading...';
+    fetchJSON('/archon/packages?system=' + (system ? 'true' : 'false')).then(function(r) {
+        if (r.error) { out.textContent = r.error; return; }
+        cnt.textContent = r.count + ' packages';
+        var lines = (r.packages || []).map(function(p) { return p.package; });
+        out.textContent = lines.join('\n');
+    });
+}
+
+// ── Permissions ──
+function archonGrant() {
+    var pkg = document.getElementById('archon-perm-pkg').value.trim();
+    var perm = document.getElementById('archon-perm-name').value.trim();
+    var out = document.getElementById('archon-perm-output');
+    if (!pkg || !perm) { out.textContent = 'Enter package and permission'; return; }
+    fetchJSON('/archon/grant', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({package: pkg, permission: perm})
+    }).then(function(r) {
+        out.textContent = r.success ? 'Granted: ' + perm + ' to ' + pkg : ('Failed: ' + r.output);
+    });
+}
+
+function archonRevoke() {
+    var pkg = document.getElementById('archon-perm-pkg').value.trim();
+    var perm = document.getElementById('archon-perm-name').value.trim();
+    var out = document.getElementById('archon-perm-output');
+    if (!pkg || !perm) { out.textContent = 'Enter package and permission'; return; }
+    fetchJSON('/archon/revoke', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({package: pkg, permission: perm})
+    }).then(function(r) {
+        out.textContent = r.success ? 'Revoked: ' + perm + ' from ' + pkg : ('Failed: ' + r.output);
+    });
+}
+
+function archonDumpsysPerm() {
+    var pkg = document.getElementById('archon-perm-pkg').value.trim();
+    var out = document.getElementById('archon-perm-output');
+    if (!pkg) { out.textContent = 'Enter package name'; return; }
+    out.textContent = 'Loading...';
+    fetchJSON('/archon/shell', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: 'dumpsys package ' + pkg + ' | grep -A200 "granted=true"'})
+    }).then(function(r) {
+        out.textContent = r.stdout || 'No granted permissions found';
+    });
+}
+
+function archonAppOps() {
+    var pkg = document.getElementById('archon-appops-pkg').value.trim();
+    var op = document.getElementById('archon-appops-op').value.trim();
+    var mode = document.getElementById('archon-appops-mode').value;
+    var out = document.getElementById('archon-perm-output');
+    if (!pkg || !op) { out.textContent = 'Enter package and operation'; return; }
+    fetchJSON('/archon/app-ops', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({package: pkg, op: op, mode: mode})
+    }).then(function(r) {
+        out.textContent = r.success ? 'Set ' + op + ' = ' + mode + ' for ' + pkg : ('Failed: ' + r.output);
+    });
+}
+
+// ── Settings DB ──
+function archonSettingsGet() {
+    var ns = document.getElementById('archon-settings-ns').value;
+    var key = document.getElementById('archon-settings-key').value.trim();
+    var out = document.getElementById('archon-settings-output');
+    if (!key) { out.textContent = 'Enter a key'; return; }
+    fetchJSON('/archon/settings-cmd', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({namespace: ns, action: 'get', key: key})
+    }).then(function(r) {
+        out.textContent = ns + '/' + key + ' = ' + (r.value || 'null');
+    });
+}
+
+function archonSettingsPut() {
+    var ns = document.getElementById('archon-settings-ns').value;
+    var key = document.getElementById('archon-settings-key').value.trim();
+    var val = document.getElementById('archon-settings-val').value.trim();
+    var out = document.getElementById('archon-settings-output');
+    if (!key || !val) { out.textContent = 'Enter key and value'; return; }
+    fetchJSON('/archon/settings-cmd', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({namespace: ns, action: 'put', key: key, value: val})
+    }).then(function(r) {
+        out.textContent = 'Set ' + ns + '/' + key + ' = ' + val;
+    });
+}
+
+function archonSettingsList() {
+    var ns = document.getElementById('archon-settings-ns').value;
+    var out = document.getElementById('archon-settings-output');
+    out.textContent = 'Loading...';
+    fetchJSON('/archon/shell', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({command: 'settings list ' + ns})
+    }).then(function(r) {
+        out.textContent = r.stdout || 'empty';
+    });
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    archonCheckStatus();
+});
+</script>
+{% endblock %}

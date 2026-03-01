@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_dashboard">
+
+    <fragment
+        android:id="@+id/nav_dashboard"
+        android:name="com.darkhal.archon.ui.DashboardFragment"
+        android:label="@string/nav_dashboard" />
+
+    <fragment
+        android:id="@+id/nav_links"
+        android:name="com.darkhal.archon.ui.LinksFragment"
+        android:label="@string/nav_links" />
+
+    <fragment
+        android:id="@+id/nav_modules"
+        android:name="com.darkhal.archon.ui.ModulesFragment"
+        android:label="@string/nav_modules" />
+
+    <fragment
+        android:id="@+id/nav_setup"
+        android:name="com.darkhal.archon.ui.SetupFragment"
+        android:label="@string/nav_setup" />
+
+    <fragment
+        android:id="@+id/nav_settings"
+        android:name="com.darkhal.archon.ui.SettingsFragment"
+        android:label="@string/nav_settings" />
+
+</navigation>

@@ -1,0 +1,128 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000000;
+    color: #00FF41;
+    font-family: 'Source Code Pro', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+#terminal {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 8px;
+}
+
+#header {
+    flex-shrink: 0;
+    margin-bottom: 8px;
+}
+
+#banner {
+    color: #00FF41;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+}
+
+#output {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 8px;
+    word-wrap: break-word;
+}
+
+#output .line {
+    margin-bottom: 2px;
+}
+
+#output .system {
+    color: #888888;
+}
+
+#output .error {
+    color: #FF4444;
+}
+
+#output .info {
+    color: #00AAFF;
+}
+
+#output .success {
+    color: #00FF41;
+}
+
+#input-line {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-top: 1px solid #333333;
+    padding-top: 8px;
+}
+
+.prompt {
+    color: #00FF41;
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+#cmd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #00FF41;
+    font-family: 'Source Code Pro', 'Courier New', monospace;
+    font-size: 14px;
+    caret-color: #00FF41;
+}
+
+/* Blinking cursor effect */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+#cmd-input:focus {
+    animation: none;
+}
+
+/* Scrollbar */
+#output::-webkit-scrollbar {
+    width: 4px;
+}
+
+#output::-webkit-scrollbar-track {
+    background: #111111;
+}
+
+#output::-webkit-scrollbar-thumb {
+    background: #333333;
+    border-radius: 2px;
+}
+
+#output::-webkit-scrollbar-thumb:hover {
+    background: #00FF41;
+}
+
+/* Loading animation */
+.loading::after {
+    content: '';
+    animation: dots 1.5s steps(3, end) infinite;
+}
+
+@keyframes dots {
+    0% { content: ''; }
+    33% { content: '.'; }
+    66% { content: '..'; }
+    100% { content: '...'; }
+}

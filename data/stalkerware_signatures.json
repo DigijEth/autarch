@@ -1,0 +1,1144 @@
+{
+  "version": "2025.02",
+  "last_updated": "2025-02-15",
+  "stalkerware": {
+    "mSpy": {
+      "severity": "critical",
+      "packages": [
+        "android.helper.system",
+        "com.mspy.lite",
+        "core.framework",
+        "com.eyezy.android",
+        "com.mspy",
+        "com.mspy.android",
+        "com.mspy.app",
+        "com.mspy.premium"
+      ],
+      "description": "Commercial stalkerware with SMS, GPS, call, social media monitoring"
+    },
+    "FlexiSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.flexispy",
+        "com.ddi.agent",
+        "com.dd.service",
+        "com.flexispy.main",
+        "com.attstudent",
+        "com.blackbird.android",
+        "com.flexispy.flexispy"
+      ],
+      "description": "Advanced stalkerware with call interception, ambient recording"
+    },
+    "Cocospy": {
+      "severity": "critical",
+      "packages": [
+        "com.tplink.systemservice",
+        "com.cocospy.main",
+        "com.cocospy.android",
+        "com.cocospy.monitor",
+        "system.service.handler"
+      ],
+      "description": "Commercial stalkerware marketed as parental control"
+    },
+    "Spyic": {
+      "severity": "critical",
+      "packages": [
+        "com.spyic.android",
+        "com.spyic.main",
+        "com.spyic.monitor",
+        "com.spyic.app"
+      ],
+      "description": "Phone monitoring app with stealth mode"
+    },
+    "XNSPY": {
+      "severity": "critical",
+      "packages": [
+        "com.xnspy.android",
+        "com.xnspy.app",
+        "com.xnspy.premium",
+        "com.xnspy.lite",
+        "com.xnore.client"
+      ],
+      "description": "Stalkerware with keylogger and surroundings recording"
+    },
+    "Hoverwatch": {
+      "severity": "critical",
+      "packages": [
+        "com.hoverwatch.android",
+        "com.refog.android",
+        "com.hoverwatch.agent",
+        "com.hoverwatch.service"
+      ],
+      "description": "SMS, call, GPS tracker with screenshot capture"
+    },
+    "iKeyMonitor": {
+      "severity": "critical",
+      "packages": [
+        "com.ikeymonitor.android",
+        "com.ikeymonitor.app",
+        "com.ikeymonitor.premium",
+        "com.ikeymonitor.service"
+      ],
+      "description": "Keylogger and screenshot stalkerware"
+    },
+    "Spyera": {
+      "severity": "critical",
+      "packages": [
+        "com.spyera.android",
+        "com.spyera.main",
+        "com.spyera.agent",
+        "com.spyera.app"
+      ],
+      "description": "Advanced stalkerware with VoIP recording"
+    },
+    "TheTruthSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.thetruthspy.android",
+        "com.thetruthspy.app",
+        "com.truthspy.android",
+        "com.thetruthspy"
+      ],
+      "description": "Stalkerware with live location and social media access"
+    },
+    "SpyHuman": {
+      "severity": "critical",
+      "packages": [
+        "com.spyhuman.android",
+        "com.spyhuman.app",
+        "com.spyhuman.monitor"
+      ],
+      "description": "Stalkerware with ambient recording and keylogging"
+    },
+    "Cerberus": {
+      "severity": "high",
+      "packages": [
+        "com.lsdroid.cerberus",
+        "com.cerberusapp.android"
+      ],
+      "description": "Anti-theft app frequently abused as stalkerware"
+    },
+    "MobileTracker Free": {
+      "severity": "high",
+      "packages": [
+        "com.mobiletracker.free",
+        "com.mobiletracker.android",
+        "fr.asso.mobiletracker"
+      ],
+      "description": "Free tracking app commonly abused for stalking"
+    },
+    "Reptilicus": {
+      "severity": "critical",
+      "packages": [
+        "com.reptilicus.android",
+        "com.reptilicus.main",
+        "com.reptilicus.app"
+      ],
+      "description": "Russian stalkerware with comprehensive surveillance"
+    },
+    "KidLogger": {
+      "severity": "high",
+      "packages": [
+        "com.kidlogger.android",
+        "com.kidlogger.app",
+        "com.kidlogger.service"
+      ],
+      "description": "Keylogger marketed as parental control"
+    },
+    "SpyBubble": {
+      "severity": "critical",
+      "packages": [
+        "com.spybubble.android",
+        "com.spybubble.main",
+        "com.spybubble.app"
+      ],
+      "description": "Hidden stalkerware for call and SMS monitoring"
+    },
+    "pcTattletale": {
+      "severity": "critical",
+      "packages": [
+        "com.pctattletale.android",
+        "com.pctattletale.app",
+        "com.pctattletale.main"
+      ],
+      "description": "Screen recording stalkerware"
+    },
+    "Spyzie": {
+      "severity": "critical",
+      "packages": [
+        "com.spyzie.android",
+        "com.spyzie.main",
+        "com.spyzie.app",
+        "com.spyzie.monitor"
+      ],
+      "description": "Phone monitoring and tracking stalkerware"
+    },
+    "Minspy": {
+      "severity": "critical",
+      "packages": [
+        "com.minspy.android",
+        "com.minspy.app",
+        "com.minspy.main"
+      ],
+      "description": "Stealth phone monitoring app"
+    },
+    "Neatspy": {
+      "severity": "critical",
+      "packages": [
+        "com.neatspy.android",
+        "com.neatspy.app"
+      ],
+      "description": "Hidden phone monitoring stalkerware"
+    },
+    "Spyine": {
+      "severity": "critical",
+      "packages": [
+        "com.spyine.android",
+        "com.spyine.app"
+      ],
+      "description": "Commercial stalkerware"
+    },
+    "LetMeSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.letmespy.android",
+        "com.letmespy.app"
+      ],
+      "description": "SMS and location tracking stalkerware"
+    },
+    "Copy9": {
+      "severity": "critical",
+      "packages": [
+        "com.copy9.android",
+        "com.copy9.app",
+        "com.copy9.main"
+      ],
+      "description": "Phone cloning and monitoring stalkerware"
+    },
+    "iSpyoo": {
+      "severity": "critical",
+      "packages": [
+        "com.ispyoo.android",
+        "com.ispyoo.app",
+        "com.ispyoo.service"
+      ],
+      "description": "GPS tracking and call monitoring stalkerware"
+    },
+    "SpyFone": {
+      "severity": "critical",
+      "packages": [
+        "com.spyfone.android",
+        "com.spyfone.app",
+        "com.spyfone.service"
+      ],
+      "description": "FTC-banned stalkerware company"
+    },
+    "PhoneSpector": {
+      "severity": "critical",
+      "packages": [
+        "com.phonespector.android",
+        "com.phonespector.app"
+      ],
+      "description": "Phone monitoring and social media stalkerware"
+    },
+    "Auto Forward": {
+      "severity": "critical",
+      "packages": [
+        "com.autoforward.android",
+        "com.autoforward.app",
+        "com.autoforward.spy"
+      ],
+      "description": "Message forwarding stalkerware"
+    },
+    "TeenSafe": {
+      "severity": "high",
+      "packages": [
+        "com.teensafe.android",
+        "com.teensafe.app"
+      ],
+      "description": "Parental monitoring app with stealth capabilities"
+    },
+    "mLite": {
+      "severity": "critical",
+      "packages": [
+        "com.mlite.android",
+        "com.mlite.app"
+      ],
+      "description": "mSpy's budget stalkerware variant"
+    },
+    "MobileSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.mobilespy.android",
+        "com.mobilespy.app",
+        "com.retinax.android"
+      ],
+      "description": "Stalkerware with IM monitoring"
+    },
+    "PhoneSheriff": {
+      "severity": "critical",
+      "packages": [
+        "com.phonesheriff.android",
+        "com.phonesheriff.app"
+      ],
+      "description": "Monitoring and filtering stalkerware"
+    },
+    "GuestSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.guestspy.android",
+        "com.guestspy.app"
+      ],
+      "description": "Ambient recording and GPS stalkerware"
+    },
+    "TheSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.thespy.android",
+        "com.thespy.app"
+      ],
+      "description": "Hidden call and SMS monitoring"
+    },
+    "OwnSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.ownspy.android",
+        "com.ownspy.app",
+        "com.ownspy.service"
+      ],
+      "description": "Spanish stalkerware with ambient recording"
+    },
+    "AppMia": {
+      "severity": "critical",
+      "packages": [
+        "com.appmia.android",
+        "com.appmia.main"
+      ],
+      "description": "WhatsApp and social media monitoring stalkerware"
+    },
+    "OneMonitar": {
+      "severity": "critical",
+      "packages": [
+        "com.onemonitar.android",
+        "com.onemonitar.app"
+      ],
+      "description": "Call recording and ambient listening stalkerware"
+    },
+    "Highster Mobile": {
+      "severity": "critical",
+      "packages": [
+        "com.highstermobile.android",
+        "com.highstermobile.app",
+        "com.highster.app"
+      ],
+      "description": "Stealth monitoring and GPS tracking stalkerware"
+    },
+    "Mobile Spy Agent": {
+      "severity": "critical",
+      "packages": [
+        "com.mobilespyagent.android",
+        "com.mobilespyagent.app"
+      ],
+      "description": "Hidden phone monitoring agent"
+    },
+    "Snoopza": {
+      "severity": "critical",
+      "packages": [
+        "com.snoopza.android",
+        "com.snoopza.app"
+      ],
+      "description": "Keylogger and screenshot stalkerware"
+    },
+    "Clevguard": {
+      "severity": "critical",
+      "packages": [
+        "com.clevguard.android",
+        "com.clevguard.app",
+        "com.kidsguard.pro",
+        "com.clevguard.kidsguard"
+      ],
+      "description": "KidsGuard Pro stalkerware developer"
+    },
+    "KidsGuard Pro": {
+      "severity": "critical",
+      "packages": [
+        "com.clevguard.kidsguardpro",
+        "com.kidsguard.pro.android",
+        "org.kidsguard.pro",
+        "com.kidsguardpro.android",
+        "com.system.service"
+      ],
+      "description": "Marketed as parental control, full phone monitoring capabilities"
+    },
+    "FamiSafe": {
+      "severity": "medium",
+      "packages": [
+        "com.famisafe.android",
+        "com.wondershare.famisafe"
+      ],
+      "description": "Parental control with location and activity monitoring"
+    },
+    "Bark": {
+      "severity": "medium",
+      "packages": [
+        "com.bark.android",
+        "com.bark.kids"
+      ],
+      "description": "Child monitoring app with content scanning"
+    },
+    "mCouple": {
+      "severity": "critical",
+      "packages": [
+        "com.mcouple.android",
+        "com.mcouple.app"
+      ],
+      "description": "Couples monitoring stalkerware"
+    },
+    "TrackMyFone": {
+      "severity": "critical",
+      "packages": [
+        "com.trackmyfone.android",
+        "com.trackmyfone.app"
+      ],
+      "description": "Stealth GPS and activity monitoring"
+    },
+    "SpyLive360": {
+      "severity": "critical",
+      "packages": [
+        "com.spylive360.android",
+        "com.spylive360.app"
+      ],
+      "description": "360-degree surveillance stalkerware"
+    },
+    "AllTracker": {
+      "severity": "critical",
+      "packages": [
+        "com.alltracker.android",
+        "com.alltracker.family"
+      ],
+      "description": "Family tracking app with stealth mode"
+    },
+    "SpyPhone": {
+      "severity": "critical",
+      "packages": [
+        "com.spyphone.android",
+        "com.spyphone.app",
+        "com.spyphoneapp.android"
+      ],
+      "description": "Phone monitoring with ambient listening"
+    },
+    "SafeSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.safespy.android",
+        "com.safespy.app"
+      ],
+      "description": "Hidden phone monitoring stalkerware"
+    },
+    "SpyFly": {
+      "severity": "critical",
+      "packages": [
+        "com.spyfly.android",
+        "com.spyfly.app"
+      ],
+      "description": "Data extraction stalkerware"
+    },
+    "Uknowkids": {
+      "severity": "high",
+      "packages": [
+        "com.uknowkids.android",
+        "com.uknowkids.app"
+      ],
+      "description": "Child monitoring with social media tracking"
+    },
+    "HelloSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.hellospy.android",
+        "com.hellospy.app"
+      ],
+      "description": "Stealth monitoring and call interception"
+    },
+    "Droidjack": {
+      "severity": "critical",
+      "packages": [
+        "net.droidjack.server",
+        "com.droidjack.android"
+      ],
+      "description": "Remote access trojan (RAT) sold as monitoring tool"
+    },
+    "AndroRAT": {
+      "severity": "critical",
+      "packages": [
+        "my.app.client",
+        "com.androrat.client",
+        "com.androrat.android"
+      ],
+      "description": "Open source remote administration tool / RAT"
+    },
+    "AhMyth": {
+      "severity": "critical",
+      "packages": [
+        "ahmyth.mine.king.ahmyth",
+        "com.ahmyth.android"
+      ],
+      "description": "Open source Android RAT"
+    },
+    "SpyNote": {
+      "severity": "critical",
+      "packages": [
+        "com.spynote.android",
+        "com.spynote.app",
+        "yps.eton.application"
+      ],
+      "description": "Android RAT with keylogging and camera access"
+    },
+    "Dendroid": {
+      "severity": "critical",
+      "packages": [
+        "com.connect.andorid",
+        "com.dendroid.android"
+      ],
+      "description": "Android RAT with HTTP-based C2"
+    },
+    "OmniRAT": {
+      "severity": "critical",
+      "packages": [
+        "com.omnirat.android",
+        "com.omniratsupport.android"
+      ],
+      "description": "Cross-platform remote administration trojan"
+    },
+    "Hiddad": {
+      "severity": "high",
+      "packages": [
+        "com.android.hiddad",
+        "com.system.hiddad"
+      ],
+      "description": "Hidden ad-fraud malware with surveillance capabilities"
+    },
+    "StalkPhish": {
+      "severity": "critical",
+      "packages": [
+        "com.stalkphish.android",
+        "com.stalkphish.app"
+      ],
+      "description": "Credential phishing combined with phone monitoring"
+    },
+    "Couple Tracker": {
+      "severity": "high",
+      "packages": [
+        "com.coupletracker.free",
+        "com.coupletracker.app"
+      ],
+      "description": "Couples tracking with message monitoring"
+    },
+    "WiseMo": {
+      "severity": "high",
+      "packages": [
+        "com.wisemo.guardian",
+        "com.wisemo.managed"
+      ],
+      "description": "Remote control app abused for stalking"
+    },
+    "TrackView": {
+      "severity": "high",
+      "packages": [
+        "com.trackview.android",
+        "com.cybrook.trackview"
+      ],
+      "description": "Camera surveillance app abused for stalking"
+    },
+    "Alfred Camera": {
+      "severity": "medium",
+      "packages": [
+        "com.ivuu",
+        "com.ivuu.alfredcamera"
+      ],
+      "description": "Camera app frequently abused as hidden surveillance"
+    },
+    "Monitor Minor": {
+      "severity": "critical",
+      "packages": [
+        "com.monitorminor.android",
+        "com.monitorminor.app",
+        "com.monitorminor.service"
+      ],
+      "description": "Stalkerware targeting minors with social media access"
+    },
+    "Exaspy": {
+      "severity": "critical",
+      "packages": [
+        "com.exaspy.android",
+        "com.exaspy.app"
+      ],
+      "description": "Italian stalkerware used in domestic abuse"
+    },
+    "Skygofree": {
+      "severity": "critical",
+      "packages": [
+        "com.android.system.update.service",
+        "com.negg.skygofree"
+      ],
+      "description": "Italian government spyware with advanced capabilities"
+    },
+    "MobiiSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.mobiispy.android",
+        "com.mobiispy.app"
+      ],
+      "description": "Stalkerware leaking victim data"
+    },
+    "Dasta": {
+      "severity": "high",
+      "packages": [
+        "app.dasta",
+        "com.dasta.app"
+      ],
+      "description": "WhatsApp online status tracker"
+    },
+    "WhatsTracker": {
+      "severity": "high",
+      "packages": [
+        "com.whatstracker.android",
+        "com.whatstracker.app",
+        "com.socialtracker.whatsapp"
+      ],
+      "description": "WhatsApp status monitoring"
+    },
+    "CatWatchful": {
+      "severity": "critical",
+      "packages": [
+        "com.catwatchful.android",
+        "com.catwatchful.app"
+      ],
+      "description": "Parental control app with stalkerware capabilities"
+    },
+    "SecureKids": {
+      "severity": "high",
+      "packages": [
+        "com.securekids.android",
+        "com.securekids.app"
+      ],
+      "description": "Parental control with keylogging"
+    },
+    "Emoze": {
+      "severity": "high",
+      "packages": [
+        "com.emoze.android",
+        "com.emoze.service"
+      ],
+      "description": "Email monitoring service"
+    },
+    "PhoneWatcher": {
+      "severity": "critical",
+      "packages": [
+        "com.phonewatcher.android",
+        "com.phonewatcher.app"
+      ],
+      "description": "Hidden phone monitoring and recording"
+    },
+    "Spapp Monitoring": {
+      "severity": "critical",
+      "packages": [
+        "com.spapp.android",
+        "com.spappmonitoring.android",
+        "com.spappmonitoring.app"
+      ],
+      "description": "SMS, call, GPS monitoring stalkerware"
+    },
+    "Phone Monitor": {
+      "severity": "critical",
+      "packages": [
+        "com.phonemonitor.android",
+        "com.phonemonitor.app",
+        "com.phonemonitorapp.android"
+      ],
+      "description": "Stealth phone monitoring"
+    },
+    "TheWiSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.thewispy.android",
+        "com.thewispy.app"
+      ],
+      "description": "Comprehensive phone monitoring stalkerware"
+    },
+    "Spymaster Pro": {
+      "severity": "critical",
+      "packages": [
+        "com.spymasterpro.android",
+        "com.spymasterpro.app"
+      ],
+      "description": "Advanced monitoring with social media access"
+    },
+    "FreeAndroidSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.freeandroidspy.android",
+        "com.freeandroidspy.app"
+      ],
+      "description": "Free stalkerware with GPS and call tracking"
+    },
+    "SpyToMobile": {
+      "severity": "critical",
+      "packages": [
+        "com.spytomobile.android",
+        "com.spytomobile.app"
+      ],
+      "description": "SMS and call interception stalkerware"
+    },
+    "PhoneSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.phonespy.android",
+        "com.phonespy.app",
+        "com.phonespy.service"
+      ],
+      "description": "Korean stalkerware with comprehensive monitoring"
+    },
+    "SilentLog": {
+      "severity": "high",
+      "packages": [
+        "com.silentlog.android",
+        "com.silentlog.app"
+      ],
+      "description": "Activity logging and tracking app"
+    },
+    "MoniMaster": {
+      "severity": "critical",
+      "packages": [
+        "com.monimaster.android",
+        "com.monimaster.app",
+        "com.monimasterpro.android"
+      ],
+      "description": "Social media monitoring stalkerware"
+    },
+    "uMobix": {
+      "severity": "critical",
+      "packages": [
+        "com.umobix.android",
+        "com.umobix.app",
+        "com.umobix.main"
+      ],
+      "description": "Stealth phone monitoring with streaming"
+    },
+    "Parentaler": {
+      "severity": "high",
+      "packages": [
+        "com.parentaler.android",
+        "com.parentaler.app"
+      ],
+      "description": "Parental monitoring with stalkerware capabilities"
+    },
+    "WebWatcher": {
+      "severity": "critical",
+      "packages": [
+        "com.webwatcher.android",
+        "com.webwatcher.app",
+        "com.awarenesstech.webwatcher"
+      ],
+      "description": "Web and messaging monitoring stalkerware"
+    },
+    "SniperSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.sniperspy.android",
+        "com.sniperspy.app"
+      ],
+      "description": "Remote monitoring with stealth mode"
+    },
+    "SpyStealth": {
+      "severity": "critical",
+      "packages": [
+        "com.spystealth.android",
+        "com.spystealth.app"
+      ],
+      "description": "Hidden surveillance stalkerware"
+    },
+    "OpinionSpy": {
+      "severity": "high",
+      "packages": [
+        "com.opinionspy.android",
+        "com.opinionspy.app"
+      ],
+      "description": "Data harvesting and monitoring"
+    },
+    "StealthGenie": {
+      "severity": "critical",
+      "packages": [
+        "com.stealthgenie.android",
+        "com.stealthgenie.app",
+        "com.stealthgenie.main"
+      ],
+      "description": "Stalkerware whose CEO was arrested for selling it"
+    },
+    "FlexiKeylogger": {
+      "severity": "critical",
+      "packages": [
+        "com.flexikeylogger.android",
+        "com.flexikeylogger.app"
+      ],
+      "description": "Android keylogger with screen capture"
+    },
+    "Spyware Android": {
+      "severity": "critical",
+      "packages": [
+        "com.spywareandroid.app",
+        "com.spyware.android"
+      ],
+      "description": "Generic Android spyware package"
+    },
+    "InvisiMon": {
+      "severity": "critical",
+      "packages": [
+        "com.invisimon.android",
+        "com.invisimon.app"
+      ],
+      "description": "Invisible monitoring stalkerware"
+    },
+    "PhoneLeash": {
+      "severity": "high",
+      "packages": [
+        "com.phoneleash.android",
+        "com.phoneleash.app"
+      ],
+      "description": "Phone control and monitoring"
+    },
+    "XploitSPY": {
+      "severity": "critical",
+      "packages": [
+        "com.xploitspy.android",
+        "com.xploitspy.app"
+      ],
+      "description": "Open source Android spyware"
+    },
+    "RatMilad": {
+      "severity": "critical",
+      "packages": [
+        "com.numgen.android",
+        "com.ratmilad.android"
+      ],
+      "description": "Iranian Android spyware distributed via fake apps"
+    },
+    "VajraSpy": {
+      "severity": "critical",
+      "packages": [
+        "com.meetme.android",
+        "com.privatechat.android",
+        "com.rafaqat.android",
+        "com.lets.chat.android",
+        "com.chit.chat.android",
+        "com.yohoo.talk.android",
+        "com.nidus.android"
+      ],
+      "description": "Patchwork APT spyware targeting Pakistan/India"
+    },
+    "Furball": {
+      "severity": "critical",
+      "packages": [
+        "com.aparat.iran",
+        "com.translation.android",
+        "com.iranmap.android"
+      ],
+      "description": "Iranian Domestic Kitten APT spyware"
+    },
+    "BadBazaar": {
+      "severity": "critical",
+      "packages": [
+        "com.badbazaar.android",
+        "com.uyghur.keyboard",
+        "com.signal.plus.android"
+      ],
+      "description": "Chinese APT targeting Uyghur community"
+    },
+    "Triout": {
+      "severity": "critical",
+      "packages": [
+        "com.triout.android",
+        "com.android.triout"
+      ],
+      "description": "Spyware framework with modular surveillance"
+    },
+    "Zanubis": {
+      "severity": "critical",
+      "packages": [
+        "com.zanubis.android",
+        "com.sunat.peru.android"
+      ],
+      "description": "Banking trojan with spyware capabilities targeting Peru"
+    },
+    "GravityRAT": {
+      "severity": "critical",
+      "packages": [
+        "com.chatico.android",
+        "com.bingeapp.android",
+        "com.gravityrat.android"
+      ],
+      "description": "Pakistani-targeting RAT with data exfiltration"
+    },
+    "Bahamut": {
+      "severity": "critical",
+      "packages": [
+        "com.openvpn.secure",
+        "com.softcell.vpn",
+        "com.bahamut.android"
+      ],
+      "description": "APT group spyware targeting South Asia"
+    },
+    "Mandrake": {
+      "severity": "critical",
+      "packages": [
+        "com.airbnb.cryptoairdrop",
+        "com.mandrake.android"
+      ],
+      "description": "Sophisticated espionage platform surviving on Play Store"
+    }
+  },
+  "government_spyware": {
+    "Pegasus (NSO Group)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["bh", "libaudio_route.so", "roleaboutd", "pcabordd", "laabordd"],
+        "files": [
+          "/data/local/tmp/oat",
+          "/system/csk",
+          "/private/var/tmp/Pegasus",
+          "/data/local/tmp/.c",
+          "/data/local/tmp/.l",
+          "/data/local/tmp/libtears.so",
+          "/data/local/tmp/.r"
+        ],
+        "domains": [
+          "*.bafrfrede.com",
+          "*.bfrfrede.com",
+          "*.mi2s.app",
+          "*.aws-amz.link",
+          "*.cdn77-secure.org"
+        ],
+        "properties": [],
+        "description": "NSO Group's 0-click spyware used by 45+ governments. Exploits iMessage, WhatsApp. Full device access."
+      }
+    },
+    "Predator (Cytrox/Intellexa)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["alien", "predator_main", "loader_agent"],
+        "files": [
+          "/data/local/tmp/astore",
+          "/data/local/tmp/.predator",
+          "/data/local/tmp/kws",
+          "/data/local/tmp/.alien"
+        ],
+        "domains": [
+          "*.cytrox.com",
+          "*.intellexa.com",
+          "*.dfrlab-security.com"
+        ],
+        "properties": [],
+        "description": "Intellexa alliance spyware. 1-click and 0-click exploits. Targets journalists and dissidents."
+      }
+    },
+    "Hermit (RCS Lab)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["hermit_core", "comm_agent"],
+        "files": [
+          "/data/local/tmp/.hermit",
+          "/data/local/tmp/hcore",
+          "/data/data/com.service.android/hermit"
+        ],
+        "domains": [
+          "*.rcslab.it",
+          "*.tykelab.it"
+        ],
+        "properties": [],
+        "description": "Italian spyware by RCS Lab. ISP-assisted deployment. Targets iOS and Android."
+      }
+    },
+    "FinSpy (FinFisher)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["finsvc", "fin_core"],
+        "files": [
+          "/data/local/tmp/.finfisher",
+          "/data/local/tmp/fcore",
+          "/data/data/org.xmlpush.v3/databases"
+        ],
+        "domains": [
+          "*.finfisher.com",
+          "*.gamma-international.de"
+        ],
+        "properties": [],
+        "description": "German-British spyware by FinFisher GmbH. Used by 32+ governments. Company went bankrupt in 2022."
+      }
+    },
+    "QuaDream REIGN": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["qdm_agent", "reign_core"],
+        "files": [
+          "/data/local/tmp/.reign",
+          "/data/local/tmp/.qdm",
+          "/data/local/tmp/qrs"
+        ],
+        "domains": [
+          "*.quadream.com"
+        ],
+        "properties": [],
+        "description": "Israeli spyware similar to Pegasus. 0-click iOS exploits. Company shut down 2023."
+      }
+    },
+    "Candiru (Saito Tech)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["cnd_svc", "saito_agent"],
+        "files": [
+          "/data/local/tmp/.candiru",
+          "/data/local/tmp/ccore"
+        ],
+        "domains": [
+          "*.candiru.com",
+          "*.saito-tech.com"
+        ],
+        "properties": [],
+        "description": "Israeli spyware targeting Windows, macOS, iOS, Android. Browser-based exploits."
+      }
+    },
+    "Chrysaor (NSO Android)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["chrysaor_svc"],
+        "files": [
+          "/data/local/tmp/.chrysaor",
+          "/system/csk",
+          "/data/data/com.network.android/databases"
+        ],
+        "domains": [],
+        "properties": [],
+        "description": "Android variant of Pegasus. Framaroot/Towelroot exploits for privilege escalation."
+      }
+    },
+    "Exodus (eSurv)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["mike42"],
+        "files": [
+          "/data/local/tmp/.exodus",
+          "/data/data/com.phonecarrier.it/exodus"
+        ],
+        "domains": [
+          "*.esurv.it",
+          "*.connexxa.it"
+        ],
+        "properties": [],
+        "description": "Italian police spyware that was on Google Play Store. Broad untargeted surveillance."
+      }
+    },
+    "Phantom (Paragon Solutions)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["phantom_svc", "graphite_core"],
+        "files": [
+          "/data/local/tmp/.phantom",
+          "/data/local/tmp/.graphite"
+        ],
+        "domains": [
+          "*.paragon-solutions.com",
+          "*.paragonis.com"
+        ],
+        "properties": [],
+        "description": "Israeli spyware by Paragon Solutions. Graphite variant targets messaging apps."
+      }
+    },
+    "Dark Caracal (Lebanese GDGS)": {
+      "severity": "critical",
+      "indicators": {
+        "processes": ["pallas_svc"],
+        "files": [
+          "/data/local/tmp/.pallas",
+          "/data/data/com.android.system.manager/pallas"
+        ],
+        "domains": [],
+        "properties": [],
+        "description": "Lebanese intelligence spyware. Pallas Android component targets activists and journalists."
+      }
+    }
+  },
+  "dangerous_permission_combos": [
+    {
+      "name": "full_surveillance",
+      "permissions": ["READ_SMS", "ACCESS_FINE_LOCATION", "RECORD_AUDIO", "CAMERA"],
+      "severity": "critical",
+      "description": "Full surveillance capability: messages, location, audio, video"
+    },
+    {
+      "name": "communication_intercept",
+      "permissions": ["READ_SMS", "READ_CONTACTS", "READ_CALL_LOG", "RECORD_AUDIO"],
+      "severity": "critical",
+      "description": "Communication interception: SMS, contacts, calls, audio"
+    },
+    {
+      "name": "accessibility_spy",
+      "permissions": ["BIND_ACCESSIBILITY_SERVICE", "CAMERA", "RECORD_AUDIO"],
+      "severity": "critical",
+      "description": "Accessibility abuse: screen reading + camera + microphone"
+    },
+    {
+      "name": "location_tracking",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_BACKGROUND_LOCATION", "READ_PHONE_STATE"],
+      "severity": "high",
+      "description": "Persistent location tracking with device identification"
+    },
+    {
+      "name": "data_exfiltration",
+      "permissions": ["READ_EXTERNAL_STORAGE", "READ_CONTACTS", "READ_SMS", "INTERNET"],
+      "severity": "high",
+      "description": "Data access and exfiltration: files, contacts, messages"
+    },
+    {
+      "name": "keylogger_behavior",
+      "permissions": ["BIND_ACCESSIBILITY_SERVICE", "SYSTEM_ALERT_WINDOW", "READ_SMS"],
+      "severity": "critical",
+      "description": "Keylogging capability via accessibility service overlay"
+    },
+    {
+      "name": "stealth_tracker",
+      "permissions": ["RECEIVE_BOOT_COMPLETED", "ACCESS_FINE_LOCATION", "CAMERA", "RECORD_AUDIO"],
+      "severity": "high",
+      "description": "Persistent stealth tracker starting on boot"
+    },
+    {
+      "name": "call_intercept",
+      "permissions": ["READ_CALL_LOG", "RECORD_AUDIO", "READ_PHONE_STATE", "PROCESS_OUTGOING_CALLS"],
+      "severity": "critical",
+      "description": "Call interception and recording capability"
+    }
+  ],
+  "suspicious_system_packages": [
+    "com.android.systemservice",
+    "com.android.system.update",
+    "com.android.system.manager",
+    "com.android.provider.contacts",
+    "com.android.provider.calendar",
+    "system.framework.service",
+    "com.android.system.secure",
+    "com.android.internal.service",
+    "com.android.services.backup",
+    "com.android.core.framework",
+    "com.android.services.sync",
+    "com.android.providers.update"
+  ],
+  "legitimate_accessibility_apps": [
+    "com.google.android.marvin.talkback",
+    "com.samsung.accessibility",
+    "com.samsung.android.accessibility.talkback",
+    "com.android.talkback",
+    "com.google.android.accessibility.switchaccess",
+    "com.samsung.android.visionintelligence",
+    "com.google.android.accessibility.soundamplifier",
+    "com.google.android.accessibility.magnification",
+    "com.samsung.android.accessibility.hearingenhancement"
+  ]
+}

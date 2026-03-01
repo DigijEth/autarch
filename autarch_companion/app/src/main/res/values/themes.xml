@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Archon" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/terminal_green</item>
+        <item name="colorPrimaryVariant">@color/terminal_green_dim</item>
+        <item name="colorOnPrimary">@color/background</item>
+        <item name="colorSecondary">@color/terminal_green_dim</item>
+        <item name="colorOnSecondary">@color/text_primary</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+</resources>

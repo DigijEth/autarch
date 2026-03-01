@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Defense - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>System Defense</h1>
+</div>
+
+<!-- Security Audit -->
+<div class="section">
+    <h2>Security Audit</h2>
+    <div class="tool-actions">
+        <button id="btn-audit" class="btn btn-primary" onclick="runDefenseAudit()">Run Full Audit</button>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="score-display">
+            <div class="score-value" id="audit-score">--</div>
+            <div class="score-label">Security Score</div>
+        </div>
+        <div style="flex:1;min-width:300px">
+            <table class="data-table">
+                <thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead>
+                <tbody id="audit-results">
+                    <tr><td colspan="3" class="empty-state">Run an audit to see results.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Individual Checks -->
+<div class="section">
+    <h2>Quick Checks</h2>
+    <div class="tool-grid">
+        <div class="tool-card">
+            <h4>Firewall</h4>
+            <p>Check iptables/ufw/firewalld status</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('firewall')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-firewall"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>SSH Config</h4>
+            <p>Check SSH hardening settings</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('ssh')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-ssh"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Open Ports</h4>
+            <p>Scan for high-risk listening ports</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('ports')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-ports"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Users</h4>
+            <p>Check UID 0 users and empty passwords</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('users')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-users"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Permissions</h4>
+            <p>Check critical file permissions</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('permissions')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-permissions"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Services</h4>
+            <p>Check for dangerous services</p>
+            <button class="btn btn-small" onclick="runDefenseCheck('services')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-services"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Firewall Manager -->
+<div class="section">
+    <h2>Firewall Manager</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="loadFirewallRules()">Refresh Rules</button>
+    </div>
+    <pre class="output-panel scrollable" id="fw-rules">Click "Refresh Rules" to load current iptables rules.</pre>
+    <div style="margin-top:12px">
+        <div class="input-row">
+            <input type="text" id="block-ip" placeholder="IP address to block">
+            <button class="btn btn-danger btn-small" onclick="blockIP()">Block IP</button>
+        </div>
+        <pre class="output-panel" id="fw-result" style="min-height:0"></pre>
+    </div>
+</div>
+
+<!-- Log Analysis -->
+<div class="section">
+    <h2>Log Analysis</h2>
+    <div class="tool-actions">
+        <button id="btn-logs" class="btn btn-primary" onclick="analyzeLogs()">Analyze Logs</button>
+    </div>
+    <pre class="output-panel scrollable" id="log-output">Click "Analyze Logs" to parse auth and web server logs.</pre>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Defense Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

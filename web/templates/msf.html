@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}MSF Console - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>MSF Console</h1>
+</div>
+
+<!-- Connection Bar -->
+<div class="section" style="padding:0.75rem 1rem">
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+        <div id="msf-conn-status" style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem">
+            <span id="msf-conn-dot" class="status-dot inactive"></span>
+            <span id="msf-conn-label">Checking...</span>
+        </div>
+        <button class="btn btn-sm" onclick="msfReconnect()">Reconnect</button>
+        <span id="msf-conn-info" style="font-size:0.8rem;color:var(--text-secondary)"></span>
+    </div>
+</div>
+
+<!-- Terminal -->
+<div class="section">
+    <div id="msf-terminal" style="background:#0a0a0a;color:#e0e0e0;font-family:monospace;font-size:0.85rem;border-radius:6px;padding:1rem;min-height:400px;max-height:60vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.5rem;align-items:center">
+        <span style="color:var(--text-secondary);font-family:monospace;font-size:0.85rem">msf6 &gt;</span>
+        <input type="text" id="msf-input" placeholder="Enter MSF console command..." style="flex:1;font-family:monospace;font-size:0.85rem" onkeypress="if(event.key==='Enter')msfSend()">
+        <button class="btn btn-primary btn-sm" onclick="msfSend()">Send</button>
+        <button class="btn btn-sm" onclick="msfClear()">Clear</button>
+    </div>
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem">
+        Examples: <code>version</code> &nbsp; <code>search ssh</code> &nbsp; <code>use auxiliary/scanner/ssh/ssh_version</code> &nbsp; <code>sessions -l</code>
+    </div>
+</div>
+
+<!-- Quick Commands -->
+<div class="section">
+    <h2>Quick Commands</h2>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="msfQuick('version')">version</button>
+        <button class="btn btn-sm" onclick="msfQuick('sessions -l')">sessions</button>
+        <button class="btn btn-sm" onclick="msfQuick('jobs -l')">jobs</button>
+        <button class="btn btn-sm" onclick="msfQuick('route')">routes</button>
+        <button class="btn btn-sm" onclick="msfQuick('hosts')">hosts</button>
+        <button class="btn btn-sm" onclick="msfQuick('services')">services</button>
+        <button class="btn btn-sm" onclick="msfQuick('creds')">creds</button>
+        <button class="btn btn-sm" onclick="msfQuick('vulns')">vulns</button>
+        <button class="btn btn-sm" onclick="msfQuick('db_status')">db_status</button>
+    </div>
+</div>
+
+<script>
+const term = document.getElementById('msf-terminal');
+
+function termPrint(text, cls) {
+    const span = document.createElement('span');
+    if (cls) span.className = cls;
+    span.textContent = text;
+    term.appendChild(span);
+    term.scrollTop = term.scrollHeight;
+}
+
+function msfClear() {
+    term.innerHTML = '';
+}
+
+async function msfCheckStatus() {
+    try {
+        const res = await fetch('/msf/status');
+        const d = await res.json();
+        const dot = document.getElementById('msf-conn-dot');
+        const label = document.getElementById('msf-conn-label');
+        const info = document.getElementById('msf-conn-info');
+        if (d.connected) {
+            dot.className = 'status-dot active';
+            label.textContent = 'Connected';
+            if (d.host) info.textContent = d.host + ':' + (d.port || 55553);
+        } else {
+            dot.className = 'status-dot inactive';
+            label.textContent = 'Disconnected';
+            info.textContent = '';
+        }
+    } catch(e) {}
+}
+
+async function msfReconnect() {
+    document.getElementById('msf-conn-label').textContent = 'Connecting...';
+    try {
+        const res = await fetch('/msf/connect', {method:'POST'});
+        const d = await res.json();
+        msfCheckStatus();
+        if (!d.connected) {
+            termPrint('[error] ' + (d.error || d.message || 'Could not connect') + '\n', 'err');
+        }
+    } catch(e) {
+        termPrint('[error] ' + e.message + '\n', 'err');
+    }
+}
+
+async function msfSend() {
+    const inp = document.getElementById('msf-input');
+    const cmd = inp.value.trim();
+    if (!cmd) return;
+    inp.value = '';
+    termPrint('msf6 > ' + cmd + '\n');
+    await msfExec(cmd);
+}
+
+function msfQuick(cmd) {
+    document.getElementById('msf-input').value = cmd;
+    msfSend();
+}
+
+async function msfExec(cmd) {
+    try {
+        const res = await fetch('/msf/console/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cmd})
+        });
+        const d = await res.json();
+        if (d.error) {
+            termPrint('[error] ' + d.error + '\n', 'err');
+        } else {
+            termPrint((d.output || '') + '\n');
+        }
+    } catch(e) {
+        termPrint('[error] ' + e.message + '\n', 'err');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    msfCheckStatus();
+    termPrint('AUTARCH MSF Console — connected to msfrpcd via RPC\n');
+    termPrint('Type commands below or use Quick Commands. Type "help" for MSF help.\n\n');
+});
+</script>
+{% endblock %}

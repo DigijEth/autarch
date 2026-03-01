@@ -1,0 +1,1365 @@
+{% extends "base.html" %}
+{% block title %}Android Shield - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Android Protection Shield</h1>
+</div>
+
+<!-- Status Cards -->
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="stat-card">
+        <div class="stat-label">ADB</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if status.adb else 'inactive' }}"></span>
+            {{ 'Available' if status.adb else 'Not found' }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Device</div>
+        <div class="stat-value small">
+            <span id="ap-dev-dot" class="status-dot inactive"></span>
+            <span id="ap-dev-text">No device</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Signatures</div>
+        <div class="stat-value small">
+            {{ sig_stats.stalkerware_packages }} packages
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Gov Spyware</div>
+        <div class="stat-value small">
+            {{ sig_stats.government_spyware }} families
+        </div>
+    </div>
+</div>
+
+<!-- ADB Connection Mode -->
+<div class="card" style="margin:0.5rem 0 0.5rem 0;padding:0.6rem 1rem;display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap">
+    <span style="font-weight:600;font-size:0.85rem;color:var(--text-secondary)">ADB Mode:</span>
+    <button id="ap-mode-server" class="btn btn-sm active" onclick="apSetMode('server')">Server (Local ADB)</button>
+    <button id="ap-mode-direct" class="btn btn-sm" onclick="apSetMode('direct')">Direct (WebUSB)</button>
+    <span id="ap-direct-bar" style="display:none;align-items:center;gap:0.5rem">
+        <span id="ap-device-label" style="font-size:0.85rem;color:var(--text-secondary)">Not connected</span>
+        <button class="btn btn-sm" onclick="apDirectConnect()">Connect</button>
+        <button class="btn btn-sm btn-danger" id="ap-disconnect-btn" style="display:none" onclick="apDirectDisconnect()">Disconnect</button>
+    </span>
+    <span id="ap-webusb-warning" style="display:none;color:#f97316;font-size:0.8rem;margin-left:0.5rem"></span>
+</div>
+
+<!-- Device Selector (server mode) -->
+<div id="ap-server-selector" class="card" style="margin:0.5rem 0 1rem 0;padding:0.8rem 1rem;display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap">
+    <label style="font-weight:600">Device:</label>
+    <select id="ap-device" style="flex:1;min-width:200px;padding:0.4rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px" onchange="apDeviceChanged()">
+        <option value="">-- Select --</option>
+    </select>
+    <button class="btn btn-sm" onclick="apRefreshDevices()">Refresh</button>
+    <span id="ap-scan-status" style="margin-left:auto;font-size:0.85em;color:var(--text-muted)"></span>
+</div>
+
+<!-- Tabs -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ap-main" data-tab="scan" onclick="showTab('ap-main','scan')">Scan</button>
+    <button class="tab" data-tab-group="ap-main" data-tab="perms" onclick="showTab('ap-main','perms')">Permissions</button>
+    <button class="tab" data-tab-group="ap-main" data-tab="remediate" onclick="showTab('ap-main','remediate')">Remediate</button>
+    <button class="tab" data-tab-group="ap-main" data-tab="shizuku" onclick="showTab('ap-main','shizuku')">Shizuku</button>
+    <button class="tab" data-tab-group="ap-main" data-tab="honeypot" onclick="showTab('ap-main','honeypot')">Honeypot</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SCAN TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" data-tab-group="ap-main" data-tab="scan">
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="apScan('quick')">Quick Scan</button>
+            <button class="btn btn-primary" onclick="apScan('full')">Full Scan</button>
+            <button class="btn" onclick="apExportReport()">Export Report</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Individual Scans</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apScan('stalkerware')">Stalkerware</button>
+            <button class="btn" onclick="apScan('hidden')">Hidden Apps</button>
+            <button class="btn" onclick="apScan('admins')">Device Admins</button>
+            <button class="btn" onclick="apScan('accessibility')">Accessibility</button>
+            <button class="btn" onclick="apScan('listeners')">Notification Listeners</button>
+            <button class="btn" onclick="apScan('spyware')">Spyware (Pegasus/Predator)</button>
+            <button class="btn" onclick="apScan('integrity')">System Integrity</button>
+            <button class="btn" onclick="apScan('processes')">Suspicious Processes</button>
+            <button class="btn" onclick="apScan('certs')">Certificates (MITM)</button>
+            <button class="btn" onclick="apScan('network')">Network Config</button>
+            <button class="btn" onclick="apScan('devopt')">Developer Options</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="ap-scan-results" class="output-box" style="min-height:100px;max-height:600px;overflow-y:auto">
+            <span class="text-muted">Select a device and run a scan to see results.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PERMISSIONS TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ap-main" data-tab="perms">
+    <div class="section">
+        <h2>Permission Analysis</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-primary" onclick="apFindDangerous()">Find Dangerous Apps</button>
+            <button class="btn" onclick="apPermHeatmap()">Permission Heatmap</button>
+            <span style="margin-left:8px">|</span>
+            <input id="ap-perm-pkg" type="text" class="input" placeholder="com.example.app" style="max-width:250px">
+            <button class="btn" onclick="apAnalyzePerms()">Analyze App</button>
+        </div>
+    </div>
+    <div class="section">
+        <h2>Results</h2>
+        <div id="ap-perm-results" class="output-box" style="min-height:100px;max-height:600px;overflow-y:auto">
+            <span class="text-muted">Run a permission analysis to see results.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- REMEDIATE TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ap-main" data-tab="remediate">
+    <div class="section">
+        <h2>Threat Remediation</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <label>Package:</label>
+            <input id="ap-fix-pkg" type="text" class="input" placeholder="com.stalkerware.app" style="max-width:300px">
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apFix('disable')">Disable</button>
+            <button class="btn btn-danger" onclick="apFix('uninstall')">Uninstall</button>
+            <button class="btn" onclick="apFix('revoke')">Revoke Permissions</button>
+            <button class="btn" onclick="apFix('remove-admin')">Remove Device Admin</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Network Cleanup</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apFixProxy()">Clear Proxy Settings</button>
+            <button class="btn" onclick="apScan('certs')">Scan Certificates</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>CA Certificate Removal</h2>
+        <div id="ap-cert-list" style="margin-bottom:8px">
+            <span class="text-muted">Run cert scan first to see installed certs.</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Results</h2>
+        <div id="ap-fix-results" class="output-box" style="min-height:80px;max-height:400px;overflow-y:auto">
+            <span class="text-muted">Remediation results will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- SHIZUKU TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ap-main" data-tab="shizuku">
+    <div class="section">
+        <h2>Shizuku Service</h2>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px">
+            <div class="stat-card">
+                <div class="stat-label">Installed</div>
+                <div class="stat-value small"><span id="ap-sz-installed">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Running</div>
+                <div class="stat-value small"><span id="ap-sz-running">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Version</div>
+                <div class="stat-value small"><span id="ap-sz-version">--</span></div>
+            </div>
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apShizukuStatus()">Check Status</button>
+            <button class="btn btn-primary" onclick="apShizukuStart()">Start Shizuku</button>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <label>Install APK:</label>
+            <input type="file" id="ap-sz-apk" accept=".apk" class="input" style="max-width:300px">
+            <button class="btn" onclick="apShizukuInstall()">Install</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Shield App</h2>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr));margin-bottom:12px">
+            <div class="stat-card">
+                <div class="stat-label">Installed</div>
+                <div class="stat-value small"><span id="ap-sh-installed">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Version</div>
+                <div class="stat-value small"><span id="ap-sh-version">--</span></div>
+            </div>
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apShieldStatus()">Check Status</button>
+            <button class="btn" onclick="apShieldGrantPerms()">Grant Permissions</button>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <label>Install APK:</label>
+            <input type="file" id="ap-sh-apk" accept=".apk" class="input" style="max-width:300px">
+            <button class="btn" onclick="apShieldInstall()">Install</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Database</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apDbStats()">Signature Stats</button>
+            <button class="btn" onclick="apDbUpdate()">Update Signatures</button>
+        </div>
+        <div id="ap-shizuku-results" class="output-box" style="min-height:80px;max-height:400px;overflow-y:auto;margin-top:12px">
+            <span class="text-muted">Shizuku/Shield status will appear here.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- HONEYPOT TAB -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ap-main" data-tab="honeypot">
+
+    <!-- Status Section -->
+    <div class="section">
+        <h2>Honeypot Status</h2>
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:12px">
+            <div class="stat-card">
+                <div class="stat-label">Active</div>
+                <div class="stat-value small">
+                    <span id="ap-hp-active-dot" class="status-dot inactive"></span>
+                    <span id="ap-hp-active">--</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Tier</div>
+                <div class="stat-value small"><span id="ap-hp-tier">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Hosts</div>
+                <div class="stat-value small"><span id="ap-hp-hosts">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">DNS</div>
+                <div class="stat-value small"><span id="ap-hp-dns">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Ad Tracking</div>
+                <div class="stat-value small"><span id="ap-hp-adtrack">--</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fake Location</div>
+                <div class="stat-value small"><span id="ap-hp-fakeloc">--</span></div>
+            </div>
+        </div>
+        <button class="btn" onclick="apHoneypotStatus()">Check Status</button>
+    </div>
+
+    <!-- Detection Section -->
+    <div class="section">
+        <h2>Detection</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apScanTrackers()">Scan Tracker Apps</button>
+            <button class="btn" onclick="apScanTrackerPerms()">Scan Tracker Permissions</button>
+            <button class="btn" onclick="apViewAdSettings()">View Ad Settings</button>
+        </div>
+    </div>
+
+    <!-- Tier 1: ADB -->
+    <div class="section">
+        <h2>Tier 1 — ADB (no root)</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn" onclick="apResetAdId()">Reset Ad ID</button>
+            <button class="btn" onclick="apOptOutTracking()">Opt Out of Tracking</button>
+            <button class="btn" onclick="apDisableLocationScan()">Disable Location Scanning</button>
+            <button class="btn" onclick="apDisableDiagnostics()">Disable Diagnostics</button>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label>DNS Provider:</label>
+            <select id="ap-hp-dns-provider" class="input" style="max-width:200px">
+                <option value="adguard">AdGuard DNS</option>
+                <option value="nextdns">NextDNS</option>
+                <option value="quad9">Quad9</option>
+                <option value="mullvad">Mullvad DNS</option>
+            </select>
+            <button class="btn btn-primary" onclick="apSetDns()">Set DNS</button>
+            <button class="btn" onclick="apClearDns()">Clear DNS</button>
+        </div>
+    </div>
+
+    <!-- Tier 2: Shizuku -->
+    <div class="section">
+        <h2>Tier 2 — Shizuku</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+            <label>Package:</label>
+            <input id="ap-hp-package" type="text" class="input" placeholder="com.tracker.app" style="max-width:280px">
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apRestrictBackground()">Restrict Background</button>
+            <button class="btn" onclick="apRevokeTrackerPerms()">Revoke Tracking Perms</button>
+            <button class="btn" onclick="apClearTrackerData()">Clear Tracker Data</button>
+            <button class="btn" onclick="apForceStopTrackers()">Force-Stop All Trackers</button>
+        </div>
+    </div>
+
+    <!-- Tier 3: Root -->
+    <div class="section">
+        <h2>Tier 3 — Root</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn btn-primary" onclick="apDeployHosts()">Deploy Hosts Blocklist</button>
+            <button class="btn" onclick="apRemoveHosts()">Remove Hosts</button>
+            <span style="color:var(--text-muted)">|</span>
+            <button class="btn" onclick="apIptablesSetup()">Setup iptables Redirect</button>
+            <button class="btn" onclick="apIptablesClear()">Clear iptables</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <label>Lat:</label>
+            <input id="ap-hp-lat" type="number" step="0.0001" class="input" placeholder="48.8584" style="max-width:130px">
+            <label>Lon:</label>
+            <input id="ap-hp-lon" type="number" step="0.0001" class="input" placeholder="2.2945" style="max-width:130px">
+            <button class="btn" onclick="apSetFakeLocation()">Set Location</button>
+            <button class="btn" onclick="apRandomLocation()">Random Location</button>
+            <button class="btn" onclick="apClearLocation()">Clear Location</button>
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apRotateIdentity()">Rotate Device Identity</button>
+            <button class="btn" onclick="apFakeFingerprint()">Fake Device Fingerprint</button>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section">
+        <h2>Quick Actions</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label>Protection Tier:</label>
+            <select id="ap-hp-tier-select" class="input" style="max-width:200px">
+                <option value="1">Tier 1 — ADB only</option>
+                <option value="2">Tier 2 — ADB + Shizuku</option>
+                <option value="3">Tier 3 — Full (Root)</option>
+            </select>
+            <button class="btn btn-primary" onclick="apActivateHoneypot()">Activate All</button>
+            <button class="btn btn-danger" onclick="apDeactivateHoneypot()">Deactivate All</button>
+        </div>
+    </div>
+
+    <!-- Database -->
+    <div class="section">
+        <h2>Tracker Database</h2>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" onclick="apTrackerStats()">Tracker Stats</button>
+            <button class="btn" onclick="apUpdateDomains()">Update Tracker Domains</button>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="section">
+        <h2>Results</h2>
+        <div id="ap-honeypot-results" class="output-box" style="min-height:100px;max-height:600px;overflow-y:auto">
+            <span class="text-muted">Select a device and run a honeypot action to see results.</span>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── State ── */
+let apSerial   = '';
+let apLastScan = null;
+let apMode     = 'server';
+
+/* ── Mode Switching ── */
+function apSetMode(mode) {
+    apMode = mode;
+    localStorage.setItem('ap_connection_mode', mode);
+    document.getElementById('ap-mode-server').classList.toggle('active', mode === 'server');
+    document.getElementById('ap-mode-direct').classList.toggle('active', mode === 'direct');
+    document.getElementById('ap-direct-bar').style.display   = mode === 'direct' ? 'flex' : 'none';
+    document.getElementById('ap-server-selector').style.display = mode === 'server' ? '' : 'none';
+
+    if (mode === 'direct') {
+        const warn = document.getElementById('ap-webusb-warning');
+        if (!navigator.usb) {
+            warn.textContent = location.protocol !== 'https:'
+                ? 'WebUSB requires HTTPS — enable in autarch_settings.conf'
+                : 'WebUSB not supported — use Chrome, Edge, or Brave';
+            warn.style.display = '';
+        } else {
+            warn.style.display = 'none';
+        }
+        apUpdateDirectStatus();
+    } else {
+        apRefreshDevices();
+    }
+}
+
+async function apDirectConnect() {
+    const lbl = document.getElementById('ap-device-label');
+    lbl.textContent = 'Connecting...';
+    try {
+        const deviceObj = await HWDirect.adbRequestDevice();
+        if (!deviceObj) { lbl.textContent = 'Cancelled'; return; }
+        await HWDirect.adbConnect(deviceObj);
+        apUpdateDirectStatus();
+        HWDirect.adbGetInfo().then(() => apUpdateDirectStatus()).catch(() => {});
+    } catch(e) {
+        lbl.textContent = 'Error: ' + e.message;
+    }
+}
+
+function apDirectDisconnect() {
+    HWDirect.adbDisconnect();
+    apSerial = '';
+    apUpdateDirectStatus();
+}
+
+function apUpdateDirectStatus() {
+    const connected = HWDirect.adbIsConnected();
+    document.getElementById('ap-device-label').textContent = connected ? HWDirect.adbGetDeviceLabel() : 'Not connected';
+    document.getElementById('ap-disconnect-btn').style.display = connected ? '' : 'none';
+    apSerial = connected ? '__webusb__' : '';
+    const dot = document.getElementById('ap-dev-dot');
+    const txt = document.getElementById('ap-dev-text');
+    dot.className = 'status-dot ' + (connected ? 'active' : 'inactive');
+    txt.textContent = connected ? HWDirect.adbGetDeviceLabel() : 'No device';
+}
+
+/* ── Device Management ── */
+function apRefreshDevices() {
+    if (apMode === 'direct') { apUpdateDirectStatus(); return; }
+    fetch('/hardware/adb/devices')
+        .then(r => r.json())
+        .then(data => {
+            const sel = document.getElementById('ap-device');
+            const prev = sel.value;
+            sel.innerHTML = '<option value="">-- Select --</option>';
+            (data.devices || []).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.serial;
+                opt.textContent = d.serial + (d.model ? ' (' + d.model + ')' : '');
+                sel.appendChild(opt);
+            });
+            if (prev) sel.value = prev;
+            apDeviceChanged();
+        })
+        .catch(() => {});
+}
+
+function apDeviceChanged() {
+    if (apMode === 'direct') return;
+    apSerial = document.getElementById('ap-device').value;
+    const dot = document.getElementById('ap-dev-dot');
+    const txt = document.getElementById('ap-dev-text');
+    dot.className = 'status-dot ' + (apSerial ? 'active' : 'inactive');
+    txt.textContent = apSerial || 'No device';
+}
+
+/* ── Helpers ── */
+function apPost(url, body) {
+    if (apMode === 'direct') return apDirect(url, body);
+    return fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    }).then(r => r.json());
+}
+
+async function apDirect(url, body) {
+    if (!HWDirect.adbIsConnected()) {
+        return {error: 'No WebUSB device connected — click Connect first.'};
+    }
+    const op = url.replace('/android-protect/', '').replace(/\//g, '_');
+    try {
+        // 1. Get shell commands for this operation
+        const cmdRes = await fetch('/android-protect/cmd', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({op})
+        });
+        const {commands, supported} = await cmdRes.json();
+        if (!supported) {
+            return {error: 'This operation requires Server mode — it writes to the device or needs server-side resources not available in Direct mode.'};
+        }
+        // 2. Execute each command via WebUSB (extract stdout string)
+        const raw = {};
+        for (const [key, cmd] of Object.entries(commands)) {
+            const result = await HWDirect.adbShell(cmd);
+            raw[key] = (typeof result === 'object' && result !== null) ? (result.stdout || result.output || '') : (result || '');
+        }
+        // 3. Parse on server (signature DB analysis, etc.)
+        const parseRes = await fetch('/android-protect/parse', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({op, body, raw})
+        });
+        return parseRes.json();
+    } catch(e) {
+        return {error: 'Direct mode error: ' + e.message};
+    }
+}
+
+function apSetStatus(msg) {
+    document.getElementById('ap-scan-status').textContent = msg;
+}
+
+function sevColor(sev) {
+    const m = {critical:'#e74c3c', high:'#e67e22', medium:'#f1c40f', low:'#27ae60'};
+    return m[sev] || '#888';
+}
+
+function sevBadge(sev) {
+    return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:0.8em;color:#fff;background:' + sevColor(sev) + '">' + sev + '</span>';
+}
+
+/* ── Scan Tab ── */
+function apScan(type) {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-scan-results');
+    box.innerHTML = '<span class="text-muted">Scanning...</span>';
+    apSetStatus('Scanning...');
+    const url = (type === 'quick' || type === 'full')
+        ? '/android-protect/scan/' + type
+        : '/android-protect/scan/' + type;
+    apPost(url, {serial: apSerial}).then(data => {
+        apSetStatus('Done');
+        apLastScan = data;
+        box.innerHTML = apRenderScan(type, data);
+    }).catch(e => {
+        apSetStatus('Error');
+        box.innerHTML = '<span style="color:#e74c3c">Error: ' + e.message + '</span>';
+    });
+}
+
+function apRenderScan(type, data) {
+    if (data.error) return '<span style="color:#e74c3c">' + data.error + '</span>';
+    let h = '';
+
+    if (type === 'quick' || type === 'full') {
+        const s = data.summary || {};
+        h += '<h3>Summary</h3>';
+        h += '<table class="data-table"><tbody>';
+        h += '<tr><td>Threats Found</td><td><strong style="color:' + (s.threats_found ? '#e74c3c' : '#27ae60') + '">' + (s.threats_found || 0) + '</strong></td></tr>';
+        if (s.system_integrity) h += '<tr><td>System Integrity</td><td>' + s.system_integrity + '</td></tr>';
+        if (s.hidden_apps !== undefined) h += '<tr><td>Hidden Apps</td><td>' + s.hidden_apps + '</td></tr>';
+        if (s.dangerous_apps !== undefined) h += '<tr><td>Dangerous Apps</td><td>' + s.dangerous_apps + '</td></tr>';
+        if (s.user_ca_certs !== undefined) h += '<tr><td>User CA Certs</td><td>' + s.user_ca_certs + '</td></tr>';
+        h += '</tbody></table>';
+
+        // Stalkerware
+        const found = (data.stalkerware || {}).found || [];
+        if (found.length) {
+            h += '<h3 style="color:#e74c3c">Stalkerware Detected (' + found.length + ')</h3>';
+            found.forEach(f => {
+                h += '<div style="margin:4px 0;padding:6px;border-left:3px solid ' + sevColor(f.severity) + ';background:rgba(0,0,0,0.1)">';
+                h += sevBadge(f.severity) + ' <strong>' + f.name + '</strong> <code>' + f.package + '</code>';
+                h += '<br><small>' + f.description + '</small></div>';
+            });
+        }
+
+        // Spyware
+        const spy = (data.spyware_indicators || {}).findings || [];
+        if (spy.length) {
+            h += '<h3 style="color:#e74c3c">Government Spyware Indicators</h3>';
+            spy.forEach(s => {
+                h += '<div style="margin:4px 0;padding:6px;border-left:3px solid #e74c3c;background:rgba(231,76,60,0.1)">';
+                h += sevBadge(s.severity) + ' <strong>' + s.name + '</strong>';
+                (s.indicators_matched || []).forEach(i => {
+                    h += '<br><small>' + i.type + ': <code>' + i.value + '</code></small>';
+                });
+                h += '</div>';
+            });
+        }
+
+        if (!found.length && !spy.length && !s.threats_found) {
+            h += '<p style="color:#27ae60"><strong>No threats detected.</strong></p>';
+        }
+        return h;
+    }
+
+    /* Individual scan types */
+    if (type === 'stalkerware') {
+        h += '<p>Scanned ' + data.total + ' packages, ' + data.clean_count + ' clean</p>';
+        const found = data.found || [];
+        if (found.length) {
+            found.forEach(f => {
+                h += '<div style="margin:4px 0;padding:6px;border-left:3px solid ' + sevColor(f.severity) + '">';
+                h += sevBadge(f.severity) + ' <strong>' + f.name + '</strong> <code>' + f.package + '</code>';
+                h += '<br><small>' + f.description + '</small></div>';
+            });
+        } else h += '<p style="color:#27ae60">No stalkerware detected.</p>';
+        return h;
+    }
+
+    if (type === 'hidden') {
+        const apps = data.hidden_apps || [];
+        h += '<p>Found ' + apps.length + ' hidden apps (no launcher icon):</p>';
+        if (apps.length) {
+            h += '<ul>';
+            apps.forEach(a => h += '<li><code>' + a + '</code></li>');
+            h += '</ul>';
+        }
+        return h;
+    }
+
+    if (type === 'admins') {
+        const admins = data.admins || [];
+        h += '<p>Device Admins (' + admins.length + '):</p>';
+        admins.forEach(a => {
+            const cls = a.suspicious ? 'color:#e74c3c' : '';
+            h += '<div style="margin:2px 0;' + cls + '"><code>' + a.package + '</code>';
+            if (a.suspicious) h += ' <strong>[SUSPICIOUS]</strong>';
+            h += '</div>';
+        });
+        return h;
+    }
+
+    if (type === 'accessibility') {
+        const svcs = data.services || [];
+        if (!svcs.length) return '<p>No accessibility services enabled.</p>';
+        svcs.forEach(s => {
+            const color = s.status === 'malicious' ? '#e74c3c' : (s.status === 'legitimate' ? '#27ae60' : '#e67e22');
+            h += '<div style="margin:2px 0;color:' + color + '"><code>' + s.package + '</code> [' + s.status + ']</div>';
+        });
+        return h;
+    }
+
+    if (type === 'listeners') {
+        const ls = data.listeners || [];
+        if (!ls.length) return '<p>No notification listeners enabled.</p>';
+        ls.forEach(l => {
+            h += '<div style="margin:2px 0"><code>' + l.package + '</code>';
+            if (l.suspicious) h += ' <strong style="color:#e74c3c">[SUSPICIOUS]</strong>';
+            h += '</div>';
+        });
+        return h;
+    }
+
+    if (type === 'spyware') {
+        h += '<p>Checked ' + data.spyware_checked + ' spyware families</p>';
+        const findings = data.findings || [];
+        if (findings.length) {
+            findings.forEach(f => {
+                h += '<div style="margin:4px 0;padding:6px;border-left:3px solid #e74c3c;background:rgba(231,76,60,0.1)">';
+                h += sevBadge(f.severity) + ' <strong>' + f.name + '</strong>';
+                h += '<br><small>' + (f.description || '') + '</small>';
+                (f.indicators_matched || []).forEach(i => {
+                    h += '<br><code>' + i.type + ': ' + i.value + '</code>';
+                });
+                h += '</div>';
+            });
+        } else h += '<p style="color:#27ae60">No government spyware indicators found.</p>';
+        return h;
+    }
+
+    if (type === 'integrity') {
+        h += '<p>Passed: ' + data.ok_count + '/' + data.total + '</p>';
+        const checks = data.checks || {};
+        for (const [k, c] of Object.entries(checks)) {
+            const icon = c.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[!!]</span>';
+            h += '<div style="margin:2px 0">' + icon + ' ' + c.description + ': <code>' + c.value + '</code></div>';
+        }
+        return h;
+    }
+
+    if (type === 'processes') {
+        const findings = data.findings || [];
+        if (!findings.length) return '<p style="color:#27ae60">No suspicious processes found.</p>';
+        findings.forEach(f => {
+            h += '<div style="margin:2px 0;color:' + sevColor(f.severity) + '">[' + f.severity.toUpperCase() + '] ' + f.type + ': <code>' + f.detail + '</code></div>';
+        });
+        return h;
+    }
+
+    if (type === 'certs') {
+        const certs = data.certs || [];
+        if (!certs.length) return '<p style="color:#27ae60">No user-installed CA certificates.</p>';
+        h += '<p>' + certs.length + ' user-installed CA certs:</p>';
+        certs.forEach(c => {
+            h += '<div style="margin:4px 0;padding:4px;border-left:3px solid #e67e22">';
+            h += '<code>' + c.hash + '</code><br><small>' + c.detail + '</small></div>';
+        });
+        // Also update cert list in remediate tab
+        apUpdateCertList(certs);
+        return h;
+    }
+
+    if (type === 'network') {
+        const checks = data.checks || {};
+        for (const [k, c] of Object.entries(checks)) {
+            const icon = c.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[!!]</span>';
+            h += '<div style="margin:2px 0">' + icon + ' ' + (c.description || k) + ': <code>' + c.value + '</code></div>';
+        }
+        return h;
+    }
+
+    if (type === 'devopt') {
+        const checks = data.checks || {};
+        for (const [k, c] of Object.entries(checks)) {
+            const icon = c.enabled ? '<span style="color:#e67e22">[ON]</span>' : '<span style="color:#27ae60">[OFF]</span>';
+            h += '<div style="margin:2px 0">' + icon + ' ' + c.description + ': ' + c.value + '</div>';
+        }
+        return h;
+    }
+
+    return '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+}
+
+function apExportReport() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apSetStatus('Exporting...');
+    apPost('/android-protect/scan/export', {serial: apSerial}).then(data => {
+        apSetStatus('Done');
+        const box = document.getElementById('ap-scan-results');
+        if (data.ok) {
+            box.innerHTML = '<p style="color:#27ae60">Report exported: <code>' + data.path + '</code></p>';
+        } else {
+            box.innerHTML = '<span style="color:#e74c3c">Error: ' + (data.error || 'Unknown') + '</span>';
+        }
+    });
+}
+
+/* ── Permissions Tab ── */
+function apFindDangerous() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-perm-results');
+    box.innerHTML = '<span class="text-muted">Analyzing permissions (this may take a while)...</span>';
+    apPost('/android-protect/perms/dangerous', {serial: apSerial}).then(data => {
+        if (data.error) { box.innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        const apps = data.dangerous || [];
+        let h = '<p>Found ' + apps.length + ' apps with dangerous permission combos:</p>';
+        if (apps.length) {
+            apps.forEach(a => {
+                h += '<div style="margin:4px 0;padding:6px;border-left:3px solid ' + sevColor(a.severity) + '">';
+                h += sevBadge(a.severity) + ' <code>' + a.package + '</code>';
+                h += '<br><small>Pattern: ' + a.combo + ' | Perms: ' + a.matched_perms.join(', ') + '</small></div>';
+            });
+        } else h += '<p style="color:#27ae60">No apps with dangerous combos found.</p>';
+        box.innerHTML = h;
+    });
+}
+
+function apAnalyzePerms() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const pkg = document.getElementById('ap-perm-pkg').value.trim();
+    if (!pkg) { alert('Enter a package name'); return; }
+    const box = document.getElementById('ap-perm-results');
+    box.innerHTML = '<span class="text-muted">Analyzing...</span>';
+    apPost('/android-protect/perms/analyze', {serial: apSerial, package: pkg}).then(data => {
+        if (data.error) { box.innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        const p = data.permissions || {};
+        let h = '<h3>' + data.package + '</h3>';
+        const info = data.info || {};
+        if (Object.keys(info).length) {
+            h += '<table class="data-table"><tbody>';
+            for (const [k,v] of Object.entries(info)) h += '<tr><td>' + k + '</td><td>' + v + '</td></tr>';
+            h += '</tbody></table>';
+        }
+        h += '<h4 style="color:#27ae60">Granted (' + (p.granted||[]).length + ')</h4><ul>';
+        (p.granted||[]).forEach(pm => h += '<li><code>' + pm + '</code></li>');
+        h += '</ul>';
+        h += '<h4 style="color:#888">Denied (' + (p.denied||[]).length + ')</h4><ul>';
+        (p.denied||[]).forEach(pm => h += '<li><code>' + pm + '</code></li>');
+        h += '</ul>';
+        box.innerHTML = h;
+    });
+}
+
+function apPermHeatmap() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-perm-results');
+    box.innerHTML = '<span class="text-muted">Building heatmap (scanning all apps)...</span>';
+    apPost('/android-protect/perms/heatmap', {serial: apSerial}).then(data => {
+        if (data.error) { box.innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        const matrix = data.matrix || [];
+        const names = data.permission_names || [];
+        if (!matrix.length) { box.innerHTML = '<p>No apps with dangerous permissions.</p>'; return; }
+        let h = '<div style="overflow-x:auto"><table class="data-table" style="font-size:0.75em"><thead><tr><th>Package</th>';
+        names.forEach(n => h += '<th style="writing-mode:vertical-lr;text-orientation:mixed;max-width:20px">' + n.replace('ACCESS_', '').replace('READ_', 'R_').replace('BIND_', 'B_').substr(0,12) + '</th>');
+        h += '</tr></thead><tbody>';
+        matrix.slice(0, 50).forEach(row => {
+            h += '<tr><td><code>' + row.package.substr(0,40) + '</code></td>';
+            names.forEach(n => {
+                const has = row.permissions[n];
+                h += '<td style="text-align:center;background:' + (has ? 'rgba(231,76,60,0.3)' : '') + '">' + (has ? 'X' : '') + '</td>';
+            });
+            h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        if (matrix.length > 50) h += '<p><small>Showing 50 of ' + matrix.length + ' apps</small></p>';
+        box.innerHTML = h;
+    });
+}
+
+/* ── Remediate Tab ── */
+function apFix(action) {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const pkg = document.getElementById('ap-fix-pkg').value.trim();
+    if (!pkg) { alert('Enter target package name'); return; }
+    if (action === 'uninstall' && !confirm('Uninstall ' + pkg + '?')) return;
+    const box = document.getElementById('ap-fix-results');
+    box.innerHTML = '<span class="text-muted">Working...</span>';
+    apPost('/android-protect/fix/' + action, {serial: apSerial, package: pkg}).then(data => {
+        if (data.ok) {
+            box.innerHTML = '<p style="color:#27ae60">' + (data.message || 'Success') + '</p>';
+        } else if (data.revoked) {
+            let h = '<p>Revoked: ' + data.revoked.join(', ') + '</p>';
+            if (data.failed && data.failed.length) h += '<p style="color:#e67e22">Failed: ' + data.failed.join(', ') + '</p>';
+            box.innerHTML = h;
+        } else {
+            box.innerHTML = '<span style="color:#e74c3c">Error: ' + (data.error || JSON.stringify(data)) + '</span>';
+        }
+    });
+}
+
+function apFixProxy() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-fix-results');
+    box.innerHTML = '<span class="text-muted">Clearing proxy...</span>';
+    apPost('/android-protect/fix/clear-proxy', {serial: apSerial}).then(data => {
+        let h = '<h4>Proxy Cleanup</h4>';
+        (data.results || []).forEach(r => {
+            h += '<div>' + (r.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[FAIL]</span>') + ' ' + r.setting + '</div>';
+        });
+        box.innerHTML = h;
+    });
+}
+
+function apUpdateCertList(certs) {
+    const el = document.getElementById('ap-cert-list');
+    if (!certs || !certs.length) {
+        el.innerHTML = '<span class="text-muted">No user CA certs found.</span>';
+        return;
+    }
+    let h = '';
+    certs.forEach(c => {
+        h += '<div style="margin:4px 0;display:flex;gap:8px;align-items:center">';
+        h += '<code>' + c.hash + '</code> <small>' + c.detail + '</small>';
+        h += ' <button class="btn btn-sm btn-danger" onclick="apRemoveCert(\'' + c.hash + '\')">Remove</button></div>';
+    });
+    el.innerHTML = h;
+}
+
+function apRemoveCert(hash) {
+    if (!apSerial) return;
+    if (!confirm('Remove CA certificate ' + hash + '?')) return;
+    apPost('/android-protect/fix/remove-cert', {serial: apSerial, cert_hash: hash}).then(data => {
+        const box = document.getElementById('ap-fix-results');
+        if (data.ok) {
+            box.innerHTML = '<p style="color:#27ae60">Certificate removed.</p>';
+        } else {
+            box.innerHTML = '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+        }
+    });
+}
+
+/* ── Shizuku Tab ── */
+function apShizukuStatus() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apPost('/android-protect/shizuku/status', {serial: apSerial}).then(data => {
+        document.getElementById('ap-sz-installed').textContent = data.installed ? 'Yes' : 'No';
+        document.getElementById('ap-sz-running').textContent = data.running ? 'Yes' : 'No';
+        document.getElementById('ap-sz-version').textContent = data.version || 'N/A';
+        document.getElementById('ap-shizuku-results').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    });
+}
+
+function apShizukuStart() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-shizuku-results');
+    box.innerHTML = '<span class="text-muted">Starting Shizuku...</span>';
+    apPost('/android-protect/shizuku/start', {serial: apSerial}).then(data => {
+        box.innerHTML = data.ok
+            ? '<p style="color:#27ae60">Shizuku started: ' + (data.output || '') + '</p>'
+            : '<span style="color:#e74c3c">Error: ' + (data.error || 'Failed') + '</span>';
+    });
+}
+
+function apShizukuInstall() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const file = document.getElementById('ap-sz-apk').files[0];
+    if (!file) { alert('Select an APK file'); return; }
+    const fd = new FormData();
+    fd.append('apk', file);
+    fd.append('serial', apSerial);
+    const box = document.getElementById('ap-shizuku-results');
+    box.innerHTML = '<span class="text-muted">Installing Shizuku...</span>';
+    fetch('/android-protect/shizuku/install', {method:'POST', body:fd}).then(r=>r.json()).then(data => {
+        box.innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">Error: ' + (data.error || 'Failed') + '</span>';
+    });
+}
+
+function apShieldStatus() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apPost('/android-protect/shield/status', {serial: apSerial}).then(data => {
+        document.getElementById('ap-sh-installed').textContent = data.installed ? 'Yes' : 'No';
+        document.getElementById('ap-sh-version').textContent = data.version || 'N/A';
+    });
+}
+
+function apShieldInstall() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const file = document.getElementById('ap-sh-apk').files[0];
+    if (!file) { alert('Select an APK file'); return; }
+    const fd = new FormData();
+    fd.append('apk', file);
+    fd.append('serial', apSerial);
+    const box = document.getElementById('ap-shizuku-results');
+    box.innerHTML = '<span class="text-muted">Installing Shield...</span>';
+    fetch('/android-protect/shield/install', {method:'POST', body:fd}).then(r=>r.json()).then(data => {
+        box.innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">Error: ' + (data.error || 'Failed') + '</span>';
+    });
+}
+
+function apShieldGrantPerms() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    const box = document.getElementById('ap-shizuku-results');
+    box.innerHTML = '<span class="text-muted">Granting permissions...</span>';
+    apPost('/android-protect/shield/permissions', {serial: apSerial}).then(data => {
+        let h = '<h4>Shield Permissions</h4>';
+        (data.granted || []).forEach(p => h += '<div style="color:#27ae60">[OK] ' + p + '</div>');
+        (data.failed || []).forEach(f => h += '<div style="color:#e74c3c">[!!] ' + f.perm + ': ' + f.error + '</div>');
+        box.innerHTML = h;
+    });
+}
+
+function apDbStats() {
+    apPost('/android-protect/db/stats', {}).then(data => {
+        let h = '<h4>Signature Database</h4>';
+        h += '<table class="data-table"><tbody>';
+        h += '<tr><td>Version</td><td>' + data.version + '</td></tr>';
+        h += '<tr><td>Last Updated</td><td>' + data.last_updated + '</td></tr>';
+        h += '<tr><td>Stalkerware Families</td><td>' + data.stalkerware_families + '</td></tr>';
+        h += '<tr><td>Stalkerware Packages</td><td>' + data.stalkerware_packages + '</td></tr>';
+        h += '<tr><td>Government Spyware</td><td>' + data.government_spyware + '</td></tr>';
+        h += '<tr><td>Permission Combos</td><td>' + data.permission_combos + '</td></tr>';
+        h += '</tbody></table>';
+        document.getElementById('ap-shizuku-results').innerHTML = h;
+    });
+}
+
+function apDbUpdate() {
+    const box = document.getElementById('ap-shizuku-results');
+    box.innerHTML = '<span class="text-muted">Updating signatures...</span>';
+    apPost('/android-protect/db/update', {}).then(data => {
+        if (data.ok) {
+            box.innerHTML = '<p style="color:#27ae60">Updated: merged ' + data.merged + ' new packages from ' + data.source + '</p>';
+        } else {
+            box.innerHTML = '<span style="color:#e74c3c">Error: ' + (data.error || 'Failed') + '</span>';
+        }
+    });
+}
+
+/* ── Honeypot Tab ── */
+function apHpBox() { return document.getElementById('ap-honeypot-results'); }
+function apHpWorking(msg) { apHpBox().innerHTML = '<span class="text-muted">' + (msg || 'Working...') + '</span>'; }
+function apHpError(e) { apHpBox().innerHTML = '<span style="color:#e74c3c">Error: ' + (e.message || e) + '</span>'; }
+
+function apHoneypotStatus() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Checking honeypot status...');
+    apPost('/android-protect/honeypot/status', {serial: apSerial}).then(data => {
+        if (data.error) { apHpBox().innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        document.getElementById('ap-hp-active').textContent = data.active ? 'Yes' : 'No';
+        document.getElementById('ap-hp-active-dot').className = 'status-dot ' + (data.active ? 'active' : 'inactive');
+        document.getElementById('ap-hp-tier').textContent = data.tier || '0';
+        document.getElementById('ap-hp-dns').textContent = data.private_dns_host || data.private_dns_mode || 'off';
+        document.getElementById('ap-hp-adtrack').textContent = data.ad_tracking_limited ? 'Limited' : 'Active';
+        var prot = data.protections || {};
+        document.getElementById('ap-hp-hosts').textContent = prot.hosts_blocklist ? 'Active' : 'Off';
+        var fl = prot.fake_location;
+        document.getElementById('ap-hp-fakeloc').textContent = fl ? (fl.lat + ', ' + fl.lon) : 'Off';
+        var h = '<h3>Honeypot Status</h3><table class="data-table"><tbody>';
+        h += '<tr><td>Active</td><td>' + (data.active ? '<span style="color:#27ae60">Yes</span>' : 'No') + '</td></tr>';
+        h += '<tr><td>Tier</td><td>' + (data.tier || 0) + '</td></tr>';
+        h += '<tr><td>Ad Tracking</td><td>' + (data.ad_tracking_limited ? 'Limited' : 'Active') + '</td></tr>';
+        h += '<tr><td>Private DNS</td><td>' + (data.private_dns_host || data.private_dns_mode || 'off') + '</td></tr>';
+        h += '</tbody></table>';
+        if (Object.keys(prot).length) {
+            h += '<h4>Active Protections</h4><table class="data-table"><tbody>';
+            for (var k in prot) h += '<tr><td>' + k + '</td><td><code>' + JSON.stringify(prot[k]) + '</code></td></tr>';
+            h += '</tbody></table>';
+        }
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apScanTrackers() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Scanning for tracker apps...');
+    apPost('/android-protect/honeypot/scan-trackers', {serial: apSerial}).then(data => {
+        if (data.error) { apHpBox().innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        var found = data.found || [];
+        var h = '<h3>Tracker Apps (' + found.length + ' / ' + data.total + ' installed)</h3>';
+        if (found.length) {
+            h += '<ul>';
+            found.forEach(function(p) { h += '<li><code>' + p + '</code></li>'; });
+            h += '</ul>';
+        } else h += '<p style="color:#27ae60">No known tracker apps found.</p>';
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apScanTrackerPerms() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Scanning tracking permissions...');
+    apPost('/android-protect/honeypot/scan-tracker-perms', {serial: apSerial}).then(data => {
+        if (data.error) { apHpBox().innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        var apps = data.apps || [];
+        var h = '<h3>Apps with Tracking Permissions (' + apps.length + ')</h3>';
+        if (apps.length) {
+            h += '<table class="data-table"><thead><tr><th>Package</th><th>Permissions</th></tr></thead><tbody>';
+            apps.forEach(function(a) {
+                h += '<tr><td><code>' + a.package + '</code></td><td>' + a.permissions.join(', ') + '</td></tr>';
+            });
+            h += '</tbody></table>';
+        } else h += '<p style="color:#27ae60">No apps with tracking permissions found.</p>';
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apViewAdSettings() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Reading ad tracking settings...');
+    apPost('/android-protect/honeypot/ad-settings', {serial: apSerial}).then(data => {
+        if (data.error) { apHpBox().innerHTML = '<span style="color:#e74c3c">' + data.error + '</span>'; return; }
+        var h = '<h3>Ad Tracking Settings</h3><table class="data-table"><tbody>';
+        for (var k in data) {
+            var s = data[k];
+            h += '<tr><td>' + (s.description || k) + '</td><td><code>' + s.value + '</code></td></tr>';
+        }
+        h += '</tbody></table>';
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apResetAdId() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Resetting advertising ID...');
+    apPost('/android-protect/honeypot/reset-ad-id', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apOptOutTracking() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Opting out of ad tracking...');
+    apPost('/android-protect/honeypot/opt-out', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apSetDns() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var provider = document.getElementById('ap-hp-dns-provider').value;
+    apHpWorking('Setting DNS to ' + provider + '...');
+    apPost('/android-protect/honeypot/set-dns', {serial: apSerial, provider: provider}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apClearDns() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Clearing DNS...');
+    apPost('/android-protect/honeypot/clear-dns', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apDisableLocationScan() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Disabling location scanning...');
+    apPost('/android-protect/honeypot/disable-location-scan', {serial: apSerial}).then(data => {
+        if (data.ok) {
+            var h = '<p style="color:#27ae60">Location scanning disabled.</p>';
+            (data.results || []).forEach(function(r) {
+                h += '<div>' + (r.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[FAIL]</span>') + ' ' + r.setting + '</div>';
+            });
+            apHpBox().innerHTML = h;
+        } else apHpBox().innerHTML = '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apDisableDiagnostics() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Disabling diagnostics...');
+    apPost('/android-protect/honeypot/disable-diagnostics', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apRestrictBackground() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var pkg = document.getElementById('ap-hp-package').value.trim();
+    if (!pkg) { alert('Enter a package name'); return; }
+    apHpWorking('Restricting background for ' + pkg + '...');
+    apPost('/android-protect/honeypot/restrict-background', {serial: apSerial, package: pkg}).then(data => {
+        if (data.ok) {
+            var h = '<p style="color:#27ae60">Background restricted for ' + data.package + '</p>';
+            (data.results || []).forEach(function(r) {
+                h += '<div>' + (r.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[FAIL]</span>') + ' ' + r.op + '</div>';
+            });
+            apHpBox().innerHTML = h;
+        } else apHpBox().innerHTML = '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apRevokeTrackerPerms() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var pkg = document.getElementById('ap-hp-package').value.trim();
+    if (!pkg) { alert('Enter a package name'); return; }
+    apHpWorking('Revoking tracking permissions...');
+    apPost('/android-protect/honeypot/revoke-tracker-perms', {serial: apSerial, package: pkg}).then(data => {
+        var h = '';
+        if (data.revoked && data.revoked.length) {
+            h += '<p style="color:#27ae60">Revoked: ' + data.revoked.join(', ') + '</p>';
+        }
+        if (data.failed && data.failed.length) {
+            h += '<p style="color:#e67e22">Failed: ' + data.failed.join(', ') + '</p>';
+        }
+        if (!h) h = '<p>No tracking permissions to revoke for ' + pkg + '</p>';
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apClearTrackerData() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var pkg = document.getElementById('ap-hp-package').value.trim();
+    if (!pkg) { alert('Enter a package name'); return; }
+    if (!confirm('Clear all data for ' + pkg + '?')) return;
+    apHpWorking('Clearing tracker data...');
+    apPost('/android-protect/honeypot/clear-tracker-data', {serial: apSerial, package: pkg}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apForceStopTrackers() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Force-stopping all tracker apps...');
+    apPost('/android-protect/honeypot/force-stop-trackers', {serial: apSerial}).then(data => {
+        var stopped = data.stopped || [];
+        var h = '<p style="color:#27ae60">Force-stopped ' + stopped.length + ' tracker packages:</p>';
+        if (stopped.length) {
+            h += '<ul>';
+            stopped.forEach(function(p) { h += '<li><code>' + p + '</code></li>'; });
+            h += '</ul>';
+        }
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apDeployHosts() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Deploying hosts blocklist (requires root)...');
+    apPost('/android-protect/honeypot/deploy-hosts', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apRemoveHosts() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Removing hosts blocklist...');
+    apPost('/android-protect/honeypot/remove-hosts', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apIptablesSetup() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Setting up iptables redirect...');
+    apPost('/android-protect/honeypot/iptables-setup', {serial: apSerial, port: 9040}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apIptablesClear() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Clearing iptables rules...');
+    apPost('/android-protect/honeypot/iptables-clear', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apSetFakeLocation() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var lat = parseFloat(document.getElementById('ap-hp-lat').value);
+    var lon = parseFloat(document.getElementById('ap-hp-lon').value);
+    if (isNaN(lat) || isNaN(lon)) { alert('Enter valid coordinates'); return; }
+    apHpWorking('Setting fake location...');
+    apPost('/android-protect/honeypot/fake-location', {serial: apSerial, lat: lat, lon: lon}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apRandomLocation() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Setting random fake location...');
+    apPost('/android-protect/honeypot/random-location', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + (data.location_name ? '<br>Location: <strong>' + data.location_name + '</strong>' : '') + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apClearLocation() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Clearing fake location...');
+    apPost('/android-protect/honeypot/clear-location', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apRotateIdentity() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Rotating device identity...');
+    apPost('/android-protect/honeypot/rotate-identity', {serial: apSerial}).then(data => {
+        if (data.ok) {
+            var h = '<p style="color:#27ae60">' + data.message + '</p>';
+            var changes = data.changes || [];
+            if (changes.length) {
+                h += '<table class="data-table"><tbody>';
+                changes.forEach(function(c) {
+                    h += '<tr><td>' + c.setting + '</td><td><code>' + c.value + '</code></td><td>' + (c.ok ? '<span style="color:#27ae60">OK</span>' : '<span style="color:#e74c3c">FAIL</span>') + '</td></tr>';
+                });
+                h += '</tbody></table>';
+            }
+            apHpBox().innerHTML = h;
+        } else {
+            apHpBox().innerHTML = '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+        }
+    }).catch(apHpError);
+}
+
+function apFakeFingerprint() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    apHpWorking('Generating fake fingerprint...');
+    apPost('/android-protect/honeypot/fake-fingerprint', {serial: apSerial}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">' + data.message + '</p>'
+            : '<span style="color:#e74c3c">' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+function apActivateHoneypot() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    var tier = parseInt(document.getElementById('ap-hp-tier-select').value);
+    if (!confirm('Activate Tier ' + tier + ' honeypot protections?')) return;
+    apHpWorking('Activating Tier ' + tier + ' honeypot...');
+    apPost('/android-protect/honeypot/activate', {serial: apSerial, tier: tier}).then(data => {
+        var h = '<h3>Honeypot Activated</h3>';
+        h += '<p><strong>' + (data.summary || '') + '</strong></p>';
+        var actions = data.actions || [];
+        if (actions.length) {
+            h += '<table class="data-table"><thead><tr><th>Action</th><th>Status</th><th>Details</th></tr></thead><tbody>';
+            actions.forEach(function(a) {
+                var r = a.result || {};
+                var ok = r.ok !== undefined ? r.ok : false;
+                h += '<tr><td>' + a.name + '</td>';
+                h += '<td>' + (ok ? '<span style="color:#27ae60">OK</span>' : '<span style="color:#e74c3c">FAIL</span>') + '</td>';
+                h += '<td>' + (r.message || r.error || '') + '</td></tr>';
+            });
+            h += '</tbody></table>';
+        }
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apDeactivateHoneypot() {
+    if (!apSerial) { alert('Select a device first'); return; }
+    if (!confirm('Deactivate all honeypot protections?')) return;
+    apHpWorking('Deactivating honeypot...');
+    apPost('/android-protect/honeypot/deactivate', {serial: apSerial}).then(data => {
+        var h = '<h3>Honeypot Deactivated</h3>';
+        var actions = data.actions || [];
+        if (actions.length) {
+            actions.forEach(function(a) {
+                var r = a.result || {};
+                h += '<div>' + (r.ok ? '<span style="color:#27ae60">[OK]</span>' : '<span style="color:#e74c3c">[FAIL]</span>') + ' ' + a.name + '</div>';
+            });
+        } else h += '<p>No active protections to deactivate.</p>';
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apTrackerStats() {
+    apHpWorking('Loading tracker stats...');
+    apPost('/android-protect/honeypot/tracker-stats', {}).then(data => {
+        var h = '<h3>Tracker Domain Database</h3>';
+        h += '<table class="data-table"><tbody>';
+        h += '<tr><td>Version</td><td>' + (data.version || 'unknown') + '</td></tr>';
+        h += '<tr><td>Total Domains</td><td><strong>' + (data.total_domains || 0) + '</strong></td></tr>';
+        h += '<tr><td>Companies</td><td>' + (data.companies || 0) + '</td></tr>';
+        h += '<tr><td>Tracker Packages</td><td>' + (data.packages || 0) + '</td></tr>';
+        h += '<tr><td>DNS Providers</td><td>' + (data.dns_providers || []).join(', ') + '</td></tr>';
+        h += '</tbody></table>';
+        var cats = data.categories || {};
+        if (Object.keys(cats).length) {
+            h += '<h4>Categories</h4><table class="data-table"><thead><tr><th>Category</th><th>Domains</th></tr></thead><tbody>';
+            for (var c in cats) h += '<tr><td>' + c + '</td><td>' + cats[c] + '</td></tr>';
+            h += '</tbody></table>';
+        }
+        apHpBox().innerHTML = h;
+    }).catch(apHpError);
+}
+
+function apUpdateDomains() {
+    apHpWorking('Updating tracker domains...');
+    apPost('/android-protect/honeypot/update-domains', {}).then(data => {
+        apHpBox().innerHTML = data.ok
+            ? '<p style="color:#27ae60">Updated: merged ' + data.merged + ' new domains from<br><code>' + data.source + '</code></p>'
+            : '<span style="color:#e74c3c">Error: ' + (data.error || 'Failed') + '</span>';
+    }).catch(apHpError);
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    const saved = localStorage.getItem('ap_connection_mode') || 'server';
+    apSetMode(saved);
+});
+</script>
+{% endblock %}

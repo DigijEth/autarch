@@ -1,0 +1,28 @@
+[Unit]
+Description=AUTARCH Web Dashboard
+Documentation=file:///home/snake/autarch/GUIDE.md
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=snake
+Group=snake
+WorkingDirectory=/home/snake/autarch
+ExecStart=/usr/bin/python3 /home/snake/autarch/autarch.py --web --no-banner
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autarch-web
+
+# Security hardening
+NoNewPrivileges=false
+ProtectHome=false
+PrivateTmp=true
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

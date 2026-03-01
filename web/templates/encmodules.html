@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+{% block title %}Encrypted Modules — AUTARCH{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Module grid ─────────────────────────────────────────────────────────── */
+.enc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.enc-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+    overflow: hidden;
+}
+.enc-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+}
+.enc-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(0,255,65,0.08);
+}
+.enc-card.unlocked::before {
+    background: linear-gradient(90deg, #00cc55, transparent);
+}
+.enc-card.running::before {
+    background: linear-gradient(90deg, var(--warning), var(--accent));
+    animation: shimmer 1.5s linear infinite;
+}
+@keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.enc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.enc-lock-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    transition: color 0.15s;
+}
+.enc-card.unlocked .enc-lock-icon { color: #00cc55; }
+.enc-card-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.03em;
+}
+.enc-card-version {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-family: monospace;
+}
+.enc-card-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.enc-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.enc-tag {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.enc-tag-danger  { background: rgba(255,50,50,0.15); color: #ff5555; border: 1px solid rgba(255,50,50,0.3); }
+.enc-tag-warn    { background: rgba(255,170,0,0.12); color: #ffaa00; border: 1px solid rgba(255,170,0,0.25); }
+.enc-tag-info    { background: rgba(0,200,255,0.1);  color: #00c8ff; border: 1px solid rgba(0,200,255,0.2); }
+.enc-tag-dim     { background: rgba(120,120,120,0.1); color: #888; border: 1px solid rgba(120,120,120,0.2); }
+.enc-size { color: var(--text-muted); font-family: monospace; }
+
+/* ── Unlock panel ────────────────────────────────────────────────────────── */
+.enc-unlock-panel {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+.enc-unlock-panel.visible { display: flex; }
+.enc-key-row {
+    display: flex;
+    gap: 0.4rem;
+}
+.enc-key-input {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.82rem;
+    background: var(--bg-input, #111);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.35rem 0.6rem;
+}
+.enc-key-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,255,65,0.12);
+}
+
+/* ── Params editor ───────────────────────────────────────────────────────── */
+.enc-params {
+    display: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+.enc-params.visible { display: flex; }
+.enc-params label { font-size: 0.75rem; color: var(--text-muted); }
+.enc-params textarea {
+    font-family: monospace;
+    font-size: 0.78rem;
+    background: #0a0a12;
+    color: #00ff41;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    resize: vertical;
+    min-height: 80px;
+}
+.enc-params textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* ── Card actions ────────────────────────────────────────────────────────── */
+.enc-card-actions {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-top: 0.25rem;
+}
+
+/* ── Output terminal ─────────────────────────────────────────────────────── */
+.enc-output-wrap {
+    margin-top: 1.5rem;
+    display: none;
+}
+.enc-output-wrap.visible { display: block; }
+.enc-output-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.enc-output-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.enc-terminal {
+    background: #050510;
+    border: 1px solid #1a2a1a;
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    max-height: 420px;
+    overflow-y: auto;
+    color: #ccc;
+}
+.enc-line-info   { color: #ccc; }
+.enc-line-warn   { color: #ffaa00; }
+.enc-line-error  { color: #ff5555; }
+.enc-line-found  { color: #00ff41; font-weight: 700; }
+.enc-line-module { color: #888; font-style: italic; }
+
+/* ── Upload zone ─────────────────────────────────────────────────────────── */
+.enc-upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.enc-upload-zone:hover, .enc-upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,255,65,0.04);
+    color: var(--text-secondary);
+}
+.enc-upload-zone input[type=file] { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1>Encrypted Modules</h1>
+    <span style="font-size:0.78rem;color:var(--text-muted);background:rgba(255,50,50,0.1);
+                 border:1px solid rgba(255,50,50,0.25);border-radius:4px;padding:2px 8px">
+        AUTHORIZED USE ONLY
+    </span>
+    <span id="enc-module-count" style="font-size:0.8rem;color:var(--text-muted);margin-left:auto">
+        {{ modules|length }} module{{ 's' if modules|length != 1 else '' }} loaded
+    </span>
+</div>
+
+<!-- Upload section -->
+<div class="section">
+    <h2>Upload Module</h2>
+    <div class="enc-upload-zone" id="upload-zone" onclick="document.getElementById('aes-file-input').click()"
+         ondragover="event.preventDefault();this.classList.add('drag-over')"
+         ondragleave="this.classList.remove('drag-over')"
+         ondrop="handleFileDrop(event)">
+        <input type="file" id="aes-file-input" accept=".aes" onchange="handleFileSelect(this)">
+        <div style="font-size:1.5rem;margin-bottom:0.4rem;opacity:0.5">&#x1F512;</div>
+        <div>Drop an <code>.aes</code> encrypted module here, or click to browse</div>
+        <div style="font-size:0.72rem;margin-top:0.3rem;opacity:0.6">AES-256 encrypted Python modules</div>
+    </div>
+    <div id="upload-status" style="margin-top:0.5rem;font-size:0.82rem;display:none"></div>
+</div>
+
+<!-- Module grid -->
+<div class="section">
+    <h2>Available Modules</h2>
+    {% if not modules %}
+    <p style="color:var(--text-muted);font-size:0.85rem">
+        No .aes modules found in <code>modules/encrypted/</code>.
+        Upload a module above to get started.
+    </p>
+    {% else %}
+    <div class="enc-grid" id="enc-grid">
+        {% for mod in modules %}
+        <div class="enc-card" id="card-{{ mod.id }}" data-filename="{{ mod.filename }}">
+            <div class="enc-card-header">
+                <span class="enc-lock-icon">&#x1F512;</span>
+                <span class="enc-card-name">{{ mod.name }}</span>
+                <span class="enc-card-version">v{{ mod.version }}</span>
+            </div>
+            <div class="enc-card-desc">{{ mod.description or 'No description available.' }}</div>
+            <div class="enc-card-meta">
+                {% for tag in mod.tags %}
+                <span class="enc-tag enc-tag-{{ mod.tag_colors.get(tag, 'dim') }}">{{ tag }}</span>
+                {% endfor %}
+                <span class="enc-size" style="margin-left:auto">{{ mod.size_kb }} KB</span>
+            </div>
+
+            <!-- Unlock panel -->
+            <div class="enc-unlock-panel" id="unlock-{{ mod.id }}">
+                <div class="enc-key-row">
+                    <input type="password" class="enc-key-input" id="key-{{ mod.id }}"
+                           placeholder="Decryption key / password"
+                           onkeypress="if(event.key==='Enter')verifyModule('{{ mod.id }}','{{ mod.filename }}')">
+                    <button class="btn btn-sm" onclick="toggleKeyVisibility('{{ mod.id }}')" title="Show/hide key">&#x1F441;</button>
+                </div>
+                <div id="verify-status-{{ mod.id }}" style="font-size:0.75rem;min-height:1em"></div>
+
+                <!-- Params editor (shown after verification) -->
+                <div class="enc-params" id="params-{{ mod.id }}">
+                    <label for="params-ta-{{ mod.id }}">
+                        Run Parameters (JSON) — passed to module's <code>run(params)</code>
+                    </label>
+                    <textarea id="params-ta-{{ mod.id }}" rows="4" spellcheck="false">{}</textarea>
+                </div>
+
+                <div class="enc-card-actions">
+                    <button class="btn btn-sm btn-primary" onclick="verifyModule('{{ mod.id }}','{{ mod.filename }}')">
+                        Unlock
+                    </button>
+                    <button class="btn btn-sm btn-danger" id="run-btn-{{ mod.id }}" style="display:none"
+                            onclick="runModule('{{ mod.id }}','{{ mod.filename }}')">
+                        Run
+                    </button>
+                    <button class="btn btn-sm btn-danger" id="stop-btn-{{ mod.id }}" style="display:none"
+                            onclick="stopModule('{{ mod.id }}')">
+                        Stop
+                    </button>
+                    <button class="btn btn-sm" onclick="cancelUnlock('{{ mod.id }}')">Cancel</button>
+                    <button class="btn btn-sm" style="margin-left:auto;color:var(--text-muted)"
+                            onclick="deleteModule('{{ mod.id }}','{{ mod.filename }}')">&#x2715; Remove</button>
+                </div>
+            </div>
+
+            <!-- Default actions (locked state) -->
+            <div class="enc-card-actions" id="locked-actions-{{ mod.id }}">
+                <button class="btn btn-sm btn-primary" onclick="showUnlock('{{ mod.id }}')">
+                    &#x1F511; Unlock &amp; Run
+                </button>
+                <button class="btn btn-sm" style="color:var(--text-muted)"
+                        onclick="deleteModule('{{ mod.id }}','{{ mod.filename }}')">&#x2715; Remove</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Output terminal -->
+<div class="enc-output-wrap section" id="output-wrap">
+    <div class="enc-output-header">
+        <div class="debug-live-dot" id="run-live-dot"></div>
+        <span class="enc-output-title" id="output-module-name">Module Output</span>
+        <button class="btn btn-sm" onclick="clearOutput()">Clear</button>
+        <button class="btn btn-sm" onclick="exportOutput()">Export</button>
+    </div>
+    <div class="enc-terminal" id="enc-terminal"></div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const _activeStreams = {};   // modId -> EventSource
+const _runIds       = {};   // modId -> run_id
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+function handleFileSelect(input) {
+    if (input.files[0]) uploadFile(input.files[0]);
+}
+function handleFileDrop(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+}
+
+async function uploadFile(file) {
+    const status = document.getElementById('upload-status');
+    status.style.display = '';
+    status.style.color   = 'var(--text-secondary)';
+    status.textContent   = `Uploading ${file.name}...`;
+    const fd = new FormData();
+    fd.append('module_file', file);
+    try {
+        const res  = await fetch('/encmodules/upload', {method: 'POST', body: fd});
+        const data = await res.json();
+        if (data.ok) {
+            status.style.color = 'var(--success)';
+            status.textContent = `Uploaded: ${data.module.name} (${data.module.size_kb} KB)`;
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            status.style.color = 'var(--danger)';
+            status.textContent = 'Upload failed: ' + (data.error || 'unknown error');
+        }
+    } catch(e) {
+        status.style.color = 'var(--danger)';
+        status.textContent = 'Upload error: ' + e.message;
+    }
+}
+
+// ── Unlock / verify ───────────────────────────────────────────────────────────
+function showUnlock(id) {
+    document.getElementById('locked-actions-' + id).style.display = 'none';
+    document.getElementById('unlock-' + id).classList.add('visible');
+    setTimeout(() => document.getElementById('key-' + id).focus(), 50);
+}
+function cancelUnlock(id) {
+    document.getElementById('locked-actions-' + id).style.display = '';
+    document.getElementById('unlock-' + id).classList.remove('visible');
+    document.getElementById('verify-status-' + id).textContent = '';
+    document.getElementById('run-btn-' + id).style.display = 'none';
+    document.getElementById('params-' + id).classList.remove('visible');
+    document.getElementById('card-' + id).classList.remove('unlocked');
+}
+function toggleKeyVisibility(id) {
+    const inp = document.getElementById('key-' + id);
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function verifyModule(id, filename) {
+    const key    = document.getElementById('key-' + id).value.trim();
+    const status = document.getElementById('verify-status-' + id);
+    if (!key) { status.style.color = 'var(--danger)'; status.textContent = 'Enter a key first.'; return; }
+    status.style.color = 'var(--text-muted)';
+    status.textContent = 'Verifying...';
+    try {
+        const res  = await fetch('/encmodules/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({filename, password: key}),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            status.style.color = 'var(--success)';
+            status.textContent = `Unlocked — ${data.lines} lines${data.has_run ? ', run() found' : ', no run() — exec only'}.`;
+            document.getElementById('card-' + id).classList.add('unlocked');
+            document.getElementById('card-' + id).querySelector('.enc-lock-icon').textContent = '\uD83D\uDD13';
+            document.getElementById('run-btn-' + id).style.display = '';
+            document.getElementById('params-' + id).classList.add('visible');
+        } else {
+            status.style.color = 'var(--danger)';
+            status.textContent = 'Error: ' + (data.error || 'unknown');
+            document.getElementById('card-' + id).classList.remove('unlocked');
+        }
+    } catch(e) {
+        status.style.color = 'var(--danger)';
+        status.textContent = 'Error: ' + e.message;
+    }
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+async function runModule(id, filename) {
+    const key     = document.getElementById('key-' + id).value.trim();
+    const rawPrm  = document.getElementById('params-ta-' + id).value.trim();
+    let params = {};
+    try { params = JSON.parse(rawPrm || '{}'); } catch(e) {
+        alert('Invalid JSON in params: ' + e.message); return;
+    }
+
+    const runBtn  = document.getElementById('run-btn-' + id);
+    const stopBtn = document.getElementById('stop-btn-' + id);
+    runBtn.style.display  = 'none';
+    stopBtn.style.display = '';
+    document.getElementById('card-' + id).classList.add('running');
+
+    // Show / clear terminal
+    const wrap = document.getElementById('output-wrap');
+    wrap.classList.add('visible');
+    document.getElementById('output-module-name').textContent =
+        document.getElementById('card-' + id).querySelector('.enc-card-name').textContent;
+    document.getElementById('enc-terminal').innerHTML = '';
+    document.getElementById('run-live-dot').style.background = 'var(--accent)';
+
+    try {
+        const res  = await fetch('/encmodules/run', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({filename, password: key, params}),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+            appendLine('[ERROR] ' + (data.error || 'unknown'), 'error');
+            resetRunState(id);
+            return;
+        }
+        const runId = data.run_id;
+        _runIds[id] = runId;
+
+        const es = new EventSource('/encmodules/stream/' + runId);
+        _activeStreams[id] = es;
+
+        es.onmessage = function(e) {
+            const d = JSON.parse(e.data);
+            if (d.done) {
+                es.close();
+                delete _activeStreams[id];
+                resetRunState(id);
+                document.getElementById('run-live-dot').style.background = '#555';
+                return;
+            }
+            if (d.error) {
+                appendLine('[ERROR] ' + escHtml(d.error), 'error');
+                return;
+            }
+            if (d.line) {
+                const cls = d.found ? 'found'
+                          : d.error ? 'error'
+                          : d.line.includes('[WARN') || d.line.includes('ALERT') ? 'warn'
+                          : d.line.includes('[MODULE]') ? 'module'
+                          : 'info';
+                appendLine(escHtml(d.line), cls);
+            }
+            if (d.result) {
+                appendLine('--- Result ---', 'module');
+                appendLine(escHtml(JSON.stringify(d.result, null, 2)), 'module');
+            }
+        };
+        es.onerror = function() {
+            es.close();
+            delete _activeStreams[id];
+            resetRunState(id);
+            document.getElementById('run-live-dot').style.background = '#555';
+        };
+
+    } catch(err) {
+        appendLine('[ERROR] ' + err.message, 'error');
+        resetRunState(id);
+    }
+}
+
+async function stopModule(id) {
+    const runId = _runIds[id];
+    if (runId) await fetch('/encmodules/stop/' + runId, {method: 'POST'});
+    const es = _activeStreams[id];
+    if (es) { es.close(); delete _activeStreams[id]; }
+    resetRunState(id);
+}
+
+function resetRunState(id) {
+    document.getElementById('run-btn-' + id).style.display  = '';
+    document.getElementById('stop-btn-' + id).style.display = 'none';
+    document.getElementById('card-' + id).classList.remove('running');
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+async function deleteModule(id, filename) {
+    if (!confirm(`Remove module "${filename}" from the module directory?`)) return;
+    const res  = await fetch('/encmodules/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename}),
+    });
+    const data = await res.json();
+    if (data.ok) {
+        document.getElementById('card-' + id)?.remove();
+        const remaining = document.querySelectorAll('.enc-card').length;
+        document.getElementById('enc-module-count').textContent =
+            remaining + ' module' + (remaining !== 1 ? 's' : '') + ' loaded';
+    } else {
+        alert('Delete failed: ' + (data.error || 'unknown'));
+    }
+}
+
+// ── Terminal helpers ──────────────────────────────────────────────────────────
+function appendLine(html, cls = 'info') {
+    const t   = document.getElementById('enc-terminal');
+    const div = document.createElement('div');
+    div.className = 'enc-line-' + cls;
+    div.innerHTML = html;
+    t.appendChild(div);
+    t.scrollTop = t.scrollHeight;
+}
+
+function clearOutput() {
+    document.getElementById('enc-terminal').innerHTML = '';
+}
+
+function exportOutput() {
+    const lines = Array.from(document.querySelectorAll('#enc-terminal div'))
+                       .map(d => d.textContent).join('\n');
+    const blob  = new Blob([lines], {type: 'text/plain'});
+    const a     = document.createElement('a');
+    a.href      = URL.createObjectURL(blob);
+    a.download  = 'module_output.txt';
+    a.click();
+}
+
+function escHtml(s) {
+    return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}
