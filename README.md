@@ -221,9 +221,8 @@ Yet, if left unchecked, artificial intelligence risks becoming a silent but powe
 
 ---
 
-## Our Rambling Rant...
+## Our Rambling Rant...Who We Are And Why We Do It
 
-**By Phoenix_Jones**
 
 We are dedicated to providing cutting-edge security solutions at no cost to the community, and since our source code is protected speech, we are not going anywhere. Criminals makes millions every year selling tools that are designed to be point and disrupt. So we decided why not do the same with security tools, except at no cost for the home user. Until now, governments, criminal organizations and other groups have paid hackers thousands of dollars to buy what are known as 0-day exploits, flaws in software you use everyday that have no fix or patches. Others report them to the manufacturer for money in bounty programs. We use them to create tools that protect YOU and your family members in real-time from these 0-days, as well as advance the right to repair movement and homebrew scene by exploiting these same flaws for good/fun.
 
