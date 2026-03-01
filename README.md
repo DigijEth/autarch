@@ -108,69 +108,6 @@ Key sections: `[server]`, `[llm]`, `[msf]`, `[wireguard]`, `[upnp]`, `[hardware]
 - **Supported:** Windows 10/11 (x86_64)
 - **WebUSB:** Chromium-based browsers required for Direct mode hardware access
 
-## Acknowledgements
-
-AUTARCH builds on the work of many outstanding open-source projects. We thank and acknowledge them all:
-
-### Frameworks & Libraries
-
-- [Flask](https://flask.palletsprojects.com/) — Web application framework
-- [Jinja2](https://jinja.palletsprojects.com/) — Template engine
-- [llama.cpp](https://github.com/ggml-org/llama.cpp) — Local LLM inference engine
-- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) — Python bindings for llama.cpp
-- [HuggingFace Transformers](https://github.com/huggingface/transformers) — ML model library
-- [Anthropic Claude API](https://docs.anthropic.com/) — Cloud LLM backend
-- [FastMCP](https://github.com/jlowin/fastmcp) — Model Context Protocol server
-
-### Security Tools
-
-- [Metasploit Framework](https://github.com/rapid7/metasploit-framework) — Penetration testing framework
-- [RouterSploit](https://github.com/threat9/routersploit) — Router exploitation framework
-- [Nmap](https://nmap.org/) — Network scanner and mapper
-- [Wireshark / tshark](https://www.wireshark.org/) — Network protocol analyzer
-- [Scapy](https://scapy.net/) — Packet crafting and analysis
-- [WireGuard](https://www.wireguard.com/) — Modern VPN tunnel
-
-### Hardware & Mobile
-
-- [@yume-chan/adb](https://github.com/nicola-nicola/nicola-nicola) — ADB over WebUSB
-- [android-fastboot](https://github.com/nicola-nicola/nicola-nicola) — Fastboot over WebUSB
-- [esptool-js](https://github.com/nicola-nicola/nicola-nicola) — ESP32 flashing in browser
-- [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools) — ADB & Fastboot CLI
-- [esptool](https://github.com/nicola-nicola/nicola-nicola) — ESP32 firmware flashing
-- [pyserial](https://github.com/pyserial/pyserial) — Serial port communication
-- [pyshark](https://github.com/KimiNewt/pyshark) — Wireshark Python interface
-- [scrcpy](https://github.com/Genymobile/scrcpy) — Android screen mirroring
-- [libadb-android](https://github.com/nicola-nicola/nicola-nicola) — ADB client for Android
-
-### Python Libraries
-
-- [bcrypt](https://github.com/pyca/bcrypt) — Password hashing
-- [requests](https://github.com/psf/requests) — HTTP client
-- [msgpack](https://github.com/msgpack/msgpack-python) — Serialization (Metasploit RPC)
-- [cryptography](https://github.com/pyca/cryptography) — Cryptographic primitives
-- [PyCryptodome](https://github.com/Legrandin/pycryptodome) — AES encryption
-- [Pillow](https://github.com/python-pillow/Pillow) — Image processing
-- [qrcode](https://github.com/lincolnloop/python-qrcode) — QR code generation
-- [zeroconf](https://github.com/python-zeroconf/python-zeroconf) — mDNS service discovery
-- [PyInstaller](https://github.com/pyinstaller/pyinstaller) — Executable packaging
-- [cx_Freeze](https://github.com/marcelotduarte/cx_Freeze) — MSI installer packaging
-
-### Android / Kotlin
-
-- [AndroidX](https://developer.android.com/jetpack/androidx) — Jetpack libraries
-- [Material Design 3](https://m3.material.io/) — UI components
-- [Conscrypt](https://github.com/nicola-nicola/nicola-nicola) — SSL/TLS provider for Android
-
-### Build Tools
-
-- [esbuild](https://esbuild.github.io/) — JavaScript bundler
-- [Gradle](https://gradle.org/) — Android build system
-
-### Data Sources
-
-- [NVD API v2.0](https://nvd.nist.gov/developers/vulnerabilities) — National Vulnerability Database
-
 ## License
 
 Restricted Public Release. Authorized use only — activity is logged.
@@ -325,6 +262,71 @@ The only question is whether European leaders have the courage to say so.
 ### About darkHal Security Group
 
 > *"There's a reason you separate military and the police. One fights the enemies of the state, the other serves and protects the people. When the military becomes both, then the enemies of the state tend to become the people."* — Commander Adama, Battlestar Galactica
+
+---
+
+## Acknowledgements
+
+AUTARCH builds on the work of many outstanding open-source projects. We thank and acknowledge them all:
+
+### Frameworks & Libraries
+
+- [Flask](https://flask.palletsprojects.com/) — Web application framework
+- [Jinja2](https://jinja.palletsprojects.com/) — Template engine
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) — Local LLM inference engine
+- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) — Python bindings for llama.cpp
+- [HuggingFace Transformers](https://github.com/huggingface/transformers) — ML model library
+- [Anthropic Claude API](https://docs.anthropic.com/) — Cloud LLM backend
+- [FastMCP](https://github.com/jlowin/fastmcp) — Model Context Protocol server
+
+### Security Tools
+
+- [Metasploit Framework](https://github.com/rapid7/metasploit-framework) — Penetration testing framework
+- [RouterSploit](https://github.com/threat9/routersploit) — Router exploitation framework
+- [Nmap](https://nmap.org/) — Network scanner and mapper
+- [Wireshark / tshark](https://www.wireshark.org/) — Network protocol analyzer
+- [Scapy](https://scapy.net/) — Packet crafting and analysis
+- [WireGuard](https://www.wireguard.com/) — Modern VPN tunnel
+
+### Hardware & Mobile
+
+- [@yume-chan/adb](https://github.com/nicola-nicola/nicola-nicola) — ADB over WebUSB
+- [android-fastboot](https://github.com/nicola-nicola/nicola-nicola) — Fastboot over WebUSB
+- [esptool-js](https://github.com/nicola-nicola/nicola-nicola) — ESP32 flashing in browser
+- [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools) — ADB & Fastboot CLI
+- [esptool](https://github.com/nicola-nicola/nicola-nicola) — ESP32 firmware flashing
+- [pyserial](https://github.com/pyserial/pyserial) — Serial port communication
+- [pyshark](https://github.com/KimiNewt/pyshark) — Wireshark Python interface
+- [scrcpy](https://github.com/Genymobile/scrcpy) — Android screen mirroring
+- [libadb-android](https://github.com/nicola-nicola/nicola-nicola) — ADB client for Android
+
+### Python Libraries
+
+- [bcrypt](https://github.com/pyca/bcrypt) — Password hashing
+- [requests](https://github.com/psf/requests) — HTTP client
+- [msgpack](https://github.com/msgpack/msgpack-python) — Serialization (Metasploit RPC)
+- [cryptography](https://github.com/pyca/cryptography) — Cryptographic primitives
+- [PyCryptodome](https://github.com/Legrandin/pycryptodome) — AES encryption
+- [Pillow](https://github.com/python-pillow/Pillow) — Image processing
+- [qrcode](https://github.com/lincolnloop/python-qrcode) — QR code generation
+- [zeroconf](https://github.com/python-zeroconf/python-zeroconf) — mDNS service discovery
+- [PyInstaller](https://github.com/pyinstaller/pyinstaller) — Executable packaging
+- [cx_Freeze](https://github.com/marcelotduarte/cx_Freeze) — MSI installer packaging
+
+### Android / Kotlin
+
+- [AndroidX](https://developer.android.com/jetpack/androidx) — Jetpack libraries
+- [Material Design 3](https://m3.material.io/) — UI components
+- [Conscrypt](https://github.com/nicola-nicola/nicola-nicola) — SSL/TLS provider for Android
+
+### Build Tools
+
+- [esbuild](https://esbuild.github.io/) — JavaScript bundler
+- [Gradle](https://gradle.org/) — Android build system
+
+### Data Sources
+
+- [NVD API v2.0](https://nvd.nist.gov/developers/vulnerabilities) — National Vulnerability Database
 
 ---
 
