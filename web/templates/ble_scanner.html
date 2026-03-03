@@ -1,0 +1,515 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — BLE Scanner{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>BLE Scanner</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Bluetooth Low Energy device discovery, service enumeration, and characteristic inspection.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ble" data-tab="scan" onclick="showTab('ble','scan')">Scan</button>
+    <button class="tab" data-tab-group="ble" data-tab="device" onclick="showTab('ble','device')">Device Detail</button>
+</div>
+
+<!-- ══ Scan Tab ══ -->
+<div class="tab-content active" data-tab-group="ble" data-tab="scan">
+
+    <!-- Scan Controls -->
+    <div class="section">
+        <h2>BLE Scan</h2>
+        <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="max-width:160px">
+                <label>Duration (seconds)</label>
+                <input type="number" id="ble-scan-duration" value="10" min="1" max="60">
+            </div>
+            <div class="form-group" style="flex:0;margin-bottom:16px">
+                <button id="btn-ble-scan" class="btn btn-primary" onclick="bleScan()">Scan</button>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span class="status-dot" id="ble-bleak-dot"></span>
+            <span id="ble-bleak-status" style="font-size:0.85rem;color:var(--text-secondary)">Checking bleak availability...</span>
+        </div>
+        <div id="ble-scan-status" class="progress-text"></div>
+    </div>
+
+    <!-- Discovered Devices -->
+    <div class="section">
+        <h2>Discovered Devices</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="bleVulnScan()">Vuln Scan All</button>
+            <button class="btn btn-small" onclick="bleSaveScan()">Save Scan</button>
+            <button class="btn btn-small" onclick="bleClearDevices()">Clear</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Address</th>
+                    <th>Name</th>
+                    <th>RSSI</th>
+                    <th>Type</th>
+                    <th>Manufacturer</th>
+                    <th>Services</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="ble-devices-body">
+                <tr><td colspan="7" class="empty-state">No devices found. Run a scan to discover BLE devices.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Saved Scans -->
+    <div class="section">
+        <h2>Saved Scans</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="bleLoadSavedScans()">Refresh</button>
+        </div>
+        <div id="ble-saved-scans">
+            <p class="empty-state" style="padding:12px;font-size:0.85rem">No saved scans.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ Device Detail Tab ══ -->
+<div class="tab-content" data-tab-group="ble" data-tab="device">
+
+    <!-- Device Selector -->
+    <div class="section">
+        <h2>Device Connection</h2>
+        <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:2">
+                <label>Device</label>
+                <select id="ble-device-select">
+                    <option value="">-- scan for devices first --</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex:0;margin-bottom:16px">
+                <button id="btn-ble-connect" class="btn btn-primary" onclick="bleConnect()">Connect</button>
+            </div>
+            <div class="form-group" style="flex:0;margin-bottom:16px">
+                <button id="btn-ble-disconnect" class="btn btn-stop btn-small" onclick="bleDisconnect()" style="display:none">Disconnect</button>
+            </div>
+        </div>
+        <div id="ble-connect-status" class="progress-text"></div>
+    </div>
+
+    <!-- Services Tree -->
+    <div class="section">
+        <h2>Services &amp; Characteristics</h2>
+        <div id="ble-services-tree">
+            <p class="empty-state" style="padding:12px;font-size:0.85rem">Connect to a device to view its GATT services.</p>
+        </div>
+    </div>
+
+    <!-- Proximity Tracking -->
+    <div class="section">
+        <h2>Proximity Tracking</h2>
+        <div class="form-row" style="align-items:flex-end">
+            <div class="form-group" style="flex:0;margin-bottom:16px">
+                <button id="btn-ble-track" class="btn btn-primary btn-small" onclick="bleStartTracking()">Start Tracking</button>
+            </div>
+            <div class="form-group" style="flex:0;margin-bottom:16px">
+                <button id="btn-ble-track-stop" class="btn btn-stop btn-small" onclick="bleStopTracking()" style="display:none">Stop</button>
+            </div>
+        </div>
+        <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+            <div>
+                <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px">Estimated Distance</div>
+                <div id="ble-distance" style="font-size:2rem;font-weight:700;color:var(--accent)">-- m</div>
+                <div id="ble-rssi-current" style="font-size:0.85rem;color:var(--text-muted)">RSSI: --</div>
+            </div>
+            <div style="flex:1;min-width:300px">
+                <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px">RSSI History</div>
+                <div id="ble-rssi-chart" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);height:120px;position:relative;overflow:hidden">
+                    <canvas id="ble-rssi-canvas" style="width:100%;height:100%"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracking History -->
+    <div class="section">
+        <h2>Tracking History</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="bleClearHistory()">Clear</button>
+            <button class="btn btn-small" onclick="bleExportHistory()">Export</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Address</th>
+                    <th>RSSI</th>
+                    <th>Distance (m)</th>
+                </tr>
+            </thead>
+            <tbody id="ble-history-body">
+                <tr><td colspan="4" class="empty-state">No tracking history.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+/* ── BLE Scanner ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+var bleDevices = [];
+var bleTrackInterval = null;
+var bleTrackHistory = [];
+var bleRssiData = [];
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    bleCheckBleak();
+    bleLoadSavedScans();
+});
+
+function bleCheckBleak() {
+    fetchJSON('/ble/status').then(function(data) {
+        var dot = document.getElementById('ble-bleak-dot');
+        var txt = document.getElementById('ble-bleak-status');
+        if (data.bleak_available) {
+            dot.className = 'status-dot active';
+            txt.textContent = 'bleak available — ready to scan';
+        } else {
+            dot.className = 'status-dot inactive';
+            txt.textContent = 'bleak not available — install with: pip install bleak';
+        }
+    }).catch(function() {
+        document.getElementById('ble-bleak-dot').className = 'status-dot inactive';
+        document.getElementById('ble-bleak-status').textContent = 'Could not check bleak status';
+    });
+}
+
+/* ── Scan Tab ── */
+function bleScan() {
+    var duration = parseInt(document.getElementById('ble-scan-duration').value) || 10;
+    var btn = document.getElementById('btn-ble-scan');
+    setLoading(btn, true);
+    document.getElementById('ble-scan-status').textContent = 'Scanning for ' + duration + ' seconds...';
+    postJSON('/ble/scan', {duration: duration}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('ble-scan-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        bleDevices = data.devices || [];
+        document.getElementById('ble-scan-status').textContent = 'Found ' + bleDevices.length + ' device(s)';
+        bleRenderDevices();
+        bleUpdateDeviceSelector();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function bleRenderDevices() {
+    var tbody = document.getElementById('ble-devices-body');
+    if (!bleDevices.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No devices found.</td></tr>';
+        return;
+    }
+    var html = '';
+    bleDevices.forEach(function(d, i) {
+        var rssiColor = d.rssi > -50 ? 'var(--success,#4ade80)' : d.rssi > -70 ? 'var(--warning,#f59e0b)' : 'var(--danger)';
+        html += '<tr>'
+            + '<td style="font-family:monospace;font-size:0.8rem">' + esc(d.address || '') + '</td>'
+            + '<td>' + esc(d.name || 'Unknown') + '</td>'
+            + '<td style="color:' + rssiColor + '">' + esc(String(d.rssi || '—')) + ' dBm</td>'
+            + '<td>' + esc(d.type || '—') + '</td>'
+            + '<td>' + esc(d.manufacturer || '—') + '</td>'
+            + '<td>' + (d.services_count || 0) + '</td>'
+            + '<td><button class="btn btn-small" onclick="bleInspectDevice(' + i + ')">Inspect</button></td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function bleUpdateDeviceSelector() {
+    var sel = document.getElementById('ble-device-select');
+    sel.innerHTML = '<option value="">-- select a device --</option>';
+    bleDevices.forEach(function(d) {
+        var opt = document.createElement('option');
+        opt.value = d.address;
+        opt.textContent = (d.name || 'Unknown') + ' (' + d.address + ') [' + d.rssi + ' dBm]';
+        sel.appendChild(opt);
+    });
+}
+
+function bleInspectDevice(idx) {
+    var d = bleDevices[idx];
+    if (!d) return;
+    document.getElementById('ble-device-select').value = d.address;
+    showTab('ble', 'device');
+}
+
+function bleVulnScan() {
+    if (!bleDevices.length) return;
+    var addresses = bleDevices.map(function(d) { return d.address; });
+    document.getElementById('ble-scan-status').textContent = 'Running vulnerability scan on ' + addresses.length + ' device(s)...';
+    postJSON('/ble/vuln-scan', {addresses: addresses}).then(function(data) {
+        if (data.error) {
+            document.getElementById('ble-scan-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        var vulnCount = (data.vulnerabilities || []).length;
+        document.getElementById('ble-scan-status').textContent = 'Vuln scan complete — ' + vulnCount + ' issue(s) found';
+        if (vulnCount && data.vulnerabilities) {
+            data.vulnerabilities.forEach(function(v) {
+                var dev = bleDevices.find(function(d) { return d.address === v.address; });
+                if (dev) dev.vuln = v.description;
+            });
+            bleRenderDevices();
+        }
+    });
+}
+
+function bleSaveScan() {
+    if (!bleDevices.length) return;
+    postJSON('/ble/save-scan', {devices: bleDevices}).then(function(data) {
+        if (data.error) {
+            document.getElementById('ble-scan-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('ble-scan-status').textContent = 'Scan saved: ' + (data.filename || 'OK');
+        bleLoadSavedScans();
+    });
+}
+
+function bleLoadSavedScans() {
+    fetchJSON('/ble/saved-scans').then(function(data) {
+        var container = document.getElementById('ble-saved-scans');
+        var scans = data.scans || [];
+        if (!scans.length) {
+            container.innerHTML = '<p class="empty-state" style="padding:12px;font-size:0.85rem">No saved scans.</p>';
+            return;
+        }
+        var html = '<table class="data-table"><thead><tr><th>Timestamp</th><th>Devices</th><th></th></tr></thead><tbody>';
+        scans.forEach(function(s) {
+            html += '<tr>'
+                + '<td>' + esc(s.timestamp || '') + '</td>'
+                + '<td>' + (s.device_count || 0) + '</td>'
+                + '<td><button class="btn btn-small" onclick="bleLoadScan(\'' + esc(s.id || '') + '\')">Load</button></td>'
+                + '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }).catch(function() {});
+}
+
+function bleLoadScan(id) {
+    fetchJSON('/ble/saved-scans/' + encodeURIComponent(id)).then(function(data) {
+        if (data.error) return;
+        bleDevices = data.devices || [];
+        bleRenderDevices();
+        bleUpdateDeviceSelector();
+        document.getElementById('ble-scan-status').textContent = 'Loaded saved scan: ' + (data.timestamp || id);
+    });
+}
+
+function bleClearDevices() {
+    bleDevices = [];
+    bleRenderDevices();
+    bleUpdateDeviceSelector();
+    document.getElementById('ble-scan-status').textContent = '';
+}
+
+/* ── Device Detail Tab ── */
+function bleConnect() {
+    var addr = document.getElementById('ble-device-select').value;
+    if (!addr) return;
+    var btn = document.getElementById('btn-ble-connect');
+    setLoading(btn, true);
+    document.getElementById('ble-connect-status').textContent = 'Connecting to ' + addr + '...';
+    postJSON('/ble/connect', {address: addr}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('ble-connect-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('ble-connect-status').textContent = 'Connected to ' + addr;
+        document.getElementById('btn-ble-disconnect').style.display = '';
+        bleRenderServices(data.services || []);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function bleDisconnect() {
+    var addr = document.getElementById('ble-device-select').value;
+    postJSON('/ble/disconnect', {address: addr}).then(function(data) {
+        document.getElementById('ble-connect-status').textContent = 'Disconnected';
+        document.getElementById('btn-ble-disconnect').style.display = 'none';
+        document.getElementById('ble-services-tree').innerHTML = '<p class="empty-state" style="padding:12px;font-size:0.85rem">Connect to a device to view its GATT services.</p>';
+    });
+}
+
+function bleRenderServices(services) {
+    var container = document.getElementById('ble-services-tree');
+    if (!services.length) {
+        container.innerHTML = '<p class="empty-state" style="padding:12px;font-size:0.85rem">No services found on this device.</p>';
+        return;
+    }
+    var html = '';
+    services.forEach(function(svc, si) {
+        html += '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:8px">';
+        html += '<div style="font-weight:600;font-size:0.9rem;margin-bottom:8px">'
+            + '<span style="color:var(--accent)">' + esc(svc.uuid || '') + '</span>'
+            + (svc.name ? ' <span style="color:var(--text-secondary);font-weight:400">(' + esc(svc.name) + ')</span>' : '')
+            + '</div>';
+        if (svc.characteristics && svc.characteristics.length) {
+            svc.characteristics.forEach(function(ch, ci) {
+                var charId = 'ble-char-' + si + '-' + ci;
+                html += '<div style="margin-left:16px;padding:8px 0;border-top:1px solid var(--border)">';
+                html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+                html += '<span style="font-family:monospace;font-size:0.8rem">' + esc(ch.uuid || '') + '</span>';
+                if (ch.name) html += '<span style="font-size:0.8rem;color:var(--text-secondary)">(' + esc(ch.name) + ')</span>';
+                var props = (ch.properties || []).join(', ');
+                if (props) html += '<span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent)">' + esc(props) + '</span>';
+                html += '</div>';
+                html += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">';
+                html += '<span id="' + charId + '-val" style="font-family:monospace;font-size:0.8rem;color:var(--text-muted)">'
+                    + (ch.value ? esc(ch.value) : '(not read)') + '</span>';
+                if ((ch.properties || []).indexOf('read') >= 0 || (ch.properties || []).indexOf('Read') >= 0) {
+                    html += '<button class="btn btn-small" style="padding:2px 8px;font-size:0.7rem" onclick="bleReadChar(\'' + esc(ch.uuid) + '\',\'' + charId + '\')">Read</button>';
+                }
+                if ((ch.properties || []).indexOf('write') >= 0 || (ch.properties || []).indexOf('Write') >= 0) {
+                    html += '<input type="text" id="' + charId + '-input" placeholder="hex value" style="width:120px;padding:3px 6px;font-size:0.8rem;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;color:var(--text-primary)">';
+                    html += '<button class="btn btn-small" style="padding:2px 8px;font-size:0.7rem" onclick="bleWriteChar(\'' + esc(ch.uuid) + '\',\'' + charId + '\')">Write</button>';
+                }
+                html += '</div>';
+                html += '</div>';
+            });
+        }
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function bleReadChar(uuid, elemId) {
+    var addr = document.getElementById('ble-device-select').value;
+    postJSON('/ble/read', {address: addr, characteristic: uuid}).then(function(data) {
+        var el = document.getElementById(elemId + '-val');
+        if (data.error) { if (el) el.textContent = 'Error: ' + data.error; return; }
+        if (el) el.textContent = data.value || '(empty)';
+    });
+}
+
+function bleWriteChar(uuid, elemId) {
+    var addr = document.getElementById('ble-device-select').value;
+    var input = document.getElementById(elemId + '-input');
+    var val = input ? input.value.trim() : '';
+    if (!val) return;
+    postJSON('/ble/write', {address: addr, characteristic: uuid, value: val}).then(function(data) {
+        var el = document.getElementById(elemId + '-val');
+        if (data.error) { if (el) el.textContent = 'Error: ' + data.error; return; }
+        if (el) el.textContent = 'Written: ' + val;
+    });
+}
+
+/* ── Proximity Tracking ── */
+function bleStartTracking() {
+    var addr = document.getElementById('ble-device-select').value;
+    if (!addr) { document.getElementById('ble-connect-status').textContent = 'Select a device first'; return; }
+    document.getElementById('btn-ble-track').style.display = 'none';
+    document.getElementById('btn-ble-track-stop').style.display = '';
+    bleRssiData = [];
+    bleTrackInterval = setInterval(function() { bleTrackPoll(addr); }, 1000);
+}
+
+function bleStopTracking() {
+    if (bleTrackInterval) { clearInterval(bleTrackInterval); bleTrackInterval = null; }
+    document.getElementById('btn-ble-track').style.display = '';
+    document.getElementById('btn-ble-track-stop').style.display = 'none';
+}
+
+function bleTrackPoll(addr) {
+    fetchJSON('/ble/rssi?address=' + encodeURIComponent(addr)).then(function(data) {
+        if (data.error) return;
+        var rssi = data.rssi || -100;
+        var distance = bleEstimateDistance(rssi);
+        document.getElementById('ble-distance').textContent = distance.toFixed(1) + ' m';
+        document.getElementById('ble-rssi-current').textContent = 'RSSI: ' + rssi + ' dBm';
+
+        bleRssiData.push(rssi);
+        if (bleRssiData.length > 60) bleRssiData.shift();
+        bleDrawRssiChart();
+
+        var entry = {
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            address: addr,
+            rssi: rssi,
+            distance: distance.toFixed(1)
+        };
+        bleTrackHistory.push(entry);
+        bleRenderHistory();
+    });
+}
+
+function bleEstimateDistance(rssi) {
+    /* Approximate using log-distance path loss model, txPower ~ -59 dBm at 1m */
+    var txPower = -59;
+    if (rssi === 0) return -1;
+    var ratio = rssi / txPower;
+    if (ratio < 1.0) return Math.pow(ratio, 10);
+    return 0.89976 * Math.pow(ratio, 7.7095) + 0.111;
+}
+
+function bleDrawRssiChart() {
+    var canvas = document.getElementById('ble-rssi-canvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.parentElement.offsetWidth;
+    var h = canvas.parentElement.offsetHeight;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+
+    if (bleRssiData.length < 2) return;
+
+    var minR = -100, maxR = -20;
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (var i = 0; i < bleRssiData.length; i++) {
+        var x = (i / (bleRssiData.length - 1)) * w;
+        var y = h - ((bleRssiData[i] - minR) / (maxR - minR)) * h;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+}
+
+function bleRenderHistory() {
+    var tbody = document.getElementById('ble-history-body');
+    if (!bleTrackHistory.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No tracking history.</td></tr>';
+        return;
+    }
+    var html = '';
+    var start = Math.max(0, bleTrackHistory.length - 50);
+    for (var i = bleTrackHistory.length - 1; i >= start; i--) {
+        var e = bleTrackHistory[i];
+        html += '<tr>'
+            + '<td style="font-size:0.8rem">' + esc(e.timestamp) + '</td>'
+            + '<td style="font-family:monospace;font-size:0.8rem">' + esc(e.address) + '</td>'
+            + '<td>' + esc(String(e.rssi)) + ' dBm</td>'
+            + '<td>' + esc(e.distance) + '</td>'
+            + '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+function bleClearHistory() {
+    bleTrackHistory = [];
+    bleRenderHistory();
+}
+
+function bleExportHistory() {
+    var blob = new Blob([JSON.stringify(bleTrackHistory, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ble_tracking_history.json';
+    a.click();
+}
+</script>
+{% endblock %}

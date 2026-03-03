@@ -1,0 +1,457 @@
+{% extends "base.html" %}
+{% block title %}Load Test - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Load Testing</h1>
+</div>
+
+<!-- Test Controls -->
+<div class="section" id="controls-section">
+    <h2>Test Configuration</h2>
+    <div class="tab-bar">
+        <button class="tab active" data-tab-group="lt-type" data-tab="http"      onclick="showTab('lt-type','http')">HTTP Flood</button>
+        <button class="tab"        data-tab-group="lt-type" data-tab="slowloris"  onclick="showTab('lt-type','slowloris')">Slowloris</button>
+        <button class="tab"        data-tab-group="lt-type" data-tab="tcp"        onclick="showTab('lt-type','tcp')">TCP Connect</button>
+        <button class="tab"        data-tab-group="lt-type" data-tab="syn"        onclick="showTab('lt-type','syn')">SYN Flood</button>
+        <button class="tab"        data-tab-group="lt-type" data-tab="udp"        onclick="showTab('lt-type','udp')">UDP Flood</button>
+    </div>
+
+    <!-- HTTP Flood -->
+    <div class="tab-content active" data-tab-group="lt-type" data-tab="http">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-target">Target URL</label>
+                <input type="text" id="lt-target" placeholder="https://example.com/api/endpoint">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-method">Method</label>
+                <select id="lt-method" style="width:90px">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="PATCH">PATCH</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group" style="margin-top:0.5rem">
+            <label for="lt-headers">Custom Headers (JSON)</label>
+            <input type="text" id="lt-headers" placeholder='{"Authorization":"Bearer token","Content-Type":"application/json"}'>
+        </div>
+        <div class="form-group">
+            <label for="lt-body">Request Body</label>
+            <input type="text" id="lt-body" placeholder='{"key":"value"} or form data'>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+            <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.3rem;cursor:pointer">
+                <input type="checkbox" id="lt-follow-redirects" checked> Follow redirects
+            </label>
+            <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.3rem;cursor:pointer">
+                <input type="checkbox" id="lt-verify-ssl"> Verify SSL
+            </label>
+            <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.3rem;cursor:pointer">
+                <input type="checkbox" id="lt-rotate-ua" checked> Rotate User-Agents
+            </label>
+        </div>
+    </div>
+
+    <!-- Slowloris -->
+    <div class="tab-content" data-tab-group="lt-type" data-tab="slowloris">
+        <div style="margin-top:0.75rem">
+            <div class="form-group">
+                <label for="lt-slowloris-target">Target URL or host:port</label>
+                <input type="text" id="lt-slowloris-target" placeholder="https://example.com or 192.168.1.1:80">
+            </div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-muted)">Slowloris holds connections open with partial HTTP headers, exhausting the target's connection pool. Each worker manages ~50 sockets.</p>
+    </div>
+
+    <!-- TCP Connect -->
+    <div class="tab-content" data-tab-group="lt-type" data-tab="tcp">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-tcp-target">Target (host:port)</label>
+                <input type="text" id="lt-tcp-target" placeholder="192.168.1.1:80">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-tcp-payload">Payload (bytes)</label>
+                <input type="number" id="lt-tcp-payload" value="0" style="width:90px" min="0" max="65535">
+            </div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Rapid TCP connect/disconnect to exhaust server resources. Set payload &gt; 0 to send random data per connection.</p>
+    </div>
+
+    <!-- SYN Flood -->
+    <div class="tab-content" data-tab-group="lt-type" data-tab="syn">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-syn-target">Target (host:port)</label>
+                <input type="text" id="lt-syn-target" placeholder="192.168.1.1:80">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-syn-srcip">Source IP (optional)</label>
+                <input type="text" id="lt-syn-srcip" placeholder="auto-detect" style="width:140px">
+            </div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--warning);margin-top:0.5rem">Requires administrator/root privileges for raw sockets. Falls back to TCP connect flood without admin.</p>
+    </div>
+
+    <!-- UDP Flood -->
+    <div class="tab-content" data-tab-group="lt-type" data-tab="udp">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-udp-target">Target (host:port)</label>
+                <input type="text" id="lt-udp-target" placeholder="192.168.1.1:53">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-udp-payload">Payload (bytes)</label>
+                <input type="number" id="lt-udp-payload" value="1024" style="width:90px" min="1" max="65535">
+            </div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem">Sends UDP packets at maximum rate. Effective against UDP services (DNS, NTP, etc.).</p>
+    </div>
+
+    <!-- Common settings -->
+    <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.75rem;align-items:end">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-workers">Workers</label>
+                <input type="number" id="lt-workers" value="10" min="1" max="500">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-duration">Duration (s)</label>
+                <input type="number" id="lt-duration" value="30" min="0">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-ramp">Ramp Pattern</label>
+                <select id="lt-ramp">
+                    <option value="constant">Constant</option>
+                    <option value="linear">Linear Ramp</option>
+                    <option value="step">Step</option>
+                    <option value="spike">Spike</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-ramp-dur">Ramp Time (s)</label>
+                <input type="number" id="lt-ramp-dur" value="0" min="0">
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.75rem;align-items:end;margin-top:0.5rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-rate">Rate Limit (req/s)</label>
+                <input type="number" id="lt-rate" value="0" min="0" placeholder="0 = unlimited">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-timeout">Timeout (s)</label>
+                <input type="number" id="lt-timeout" value="10" min="1">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="lt-max-req">Max Req/Worker</label>
+                <input type="number" id="lt-max-req" value="0" min="0" placeholder="0 = unlimited">
+            </div>
+            <div></div>
+        </div>
+    </div>
+
+    <!-- Launch controls -->
+    <div class="tool-actions" style="margin-top:1rem">
+        <button id="btn-start" class="btn btn-danger" onclick="startTest()">Start Test</button>
+        <button id="btn-pause" class="btn btn-secondary" onclick="pauseTest()" style="display:none">Pause</button>
+        <button id="btn-resume" class="btn btn-primary" onclick="resumeTest()" style="display:none">Resume</button>
+        <button id="btn-stop" class="btn btn-secondary" onclick="stopTest()" style="display:none">Stop</button>
+    </div>
+</div>
+
+<!-- Live Dashboard -->
+<div class="section" id="dashboard-section" style="display:none">
+    <h2>Live Metrics</h2>
+    <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:0.75rem">
+        <div class="card" style="text-align:center">
+            <div style="font-size:1.8rem;font-weight:700;color:var(--accent)" id="m-rps">0</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Requests/sec</div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div style="font-size:1.8rem;font-weight:700" id="m-total">0</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Total Requests</div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div style="font-size:1.8rem;font-weight:700;color:var(--success)" id="m-success">0%</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Success Rate</div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div style="font-size:1.8rem;font-weight:700;color:var(--warning)" id="m-avg-latency">0ms</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">Avg Latency</div>
+        </div>
+    </div>
+
+    <!-- Detail metrics -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
+        <div class="card">
+            <h3 style="margin:0 0 0.5rem 0;font-size:0.9rem">Performance</h3>
+            <table style="width:100%;font-size:0.85rem">
+                <tr><td style="color:var(--text-muted)">Workers</td><td id="m-workers" style="text-align:right">0</td></tr>
+                <tr><td style="color:var(--text-muted)">Elapsed</td><td id="m-elapsed" style="text-align:right">0s</td></tr>
+                <tr><td style="color:var(--text-muted)">Successful</td><td id="m-ok" style="text-align:right;color:var(--success)">0</td></tr>
+                <tr><td style="color:var(--text-muted)">Failed</td><td id="m-fail" style="text-align:right;color:var(--error)">0</td></tr>
+                <tr><td style="color:var(--text-muted)">Data Sent</td><td id="m-sent" style="text-align:right">0</td></tr>
+                <tr><td style="color:var(--text-muted)">Data Recv</td><td id="m-recv" style="text-align:right">0</td></tr>
+            </table>
+        </div>
+        <div class="card">
+            <h3 style="margin:0 0 0.5rem 0;font-size:0.9rem">Latency Percentiles</h3>
+            <table style="width:100%;font-size:0.85rem">
+                <tr><td style="color:var(--text-muted)">Min</td><td id="m-p-min" style="text-align:right">0ms</td></tr>
+                <tr><td style="color:var(--text-muted)">P50 (Median)</td><td id="m-p50" style="text-align:right">0ms</td></tr>
+                <tr><td style="color:var(--text-muted)">P95</td><td id="m-p95" style="text-align:right">0ms</td></tr>
+                <tr><td style="color:var(--text-muted)">P99</td><td id="m-p99" style="text-align:right">0ms</td></tr>
+                <tr><td style="color:var(--text-muted)">Max</td><td id="m-p-max" style="text-align:right">0ms</td></tr>
+                <tr><td style="color:var(--text-muted)">Error Rate</td><td id="m-err-rate" style="text-align:right">0%</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- RPS chart (ASCII-style bar chart) -->
+    <div class="card" style="margin-top:0.75rem">
+        <h3 style="margin:0 0 0.5rem 0;font-size:0.9rem">RPS Over Time</h3>
+        <div id="rps-chart" style="height:80px;display:flex;align-items:flex-end;gap:1px;overflow:hidden"></div>
+    </div>
+
+    <!-- Status codes & errors -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
+        <div class="card">
+            <h3 style="margin:0 0 0.5rem 0;font-size:0.9rem">Status Codes</h3>
+            <div id="m-status-codes" style="font-size:0.85rem"><span style="color:var(--text-muted)">—</span></div>
+        </div>
+        <div class="card">
+            <h3 style="margin:0 0 0.5rem 0;font-size:0.9rem">Top Errors</h3>
+            <div id="m-errors" style="font-size:0.85rem"><span style="color:var(--text-muted)">—</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- Presets -->
+<div class="section">
+    <h2>Quick Presets</h2>
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.75rem">
+        <button class="btn btn-small" onclick="applyPreset('gentle')">Gentle (5w / 10s)</button>
+        <button class="btn btn-small" onclick="applyPreset('moderate')">Moderate (25w / 30s)</button>
+        <button class="btn btn-small" onclick="applyPreset('heavy')">Heavy (100w / 60s)</button>
+        <button class="btn btn-small" onclick="applyPreset('stress')">Stress (250w / 120s)</button>
+        <button class="btn btn-small" onclick="applyPreset('ramp')">Linear Ramp (50w / 60s)</button>
+        <button class="btn btn-small" onclick="applyPreset('spike')">Spike Test (100w / 30s)</button>
+    </div>
+</div>
+
+<script>
+let _ltEventSource = null;
+let _ltPollTimer = null;
+
+function _v(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+function _getActiveAttackType() {
+    const tabs = document.querySelectorAll('[data-tab-group="lt-type"].tab-content');
+    for (const t of tabs) {
+        if (t.classList.contains('active')) return t.dataset.tab;
+    }
+    return 'http';
+}
+
+function _buildConfig() {
+    const type = _getActiveAttackType();
+    const config = {
+        workers: parseInt(_v('lt-workers')) || 10,
+        duration: parseInt(_v('lt-duration')) || 30,
+        ramp_pattern: _v('lt-ramp') || 'constant',
+        ramp_duration: parseInt(_v('lt-ramp-dur')) || 0,
+        rate_limit: parseInt(_v('lt-rate')) || 0,
+        timeout: parseInt(_v('lt-timeout')) || 10,
+        requests_per_worker: parseInt(_v('lt-max-req')) || 0,
+    };
+
+    if (type === 'http') {
+        config.attack_type = 'http_flood';
+        config.target = _v('lt-target');
+        config.method = _v('lt-method') || 'GET';
+        config.body = _v('lt-body') || '';
+        config.follow_redirects = document.getElementById('lt-follow-redirects').checked;
+        config.verify_ssl = document.getElementById('lt-verify-ssl').checked;
+        config.rotate_useragent = document.getElementById('lt-rotate-ua').checked;
+        try { config.headers = JSON.parse(_v('lt-headers') || '{}'); } catch(e) { config.headers = {}; }
+    } else if (type === 'slowloris') {
+        config.attack_type = 'slowloris';
+        config.target = _v('lt-slowloris-target');
+    } else if (type === 'tcp') {
+        config.attack_type = 'tcp_connect';
+        config.target = _v('lt-tcp-target');
+        config.payload_size = parseInt(_v('lt-tcp-payload')) || 0;
+    } else if (type === 'syn') {
+        config.attack_type = 'syn_flood';
+        config.target = _v('lt-syn-target');
+        config.source_ip = _v('lt-syn-srcip') || '';
+    } else if (type === 'udp') {
+        config.attack_type = 'udp_flood';
+        config.target = _v('lt-udp-target');
+        config.payload_size = parseInt(_v('lt-udp-payload')) || 1024;
+    }
+
+    return config;
+}
+
+function startTest() {
+    const config = _buildConfig();
+    if (!config.target) { alert('Enter a target'); return; }
+
+    fetch('/loadtest/start', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { alert(d.error || 'Failed to start'); return; }
+        _showRunning();
+        _startStream();
+    }).catch(e => alert('Error: ' + e.message));
+}
+
+function stopTest() {
+    fetch('/loadtest/stop', {method: 'POST'}).then(() => {
+        _showStopped();
+        _stopStream();
+    });
+}
+
+function pauseTest() {
+    fetch('/loadtest/pause', {method: 'POST'}).then(() => {
+        document.getElementById('btn-pause').style.display = 'none';
+        document.getElementById('btn-resume').style.display = '';
+    });
+}
+
+function resumeTest() {
+    fetch('/loadtest/resume', {method: 'POST'}).then(() => {
+        document.getElementById('btn-resume').style.display = 'none';
+        document.getElementById('btn-pause').style.display = '';
+    });
+}
+
+function _showRunning() {
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-pause').style.display = '';
+    document.getElementById('btn-stop').style.display = '';
+    document.getElementById('btn-resume').style.display = 'none';
+    document.getElementById('dashboard-section').style.display = '';
+}
+
+function _showStopped() {
+    document.getElementById('btn-start').style.display = '';
+    document.getElementById('btn-pause').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'none';
+    document.getElementById('btn-resume').style.display = 'none';
+}
+
+function _startStream() {
+    _stopStream();
+    // Use polling as a reliable fallback (SSE can be flaky through proxies)
+    _ltPollTimer = setInterval(function() {
+        fetch('/loadtest/status').then(r => r.json()).then(d => {
+            if (!d.running) {
+                _showStopped();
+                _stopStream();
+            }
+            if (d.metrics) _updateMetrics(d.metrics);
+        }).catch(() => {});
+    }, 1000);
+}
+
+function _stopStream() {
+    if (_ltEventSource) { _ltEventSource.close(); _ltEventSource = null; }
+    if (_ltPollTimer) { clearInterval(_ltPollTimer); _ltPollTimer = null; }
+}
+
+function _fmtBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+    return (b / 1073741824).toFixed(2) + ' GB';
+}
+
+function _updateMetrics(m) {
+    document.getElementById('m-rps').textContent = m.rps.toFixed(1);
+    document.getElementById('m-total').textContent = m.total_requests;
+    document.getElementById('m-success').textContent = m.success_rate.toFixed(1) + '%';
+    document.getElementById('m-avg-latency').textContent = m.avg_latency.toFixed(0) + 'ms';
+
+    document.getElementById('m-workers').textContent = m.active_workers;
+    document.getElementById('m-elapsed').textContent = m.elapsed.toFixed(0) + 's';
+    document.getElementById('m-ok').textContent = m.successful;
+    document.getElementById('m-fail').textContent = m.failed;
+    document.getElementById('m-sent').textContent = _fmtBytes(m.bytes_sent);
+    document.getElementById('m-recv').textContent = _fmtBytes(m.bytes_received);
+
+    document.getElementById('m-p-min').textContent = m.min_latency.toFixed(1) + 'ms';
+    document.getElementById('m-p50').textContent = m.p50_latency.toFixed(1) + 'ms';
+    document.getElementById('m-p95').textContent = m.p95_latency.toFixed(1) + 'ms';
+    document.getElementById('m-p99').textContent = m.p99_latency.toFixed(1) + 'ms';
+    document.getElementById('m-p-max').textContent = m.max_latency.toFixed(1) + 'ms';
+    document.getElementById('m-err-rate').textContent = m.error_rate.toFixed(1) + '%';
+
+    // Status codes
+    const codes = m.status_codes || {};
+    const codeKeys = Object.keys(codes).sort();
+    if (codeKeys.length) {
+        document.getElementById('m-status-codes').innerHTML = codeKeys.map(c => {
+            const color = c < 300 ? 'var(--success)' : c < 400 ? 'var(--warning)' : 'var(--error)';
+            return '<span style="color:' + color + '">' + escapeHtml(c) + '</span>: ' + codes[c];
+        }).join(' &nbsp; ');
+    }
+
+    // Errors
+    const errs = m.top_errors || {};
+    const errKeys = Object.keys(errs);
+    if (errKeys.length) {
+        document.getElementById('m-errors').innerHTML = errKeys.map(e =>
+            '<div>' + errs[e] + '&times; <span style="color:var(--text-muted)">' + escapeHtml(e) + '</span></div>'
+        ).join('');
+    }
+
+    // RPS chart
+    const rpsHist = m.rps_history || [];
+    if (rpsHist.length > 1) {
+        const chart = document.getElementById('rps-chart');
+        const maxRps = Math.max(...rpsHist, 1);
+        chart.innerHTML = rpsHist.map(r => {
+            const h = Math.max(2, (r / maxRps) * 70);
+            return '<div style="flex:1;min-width:2px;background:var(--accent);height:' + h + 'px;border-radius:1px 1px 0 0" title="' + r + ' req/s"></div>';
+        }).join('');
+    }
+}
+
+function applyPreset(name) {
+    const presets = {
+        'gentle':   {workers: 5,   duration: 10,  ramp: 'constant', rampDur: 0},
+        'moderate': {workers: 25,  duration: 30,  ramp: 'constant', rampDur: 0},
+        'heavy':    {workers: 100, duration: 60,  ramp: 'constant', rampDur: 0},
+        'stress':   {workers: 250, duration: 120, ramp: 'constant', rampDur: 0},
+        'ramp':     {workers: 50,  duration: 60,  ramp: 'linear',   rampDur: 30},
+        'spike':    {workers: 100, duration: 30,  ramp: 'spike',    rampDur: 10},
+    };
+    const p = presets[name];
+    if (!p) return;
+    document.getElementById('lt-workers').value = p.workers;
+    document.getElementById('lt-duration').value = p.duration;
+    document.getElementById('lt-ramp').value = p.ramp;
+    document.getElementById('lt-ramp-dur').value = p.rampDur;
+}
+
+// On load: check if test is already running
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/loadtest/status').then(r => r.json()).then(d => {
+        if (d.running) {
+            _showRunning();
+            _startStream();
+            if (d.metrics) _updateMetrics(d.metrics);
+        }
+    }).catch(() => {});
+});
+</script>
+{% endblock %}

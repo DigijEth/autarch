@@ -59,7 +59,9 @@ android/
 dist/
 build/
 build_temp/
+release/
 *.spec.bak
+*.zip
 
 # Local utility scripts
 kill_autarch.bat
@@ -70,6 +72,9 @@ Thumbs.db
 
 # Claude Code
 .claude/
+
+# Development planning docs
+phase2.md
 
 # Snoop data
 snoop/

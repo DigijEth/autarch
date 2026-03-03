@@ -40,12 +40,32 @@
                     <li><a href="{{ url_for('defense.linux_index') }}" class="{% if request.endpoint == 'defense.linux_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Linux</a></li>
                     <li><a href="{{ url_for('defense.windows_index') }}" class="{% if request.endpoint == 'defense.windows_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows</a></li>
                     <li><a href="{{ url_for('defense.monitor_index') }}" class="{% if request.endpoint == 'defense.monitor_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Threat Monitor</a></li>
+                    <li><a href="{{ url_for('threat_intel.index') }}" class="{% if request.blueprint == 'threat_intel' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Threat Intel</a></li>
+                    <li><a href="{{ url_for('log_correlator.index') }}" class="{% if request.blueprint == 'log_correlator' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Log Correlator</a></li>
                     <li><a href="{{ url_for('offense.index') }}" class="{% if request.blueprint == 'offense' %}active{% endif %}">Offense</a></li>
+                    <li><a href="{{ url_for('loadtest.index') }}" class="{% if request.blueprint == 'loadtest' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Load Test</a></li>
+                    <li><a href="{{ url_for('phishmail.index') }}" class="{% if request.blueprint == 'phishmail' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Gone Fishing</a></li>
+                    <li><a href="{{ url_for('hack_hijack.index') }}" class="{% if request.blueprint == 'hack_hijack' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Hack Hijack</a></li>
+                    <li><a href="{{ url_for('webapp_scanner.index') }}" class="{% if request.blueprint == 'webapp_scanner' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Web Scanner</a></li>
+                    <li><a href="{{ url_for('c2_framework.index') }}" class="{% if request.blueprint == 'c2_framework' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; C2 Framework</a></li>
+                    <li><a href="{{ url_for('wifi_audit.index') }}" class="{% if request.blueprint == 'wifi_audit' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; WiFi Audit</a></li>
+                    <li><a href="{{ url_for('api_fuzzer.index') }}" class="{% if request.blueprint == 'api_fuzzer' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; API Fuzzer</a></li>
+                    <li><a href="{{ url_for('cloud_scan.index') }}" class="{% if request.blueprint == 'cloud_scan' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Cloud Scan</a></li>
                     <li><a href="{{ url_for('counter.index') }}" class="{% if request.blueprint == 'counter' %}active{% endif %}">Counter</a></li>
+                    <li><a href="{{ url_for('steganography.index') }}" class="{% if request.blueprint == 'steganography' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Steganography</a></li>
+                    <li><a href="{{ url_for('anti_forensics.index') }}" class="{% if request.blueprint == 'anti_forensics' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Anti-Forensics</a></li>
                     <li><a href="{{ url_for('analyze.index') }}" class="{% if request.blueprint == 'analyze' and request.endpoint != 'analyze.hash_detection' %}active{% endif %}">Analyze</a></li>
                     <li><a href="{{ url_for('analyze.hash_detection') }}" class="{% if request.endpoint == 'analyze.hash_detection' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Hash Toolkit</a></li>
                     <li><a href="{{ url_for('llm_trainer.index') }}" class="{% if request.blueprint == 'llm_trainer' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Trainer</a></li>
+                    <li><a href="{{ url_for('password_toolkit.index') }}" class="{% if request.blueprint == 'password_toolkit' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Password Toolkit</a></li>
+                    <li><a href="{{ url_for('net_mapper.index') }}" class="{% if request.blueprint == 'net_mapper' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Net Mapper</a></li>
+                    <li><a href="{{ url_for('report_engine.index') }}" class="{% if request.blueprint == 'report_engine' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Reports</a></li>
+                    <li><a href="{{ url_for('ble_scanner.index') }}" class="{% if request.blueprint == 'ble_scanner' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; BLE Scanner</a></li>
+                    <li><a href="{{ url_for('forensics.index') }}" class="{% if request.blueprint == 'forensics' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Forensics</a></li>
+                    <li><a href="{{ url_for('rfid_tools.index') }}" class="{% if request.blueprint == 'rfid_tools' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; RFID/NFC</a></li>
+                    <li><a href="{{ url_for('malware_sandbox.index') }}" class="{% if request.blueprint == 'malware_sandbox' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Malware Sandbox</a></li>
                     <li><a href="{{ url_for('osint.index') }}" class="{% if request.blueprint == 'osint' %}active{% endif %}">OSINT</a></li>
+                    <li><a href="{{ url_for('ipcapture.index') }}" class="{% if request.blueprint == 'ipcapture' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; IP Capture</a></li>
                     <li><a href="{{ url_for('simulate.index') }}" class="{% if request.blueprint == 'simulate' and request.endpoint != 'simulate.legendary_creator' %}active{% endif %}">Simulate</a></li>
                     <li><a href="{{ url_for('simulate.legendary_creator') }}" class="{% if request.endpoint == 'simulate.legendary_creator' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Legendary Creator</a></li>
                 </ul>
@@ -69,6 +89,8 @@
                     <li><a href="{{ url_for('upnp.index') }}" class="{% if request.blueprint == 'upnp' %}active{% endif %}">UPnP</a></li>
                     <li><a href="{{ url_for('wireguard.index') }}" class="{% if request.blueprint == 'wireguard' %}active{% endif %}">WireGuard</a></li>
                     <li><a href="{{ url_for('msf.index') }}" class="{% if request.blueprint == 'msf' %}active{% endif %}">MSF Console</a></li>
+                    <li><a href="{{ url_for('dns_service.index') }}" class="{% if request.blueprint == 'dns_service' and request.endpoint != 'dns_service.nameserver' %}active{% endif %}">DNS Server</a></li>
+                    <li><a href="{{ url_for('dns_service.nameserver') }}" class="{% if request.endpoint == 'dns_service.nameserver' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Nameserver</a></li>
                     <li><a href="{{ url_for('settings.index') }}" class="{% if request.blueprint == 'settings' and request.endpoint not in ('settings.llm_settings', 'settings.deps_index') %}active{% endif %}">Settings</a></li>
                     <li><a href="{{ url_for('settings.llm_settings') }}" class="{% if request.endpoint == 'settings.llm_settings' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Config</a></li>
                     <li><a href="{{ url_for('settings.deps_index') }}" class="{% if request.endpoint == 'settings.deps_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Dependencies</a></li>

@@ -1,0 +1,10 @@
+{
+  "listen_dns": "10.0.0.56:53",
+  "listen_api": "127.0.0.1:5380",
+  "api_token": "5ed79350fed2490d2aca6f3b29776365",
+  "upstream": [],
+  "cache_ttl": 300,
+  "zones_dir": "C:\\she\\autarch\\data\\dns\\zones",
+  "dnssec_keys_dir": "C:\\she\\autarch\\data\\dns\\keys",
+  "log_queries": true
+}

@@ -66,6 +66,27 @@ def create_app():
     from web.routes.encmodules import encmodules_bp
     from web.routes.llm_trainer import llm_trainer_bp
     from web.routes.autonomy import autonomy_bp
+    from web.routes.loadtest import loadtest_bp
+    from web.routes.phishmail import phishmail_bp
+    from web.routes.dns_service import dns_service_bp
+    from web.routes.ipcapture import ipcapture_bp
+    from web.routes.hack_hijack import hack_hijack_bp
+    from web.routes.password_toolkit import password_toolkit_bp
+    from web.routes.webapp_scanner import webapp_scanner_bp
+    from web.routes.report_engine import report_engine_bp
+    from web.routes.net_mapper import net_mapper_bp
+    from web.routes.c2_framework import c2_framework_bp
+    from web.routes.wifi_audit import wifi_audit_bp
+    from web.routes.threat_intel import threat_intel_bp
+    from web.routes.steganography import steganography_bp
+    from web.routes.api_fuzzer import api_fuzzer_bp
+    from web.routes.ble_scanner import ble_scanner_bp
+    from web.routes.forensics import forensics_bp
+    from web.routes.rfid_tools import rfid_tools_bp
+    from web.routes.cloud_scan import cloud_scan_bp
+    from web.routes.malware_sandbox import malware_sandbox_bp
+    from web.routes.log_correlator import log_correlator_bp
+    from web.routes.anti_forensics import anti_forensics_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -91,6 +112,27 @@ def create_app():
     app.register_blueprint(encmodules_bp)
     app.register_blueprint(llm_trainer_bp)
     app.register_blueprint(autonomy_bp)
+    app.register_blueprint(loadtest_bp)
+    app.register_blueprint(phishmail_bp)
+    app.register_blueprint(dns_service_bp)
+    app.register_blueprint(ipcapture_bp)
+    app.register_blueprint(hack_hijack_bp)
+    app.register_blueprint(password_toolkit_bp)
+    app.register_blueprint(webapp_scanner_bp)
+    app.register_blueprint(report_engine_bp)
+    app.register_blueprint(net_mapper_bp)
+    app.register_blueprint(c2_framework_bp)
+    app.register_blueprint(wifi_audit_bp)
+    app.register_blueprint(threat_intel_bp)
+    app.register_blueprint(steganography_bp)
+    app.register_blueprint(api_fuzzer_bp)
+    app.register_blueprint(ble_scanner_bp)
+    app.register_blueprint(forensics_bp)
+    app.register_blueprint(rfid_tools_bp)
+    app.register_blueprint(cloud_scan_bp)
+    app.register_blueprint(malware_sandbox_bp)
+    app.register_blueprint(log_correlator_bp)
+    app.register_blueprint(anti_forensics_bp)
 
     # Start network discovery advertising (mDNS + Bluetooth)
     try:

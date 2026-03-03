@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Web Scanner — AUTARCH{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Web Application Scanner</h1>
+    <p class="text-muted">Directory brute, subdomain enum, vuln scanning, header analysis</p>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="switchTab('quick')">Quick Scan</button>
+    <button class="tab" onclick="switchTab('dirbust')">Dir Brute</button>
+    <button class="tab" onclick="switchTab('subdomain')">Subdomains</button>
+    <button class="tab" onclick="switchTab('vuln')">Vuln Scan</button>
+    <button class="tab" onclick="switchTab('crawl')">Crawl</button>
+</div>
+
+<!-- Quick Scan -->
+<div id="tab-quick" class="tab-content active">
+    <div class="card" style="max-width:900px">
+        <h3>Quick Scan</h3>
+        <div style="display:flex;gap:0.5rem;align-items:end">
+            <div class="form-group" style="flex:1;margin:0">
+                <input type="text" id="qs-url" class="form-control" placeholder="https://example.com" onkeypress="if(event.key==='Enter')quickScan()">
+            </div>
+            <button class="btn btn-primary" onclick="quickScan()">Scan</button>
+        </div>
+        <div id="qs-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<!-- Dir Brute -->
+<div id="tab-dirbust" class="tab-content" style="display:none">
+    <div class="card" style="max-width:900px">
+        <h3>Directory Bruteforce</h3>
+        <div class="form-group">
+            <label>Target URL</label>
+            <input type="text" id="db-url" class="form-control" placeholder="https://example.com">
+        </div>
+        <div class="form-group">
+            <label>Extensions (comma-separated, empty for none)</label>
+            <input type="text" id="db-ext" class="form-control" placeholder=".php,.html,.txt,.bak">
+        </div>
+        <button class="btn btn-primary" onclick="startDirbust()">Start</button>
+        <div id="db-status" style="margin-top:0.5rem"></div>
+        <div id="db-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<!-- Subdomain -->
+<div id="tab-subdomain" class="tab-content" style="display:none">
+    <div class="card" style="max-width:900px">
+        <h3>Subdomain Enumeration</h3>
+        <div style="display:flex;gap:0.5rem;align-items:end">
+            <div class="form-group" style="flex:1;margin:0">
+                <input type="text" id="sd-domain" class="form-control" placeholder="example.com">
+            </div>
+            <label style="white-space:nowrap;font-size:0.85rem"><input type="checkbox" id="sd-ct" checked> CT Logs</label>
+            <button class="btn btn-primary" onclick="subdomainEnum()">Enumerate</button>
+        </div>
+        <div id="sd-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<!-- Vuln Scan -->
+<div id="tab-vuln" class="tab-content" style="display:none">
+    <div class="card" style="max-width:900px">
+        <h3>Vulnerability Scanner</h3>
+        <div class="form-group">
+            <label>Target URL (with parameters preferred)</label>
+            <input type="text" id="vs-url" class="form-control" placeholder="https://example.com/search?q=test">
+        </div>
+        <div style="display:flex;gap:1rem;margin:0.5rem 0;font-size:0.85rem">
+            <label><input type="checkbox" id="vs-sqli" checked> SQL Injection</label>
+            <label><input type="checkbox" id="vs-xss" checked> Cross-Site Scripting</label>
+        </div>
+        <button class="btn btn-primary" onclick="vulnScan()">Scan</button>
+        <div id="vs-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<!-- Crawl -->
+<div id="tab-crawl" class="tab-content" style="display:none">
+    <div class="card" style="max-width:900px">
+        <h3>Web Crawler / Spider</h3>
+        <div style="display:flex;gap:0.5rem;align-items:end">
+            <div class="form-group" style="flex:1;margin:0">
+                <input type="text" id="cr-url" class="form-control" placeholder="https://example.com">
+            </div>
+            <div class="form-group" style="width:100px;margin:0">
+                <input type="number" id="cr-max" class="form-control" value="50" min="1" max="500" title="Max pages">
+            </div>
+            <button class="btn btn-primary" onclick="startCrawl()">Crawl</button>
+        </div>
+        <div id="cr-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<style>
+.hdr-good{color:#22c55e}.hdr-weak{color:#f59e0b}.hdr-missing{color:var(--danger)}
+.sev-high{color:var(--danger);font-weight:700}.sev-medium{color:#f59e0b;font-weight:600}.sev-low{color:var(--text-muted)}
+.tech-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;margin:2px;background:var(--bg-input);color:var(--accent)}
+.spinner-inline{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<script>
+let dbPoll=null;
+
+function switchTab(name){
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',
+        ['quick','dirbust','subdomain','vuln','crawl'][i]===name));
+    document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+    document.getElementById('tab-'+name).style.display='';
+}
+
+function quickScan(){
+    const url=document.getElementById('qs-url').value.trim();
+    if(!url) return;
+    const div=document.getElementById('qs-results');
+    div.innerHTML='<div class="spinner-inline"></div> Scanning...';
+    fetch('/web-scanner/quick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        let html=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">`;
+        // General
+        html+=`<div class="card"><h4>General</h4>
+            <div>Status: <strong>${d.status_code}</strong></div>
+            <div>Server: <strong>${esc(d.server||'hidden')}</strong></div>
+            ${d.technologies&&d.technologies.length?'<div style="margin-top:0.5rem">Tech: '+d.technologies.map(t=>`<span class="tech-badge">${t}</span>`).join('')+'</div>':''}
+            ${d.redirects&&d.redirects.length?'<div style="margin-top:0.5rem;font-size:0.8rem">Redirects: '+d.redirects.map(r=>r.status+' → '+esc(r.url)).join(' → ')+'</div>':''}
+        </div>`;
+        // Security headers
+        if(d.security_headers){
+            html+=`<div class="card"><h4>Security Headers</h4>`;
+            for(const[h,info] of Object.entries(d.security_headers)){
+                const cls='hdr-'+info.rating;
+                html+=`<div style="font-size:0.8rem;padding:2px 0"><span class="${cls}">${info.present?'&#10003;':'&#10007;'}</span> ${h}${info.value?' <span style="color:var(--text-muted)">'+esc(info.value).slice(0,60)+'</span>':''}</div>`;
+            }
+            html+=`</div>`;
+        }
+        html+=`</div>`;
+        // SSL
+        if(d.ssl&&Object.keys(d.ssl).length>1){
+            html+=`<div class="card" style="margin-top:1rem"><h4>SSL/TLS</h4>
+                <div>Valid: <strong class="${d.ssl.valid?'hdr-good':'hdr-missing'}">${d.ssl.valid?'Yes':'No'}</strong></div>
+                <div>Protocol: ${esc(d.ssl.protocol||'?')}</div>
+                <div>Cipher: ${esc(d.ssl.cipher||'?')}</div>
+                ${d.ssl.expires?'<div>Expires: '+esc(d.ssl.expires)+'</div>':''}
+                ${(d.ssl.issues||[]).map(i=>'<div class="hdr-missing">[!] '+esc(i)+'</div>').join('')}
+            </div>`;
+        }
+        div.innerHTML=html;
+    }).catch(e=>{div.innerHTML='Error: '+e.message});
+}
+
+function startDirbust(){
+    const url=document.getElementById('db-url').value.trim();
+    if(!url) return;
+    const ext=document.getElementById('db-ext').value.split(',').map(e=>e.trim()).filter(Boolean);
+    document.getElementById('db-status').innerHTML='<div class="spinner-inline"></div> Bruteforcing...';
+    document.getElementById('db-results').innerHTML='';
+    fetch('/web-scanner/dirbust',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({url,extensions:ext})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){document.getElementById('db-status').innerHTML='Error: '+esc(d.error);return}
+        if(dbPoll) clearInterval(dbPoll);
+        dbPoll=setInterval(()=>{
+            fetch('/web-scanner/dirbust/'+d.job_id).then(r=>r.json()).then(s=>{
+                document.getElementById('db-status').innerHTML=s.done?
+                    `Done. Found ${s.found.length} paths (tested ${s.tested}/${s.total})`:
+                    `<div class="spinner-inline"></div> ${s.tested}/${s.total} tested, ${s.found.length} found`;
+                if(s.found.length){
+                    document.getElementById('db-results').innerHTML='<table class="data-table"><thead><tr><th>Status</th><th>Path</th><th>Size</th><th>Type</th></tr></thead><tbody>'+
+                        s.found.map(f=>`<tr><td>${f.status}</td><td><a href="${esc(url+f.path)}" target="_blank">${esc(f.path)}</a></td><td>${f.size}</td><td style="font-size:0.75rem">${esc(f.content_type)}</td></tr>`).join('')+
+                        '</tbody></table>';
+                }
+                if(s.done){clearInterval(dbPoll);dbPoll=null}
+            });
+        },2000);
+    });
+}
+
+function subdomainEnum(){
+    const domain=document.getElementById('sd-domain').value.trim();
+    if(!domain) return;
+    const div=document.getElementById('sd-results');
+    div.innerHTML='<div class="spinner-inline"></div> Enumerating...';
+    fetch('/web-scanner/subdomain',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({domain,use_ct:document.getElementById('sd-ct').checked})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        const subs=d.subdomains||[];
+        div.innerHTML=`<div style="margin-bottom:0.5rem"><strong>${subs.length}</strong> subdomains found for <strong>${esc(d.domain)}</strong></div>`+
+            (subs.length?'<div style="column-count:3;font-size:0.85rem;font-family:monospace">'+subs.map(s=>`<div>${esc(s)}</div>`).join('')+'</div>':'');
+    });
+}
+
+function vulnScan(){
+    const url=document.getElementById('vs-url').value.trim();
+    if(!url) return;
+    const div=document.getElementById('vs-results');
+    div.innerHTML='<div class="spinner-inline"></div> Scanning for vulnerabilities...';
+    fetch('/web-scanner/vuln',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({url,sqli:document.getElementById('vs-sqli').checked,xss:document.getElementById('vs-xss').checked})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        const findings=d.findings||[];
+        if(!findings.length){div.innerHTML=`<div style="color:#22c55e">No vulnerabilities found. Tested ${d.urls_tested||0} URL(s).</div>`;return}
+        div.innerHTML=`<div style="margin-bottom:0.5rem"><strong class="sev-high">${findings.length} finding(s)</strong></div>
+            <table class="data-table"><thead><tr><th>Severity</th><th>Type</th><th>Parameter</th><th>Description</th><th>Payload</th></tr></thead><tbody>`+
+            findings.map(f=>`<tr><td class="sev-${f.severity}">${f.severity.toUpperCase()}</td>
+                <td>${f.type.toUpperCase()}</td><td>${esc(f.parameter||'')}</td>
+                <td style="font-size:0.8rem">${esc(f.description)}</td>
+                <td style="font-family:monospace;font-size:0.75rem">${esc(f.payload||'')}</td></tr>`).join('')+
+            '</tbody></table>';
+    });
+}
+
+function startCrawl(){
+    const url=document.getElementById('cr-url').value.trim();
+    if(!url) return;
+    const max=+document.getElementById('cr-max').value||50;
+    const div=document.getElementById('cr-results');
+    div.innerHTML='<div class="spinner-inline"></div> Crawling...';
+    fetch('/web-scanner/crawl',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({url,max_pages:max})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        const pages=d.pages||[];
+        div.innerHTML=`<div style="margin-bottom:0.5rem"><strong>${pages.length}</strong> pages crawled</div>
+            <table class="data-table"><thead><tr><th>Status</th><th>URL</th><th>Title</th><th>Size</th><th>Forms</th></tr></thead><tbody>`+
+            pages.map(p=>`<tr><td>${p.status}</td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis">
+                <a href="${esc(p.url)}" target="_blank" style="font-size:0.8rem">${esc(p.url)}</a></td>
+                <td style="font-size:0.8rem">${esc(p.title||'')}</td><td>${p.size}</td><td>${p.forms}</td></tr>`).join('')+
+            '</tbody></table>';
+    });
+}
+
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+</script>
+{% endblock %}

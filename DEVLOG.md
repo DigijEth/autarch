@@ -5610,3 +5610,133 @@ Wired Hal chat to the Agent system so it can create new AUTARCH modules on deman
 
 ---
 
+## Phase 5 — Arsenal Expansion (2026-03-03)
+
+Major expansion adding 11 new modules across all categories: DNS service, IP capture, phishing mail, load testing, hack hijack, password toolkit, web app scanner, reporting engine, network topology mapper, and C2 framework.
+
+### Phase 5.0 — Go DNS/Nameserver Service
+
+**Problem:** No built-in DNS/nameserver capability. Phishing, C2, and OSINT operations all benefit from authoritative DNS control but required external tools.
+
+**Fix:** Built a standalone Go DNS server (`services/dns-server/`) with full zone management, record CRUD, DNSSEC signing, and upstream recursive resolution. Python management layer wraps the Go binary via HTTP REST API. Web dashboard provides zone editor, record management, DNSSEC toggle, and live metrics.
+
+**Files Changed:**
+- `services/dns-server/` (NEW) — Go DNS server: `main.go`, `server/dns.go`, `server/zones.go`, `server/dnssec.go`, `server/resolver.go`, `api/router.go`, `api/zones.go`, `api/status.go`, `api/middleware.go`, `config/config.go`, `build.sh`
+- `core/dns_service.py` (NEW) — `DNSServiceManager` singleton: binary discovery, process lifecycle, REST API proxy, zone/record CRUD, mail record setup, DNSSEC management, metrics
+- `web/routes/dns_service.py` (NEW) — Blueprint `dns_service_bp`, 15+ endpoints proxying to Go API
+- `web/templates/dns_service.html` (NEW) — Zone manager, record editor, DNSSEC panel, metrics dashboard
+- `autarch_settings.conf` — Added `[dns]` section (enabled, listen, api_port, upstream, auto_start)
+
+### Phase 5.1 — IP Capture Redirect Service
+
+**Problem:** No way to track who clicks a link and capture their IP/metadata for OSINT operations.
+
+**Fix:** Created stealthy IP capture service with fast 302 redirects, realistic disguised URLs (looks like real article paths), full header capture (IP, User-Agent, Accept-Language, Referer, timezone), GeoIP lookup, and dossier integration. Capture endpoints are unauthenticated for stealth; management UI is behind login.
+
+**Files Changed:**
+- `modules/ipcapture.py` (NEW, ~350 lines) — `IPCaptureService` class: link creation with disguise types, capture recording with full header extraction, GeoIP lookup, dossier integration, CSV/JSON export. CLI `run()` with 5 menu options.
+- `web/routes/ipcapture.py` (NEW, ~120 lines) — Blueprint `ipcapture_bp`: link CRUD, capture viewer, export, unauthenticated capture endpoints (`/c/<key>`, `/article/<path>`)
+- `web/templates/ipcapture.html` (NEW, ~300 lines) — 2 tabs: Create & Manage (link form, active links table, copy-to-clipboard, QR codes), Captures (per-link log with IP/geo/timestamp/UA, map, export, "Add to Dossier")
+
+### Phase 5.2 — Gone Fishing Mail Service
+
+**Problem:** No built-in phishing email capability for authorized penetration testing engagements.
+
+**Fix:** Full SMTP phishing mail service with HTML template editor, attachment support, sender spoofing, DKIM signing, self-signed TLS cert generation, campaign tracking, and DNS service integration for auto-creating MX/SPF/DKIM/DMARC records.
+
+**Files Changed:**
+- `modules/phishmail.py` (NEW) — `PhishMailService` class: SMTP sending with spoofed headers, HTML templates, DKIM signing, TLS cert generation, campaign management, DNS auto-setup
+- `web/routes/phishmail.py` (NEW) — Blueprint `phishmail_bp`: compose, send, templates, campaigns, DNS integration
+- `web/templates/phishmail.html` (NEW) — 4 tabs: Compose (WYSIWYG-like), Templates, Campaigns, Server & Certs (DNS integration section)
+
+### Phase 5.3 — SYN Flood / Load Testing
+
+**Problem:** No built-in network stress testing / DDoS simulation for authorized testing.
+
+**Fix:** Created load testing module with SYN flood (raw sockets), HTTP flood (GET/POST), UDP flood, and Slowloris attack modes. Configurable threads, duration, packet size. Real-time stats via SSE.
+
+**Files Changed:**
+- `modules/loadtest.py` (NEW) — `LoadTestService` class: SYN/HTTP/UDP/Slowloris flood modes, threaded execution, real-time statistics, bandwidth calculation
+- `web/routes/loadtest.py` (NEW) — Blueprint `loadtest_bp`: start/stop/status endpoints, SSE stats stream
+- `web/templates/loadtest.html` (NEW) — Attack mode selector, target config, live stats dashboard with packets/sec and bandwidth graphs
+
+### Phase 5.4 — Hack Hijack
+
+**Problem:** No way to scan for and take over already-compromised systems — devices with existing backdoors, RAT listeners, web shells, bind shells, or crypto miners.
+
+**Fix:** Created offense module with 25+ backdoor signatures covering EternalBlue/DoublePulsar, major RATs (Meterpreter, Cobalt Strike, njRAT, DarkComet, Quasar, AsyncRAT, Gh0st, Poison Ivy), shell backdoors, web shells (20+ common paths probed), SOCKS/HTTP proxies, and crypto miners. DoublePulsar detection uses SMB Trans2 SESSION_SETUP probe with MID manipulation analysis. Threaded scanning with configurable concurrency.
+
+**Files Changed:**
+- `modules/hack_hijack.py` (NEW, ~580 lines) — `HackHijackService` class: `scan_target()` (threaded port scan + signature matching), `_check_doublepulsar()` (SMB Trans2 probe), `_check_smb()` (nmap MS17-010), `connect_raw_shell()`, `shell_execute()`, `attempt_takeover()`, `_detect_webshell()`. 25+ `BackdoorSignature` dataclasses. Singleton `get_hack_hijack()`. CLI `run()` with 5 options.
+- `web/routes/hack_hijack.py` (NEW, ~100 lines) — Blueprint `hack_hijack_bp`: scan (POST + poll), takeover, sessions CRUD, shell exec, history
+- `web/templates/hack_hijack.html` (NEW, ~250 lines) — 4 tabs: Scan Target, Results (color-coded confidence + category badges), Sessions (interactive shell terminal), History
+
+### Phase 5.5 — Password Toolkit
+
+**Problem:** No built-in hash analysis or password cracking capability.
+
+**Fix:** Created analyze module with 22 hash type signatures (MD5 through bcrypt/scrypt/Argon2), hashcat/John integration via subprocess with Python fallback for common hashes, configurable password generator with pattern syntax (`?u`/`?l`/`?d`/`?s`/`?a`), entropy-based password auditing, and credential spray testing against SSH/FTP/SMB services.
+
+**Files Changed:**
+- `modules/password_toolkit.py` (NEW, ~480 lines) — `PasswordToolkit` class: `identify_hash()` (22 regex signatures with hashcat mode + john format), `crack_hash()` (hashcat → john → python fallback), `generate_password()` (charset + pattern), `audit_password()` (entropy + policy), `credential_spray()` (SSH/FTP/SMB), `list_wordlists()`, `hash_string()`. Singleton `get_password_toolkit()`.
+- `web/routes/password_toolkit.py` (NEW, ~120 lines) — Blueprint `password_toolkit_bp`, 12 endpoints
+- `web/templates/password_toolkit.html` (NEW, ~250 lines) — 5 tabs: Identify, Crack, Generate, Spray, Wordlists. Live password audit with animated strength bar.
+
+### Phase 5.6 — Web Application Scanner
+
+**Problem:** No built-in web vulnerability scanner for authorized penetration testing.
+
+**Fix:** Created offense module with directory bruteforce (threaded, ~60 built-in paths + custom wordlists), subdomain enumeration (crt.sh CT logs + DNS brute), technology fingerprinting (17 signatures: WordPress, Drupal, Laravel, Django, React, Angular, etc.), security header analysis (10 checks), SSL/TLS audit, SQLi detection (error-based signatures), XSS detection (reflected payloads), and site crawling with depth control.
+
+**Files Changed:**
+- `modules/webapp_scanner.py` (NEW, ~500 lines) — `WebAppScanner` class: `quick_scan()` (headers + tech + SSL), `dir_bruteforce()` (threaded), `subdomain_enum()` (CT logs + DNS brute), `vuln_scan()` (SQLi + XSS), `crawl()` (spider with depth), `_check_ssl()`, `_fingerprint_tech()`. 17 `TECH_SIGNATURES`, 10 `SECURITY_HEADERS`, `SQLI_PAYLOADS`, `XSS_PAYLOADS`, `SQL_ERRORS`.
+- `web/routes/webapp_scanner.py` (NEW, ~60 lines) — Blueprint `webapp_scanner_bp`, 6 endpoints
+- `web/templates/webapp_scanner.html` (NEW, ~200 lines) — 5 tabs: Quick Scan, Dir Brute, Subdomains, Vuln Scan, Crawl
+
+### Phase 5.7 — Reporting Engine
+
+**Problem:** No structured way to compile pentest findings into professional reports.
+
+**Fix:** Created analyze module with structured report builder (executive summary, scope, methodology, findings, recommendations), 10 pre-built finding templates with CVSS scores mapped to OWASP Top 10 (SQLi 9.8, XSS 7.5, Broken Auth 9.1, IDOR 7.5, Missing Headers 3.1, etc.), and export to HTML (styled with severity summary), Markdown, and JSON formats. JSON file persistence per report in `data/reports/`.
+
+**Files Changed:**
+- `modules/report_engine.py` (NEW, ~380 lines) — `ReportEngine` class: `create_report()`, `add_finding()`, `update_finding()`, `export_html()` (styled HTML with severity breakdown), `export_markdown()`, `export_json()`. 10 `FINDING_TEMPLATES` with CVSS scores. Singleton `get_report_engine()`.
+- `web/routes/report_engine.py` (NEW, ~90 lines) — Blueprint `report_engine_bp`, 11 endpoints
+- `web/templates/report_engine.html` (NEW, ~220 lines) — 3 tabs: Reports (list + create), Editor (severity summary + findings + export), Templates (pre-built finding types)
+
+### Phase 5.8 — Network Topology Mapper
+
+**Problem:** No visual network mapping capability beyond raw nmap output.
+
+**Fix:** Created analyze module with host discovery (nmap or ICMP/TCP ping sweep, 100 concurrent threads), service enumeration with OS fingerprinting, SVG topology visualization with force-directed layout, auto-grouping by subnet, scan persistence with diff comparison (new/removed/unchanged hosts over time), and CIDR expansion via `struct.unpack`/`socket.inet_aton`.
+
+**Files Changed:**
+- `modules/net_mapper.py` (NEW, ~400 lines) — `NetMapper` class: `discover_hosts()` (nmap/ping sweep), `scan_host()` (nmap or socket fallback), `build_topology()` (nodes + edges graph), `save_scan()`, `load_scan()`, `diff_scans()`. `Host` dataclass. Singleton `get_net_mapper()`.
+- `web/routes/net_mapper.py` (NEW, ~70 lines) — Blueprint `net_mapper_bp`, 8 endpoints (discover + poll, scan-host, topology, scans CRUD, diff)
+- `web/templates/net_mapper.html` (NEW, ~200 lines) — 3 tabs: Discover (host table with detail scan), Map (SVG topology with color-coded node types), Saved Scans (list + diff comparison)
+
+### Phase 5.9 — C2 Framework
+
+**Problem:** Reverse shell listener existed but no multi-agent command & control infrastructure.
+
+**Fix:** Created offense module with multi-listener TCP server, multi-agent management, task queue architecture, and agent templates for Python/Bash/PowerShell with configurable beacon interval and jitter. Agents support: register, exec, download, upload, sysinfo commands. Communication via HTTP beaconing or raw TCP. Web UI provides agent dashboard with auto-refresh, interactive shell, and payload generator with one-liners.
+
+**Files Changed:**
+- `modules/c2_framework.py` (NEW, ~500 lines) — `C2Server` class: `start_listener()` (TCP accept loop), `_handle_agent()` (registration + task dispatch), `queue_task()`, `execute_command()`, `download_file()`, `upload_file()`, `generate_agent()`, `get_oneliner()`. `PYTHON_AGENT_TEMPLATE`, `BASH_AGENT_TEMPLATE`, `POWERSHELL_AGENT_TEMPLATE`. Singleton `get_c2_server()`.
+- `web/routes/c2_framework.py` (NEW, ~100 lines) — Blueprint `c2_framework_bp`, 12 endpoints (listeners, agents, tasks, generate, oneliner)
+- `web/templates/c2_framework.html` (NEW, ~220 lines) — 3 tabs: Dashboard (listeners + agents + task queue with 10s auto-refresh), Agents (interactive shell terminal), Generate (agent payloads + one-liners with copy-to-clipboard)
+
+### Phase 5.10 — Wiring & Build Config
+
+**Problem:** All new modules needed to be wired into the Flask app, sidebar navigation, and build configs.
+
+**Fix:** Registered all 11 new blueprints in `web/app.py`, added sidebar links under appropriate categories in `base.html`, and added all modules to hidden imports in both `autarch_public.spec` (PyInstaller) and `setup_msi.py` (cx_Freeze).
+
+**Files Changed:**
+- `web/app.py` — Added imports + `register_blueprint()` for: `llm_trainer_bp`, `autonomy_bp`, `loadtest_bp`, `phishmail_bp`, `dns_service_bp`, `ipcapture_bp`, `hack_hijack_bp`, `password_toolkit_bp`, `webapp_scanner_bp`, `report_engine_bp`, `net_mapper_bp`, `c2_framework_bp`
+- `web/templates/base.html` — Sidebar additions: Defense: `&#x2514; Defender Monitor`; Offense: `&#x2514; Load Test`, `&#x2514; Gone Fishing`, `&#x2514; Hack Hijack`, `&#x2514; Web Scanner`, `&#x2514; C2 Framework`; Analyze: `&#x2514; Hash Toolkit`, `&#x2514; LLM Trainer`, `&#x2514; Password Toolkit`, `&#x2514; Net Mapper`, `&#x2514; Reports`; OSINT: `&#x2514; IP Capture`; System: `&#x2514; DNS Server`
+- `autarch_public.spec` — Added 12 new entries to `hiddenimports`
+- `setup_msi.py` — Added 12 new entries to `includes`
+
+---
+

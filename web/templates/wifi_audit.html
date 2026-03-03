@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — WiFi Audit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>WiFi Auditing</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Wireless network scanning, attack tools, and monitoring.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="wifi" data-tab="scan" onclick="showTab('wifi','scan')">Scan</button>
+    <button class="tab" data-tab-group="wifi" data-tab="attack" onclick="showTab('wifi','attack')">Attack</button>
+    <button class="tab" data-tab-group="wifi" data-tab="monitor" onclick="showTab('wifi','monitor')">Monitor</button>
+</div>
+
+<!-- ==================== SCAN TAB ==================== -->
+<div class="tab-content active" data-tab-group="wifi" data-tab="scan">
+
+<div class="section">
+    <h2>Wireless Interfaces</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="wifiRefreshIfaces()">Refresh</button>
+        <button class="btn btn-primary btn-small" onclick="wifiMonitorMode(true)">Enable Monitor Mode</button>
+        <button class="btn btn-danger btn-small" onclick="wifiMonitorMode(false)">Disable Monitor Mode</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Interface</th><th>Mode</th><th>Driver</th><th>Chipset</th><th>Status</th></tr></thead>
+        <tbody id="wifi-iface-list">
+            <tr><td colspan="5" class="empty-state">Click Refresh to list wireless interfaces.</td></tr>
+        </tbody>
+    </table>
+    <div class="form-group" style="max-width:300px;margin-top:12px">
+        <label>Selected Interface</label>
+        <select id="wifi-iface-select">
+            <option value="">-- refresh to populate --</option>
+        </select>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Network Scan</h2>
+    <div class="input-row">
+        <input type="number" id="wifi-scan-duration" placeholder="Duration (seconds)" value="15" min="5" max="120" style="max-width:200px">
+        <button id="btn-wifi-scan" class="btn btn-primary" onclick="wifiScanNetworks()">Scan Networks</button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>BSSID</th><th>SSID</th><th>Channel</th>
+                <th>Encryption</th><th>Signal</th><th>Clients</th>
+            </tr>
+        </thead>
+        <tbody id="wifi-scan-results">
+            <tr><td colspan="6" class="empty-state">No scan results yet.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== ATTACK TAB ==================== -->
+<div class="tab-content" data-tab-group="wifi" data-tab="attack">
+
+<div class="section">
+    <h2>Deauthentication Attack</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Send deauthentication frames to disconnect clients from an access point.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Target BSSID</label>
+            <input type="text" id="deauth-bssid" placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
+        <div class="form-group">
+            <label>Client MAC (optional, blank = broadcast)</label>
+            <input type="text" id="deauth-client" placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Count</label>
+            <input type="number" id="deauth-count" value="10" min="1" max="9999">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-deauth" class="btn btn-danger" onclick="wifiDeauth()">Send Deauth</button>
+    </div>
+    <pre class="output-panel" id="deauth-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Handshake Capture</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Capture WPA/WPA2 four-way handshake from a target network.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Target BSSID</label>
+            <input type="text" id="hs-bssid" placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Channel</label>
+            <input type="number" id="hs-channel" placeholder="6" min="1" max="196">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-hs-capture" class="btn btn-primary" onclick="wifiCaptureHandshake()">Capture Handshake</button>
+        <button class="btn btn-small" onclick="wifiStopCapture()">Stop Capture</button>
+    </div>
+    <pre class="output-panel" id="hs-output"></pre>
+</div>
+
+<div class="section">
+    <h2>WPS Attack</h2>
+    <div class="tool-actions">
+        <button id="btn-wps-scan" class="btn btn-small" onclick="wifiWpsScan()">Scan WPS Networks</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>BSSID</th><th>SSID</th><th>WPS Version</th><th>Locked</th><th>Action</th></tr></thead>
+        <tbody id="wps-scan-results">
+            <tr><td colspan="5" class="empty-state">Click Scan to find WPS-enabled networks.</td></tr>
+        </tbody>
+    </table>
+    <pre class="output-panel" id="wps-output" style="margin-top:12px"></pre>
+</div>
+
+<div class="section">
+    <h2>Crack Handshake</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Capture File Path</label>
+            <input type="text" id="crack-file" placeholder="/path/to/capture.cap">
+        </div>
+        <div class="form-group">
+            <label>Wordlist Path</label>
+            <input type="text" id="crack-wordlist" placeholder="/path/to/wordlist.txt">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-crack" class="btn btn-primary" onclick="wifiCrackHandshake()">Crack</button>
+    </div>
+    <pre class="output-panel scrollable" id="crack-output"></pre>
+</div>
+
+</div>
+
+<!-- ==================== MONITOR TAB ==================== -->
+<div class="tab-content" data-tab-group="wifi" data-tab="monitor">
+
+<div class="section">
+    <h2>Rogue AP Detection</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Save a baseline of known APs, then detect rogue or evil-twin access points.
+    </p>
+    <div class="tool-actions">
+        <button id="btn-baseline" class="btn btn-primary btn-small" onclick="wifiSaveBaseline()">Save Baseline</button>
+        <button id="btn-detect-rogue" class="btn btn-danger btn-small" onclick="wifiDetectRogue()">Detect Rogue APs</button>
+    </div>
+    <pre class="output-panel scrollable" id="rogue-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Packet Capture</h2>
+    <div class="input-row">
+        <select id="cap-filter" style="max-width:200px">
+            <option value="">No Filter</option>
+            <option value="beacon">Beacons</option>
+            <option value="probe">Probes</option>
+            <option value="deauth">Deauth Frames</option>
+            <option value="data">Data Frames</option>
+            <option value="eapol">EAPOL (Handshakes)</option>
+        </select>
+        <button id="btn-cap-start" class="btn btn-primary btn-small" onclick="wifiStartCapture()">Start Capture</button>
+        <button class="btn btn-danger btn-small" onclick="wifiStopPacketCapture()">Stop Capture</button>
+    </div>
+    <pre class="output-panel scrollable" id="cap-live-output" style="max-height:300px"></pre>
+</div>
+
+<div class="section">
+    <h2>Saved Captures</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="wifiListCaptures()">Refresh List</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Filename</th><th>Size</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="captures-list">
+            <tr><td colspan="4" class="empty-state">Click Refresh to list saved capture files.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<script>
+/* ── WiFi Audit ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function wifiRefreshIfaces() {
+    fetchJSON('/wifi/interfaces').then(function(data) {
+        if (data.error) { renderOutput('wifi-iface-list', data.error); return; }
+        var ifaces = data.interfaces || [];
+        var sel = document.getElementById('wifi-iface-select');
+        sel.innerHTML = '';
+        if (!ifaces.length) {
+            document.getElementById('wifi-iface-list').innerHTML =
+                '<tr><td colspan="5" class="empty-state">No wireless interfaces found.</td></tr>';
+            sel.innerHTML = '<option value="">No interfaces</option>';
+            return;
+        }
+        var html = '';
+        ifaces.forEach(function(ifc) {
+            html += '<tr><td>' + esc(ifc.name) + '</td><td>' + esc(ifc.mode || 'managed') + '</td>'
+                + '<td>' + esc(ifc.driver || '--') + '</td><td>' + esc(ifc.chipset || '--') + '</td>'
+                + '<td><span class="badge ' + (ifc.up ? 'badge-pass' : 'badge-fail') + '">'
+                + (ifc.up ? 'UP' : 'DOWN') + '</span></td></tr>';
+            var opt = document.createElement('option');
+            opt.value = ifc.name;
+            opt.textContent = ifc.name + ' (' + (ifc.mode || 'managed') + ')';
+            sel.appendChild(opt);
+        });
+        document.getElementById('wifi-iface-list').innerHTML = html;
+    });
+}
+
+function wifiGetIface() {
+    var sel = document.getElementById('wifi-iface-select');
+    return sel ? sel.value : '';
+}
+
+function wifiMonitorMode(enable) {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    postJSON('/wifi/monitor-mode', {interface: iface, enable: enable}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        alert(data.message || (enable ? 'Monitor mode enabled' : 'Monitor mode disabled'));
+        wifiRefreshIfaces();
+    });
+}
+
+function wifiScanNetworks() {
+    var btn = document.getElementById('btn-wifi-scan');
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var duration = parseInt(document.getElementById('wifi-scan-duration').value) || 15;
+    setLoading(btn, true);
+    postJSON('/wifi/scan', {interface: iface, duration: duration}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('wifi-scan-results').innerHTML =
+                '<tr><td colspan="6" class="empty-state">Error: ' + esc(data.error) + '</td></tr>';
+            return;
+        }
+        var nets = data.networks || [];
+        if (!nets.length) {
+            document.getElementById('wifi-scan-results').innerHTML =
+                '<tr><td colspan="6" class="empty-state">No networks found.</td></tr>';
+            return;
+        }
+        var html = '';
+        nets.forEach(function(n) {
+            var sigClass = n.signal > -50 ? 'badge-pass' : n.signal > -70 ? 'badge-medium' : 'badge-fail';
+            html += '<tr><td><code>' + esc(n.bssid) + '</code></td>'
+                + '<td>' + esc(n.ssid || '<hidden>') + '</td>'
+                + '<td>' + esc(n.channel) + '</td>'
+                + '<td>' + esc(n.encryption || 'Open') + '</td>'
+                + '<td><span class="badge ' + sigClass + '">' + esc(n.signal) + ' dBm</span></td>'
+                + '<td>' + esc(n.clients || 0) + '</td></tr>';
+        });
+        document.getElementById('wifi-scan-results').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiDeauth() {
+    var bssid = document.getElementById('deauth-bssid').value.trim();
+    if (!bssid) { alert('Enter a target BSSID.'); return; }
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var btn = document.getElementById('btn-deauth');
+    setLoading(btn, true);
+    postJSON('/wifi/deauth', {
+        interface: iface,
+        bssid: bssid,
+        client: document.getElementById('deauth-client').value.trim(),
+        count: parseInt(document.getElementById('deauth-count').value) || 10
+    }).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('deauth-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiCaptureHandshake() {
+    var bssid = document.getElementById('hs-bssid').value.trim();
+    if (!bssid) { alert('Enter a target BSSID.'); return; }
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var btn = document.getElementById('btn-hs-capture');
+    setLoading(btn, true);
+    postJSON('/wifi/capture-handshake', {
+        interface: iface,
+        bssid: bssid,
+        channel: parseInt(document.getElementById('hs-channel').value) || 0
+    }).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('hs-output', data.message || data.error || 'Capture started');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiStopCapture() {
+    postJSON('/wifi/stop-capture', {}).then(function(data) {
+        renderOutput('hs-output', data.message || data.error || 'Stopped');
+    });
+}
+
+function wifiWpsScan() {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var btn = document.getElementById('btn-wps-scan');
+    setLoading(btn, true);
+    postJSON('/wifi/wps-scan', {interface: iface}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('wps-scan-results').innerHTML =
+                '<tr><td colspan="5" class="empty-state">Error: ' + esc(data.error) + '</td></tr>';
+            return;
+        }
+        var nets = data.networks || [];
+        if (!nets.length) {
+            document.getElementById('wps-scan-results').innerHTML =
+                '<tr><td colspan="5" class="empty-state">No WPS networks found.</td></tr>';
+            return;
+        }
+        var html = '';
+        nets.forEach(function(n) {
+            html += '<tr><td><code>' + esc(n.bssid) + '</code></td>'
+                + '<td>' + esc(n.ssid || '<hidden>') + '</td>'
+                + '<td>' + esc(n.wps_version || '--') + '</td>'
+                + '<td><span class="badge ' + (n.locked ? 'badge-fail' : 'badge-pass') + '">'
+                + (n.locked ? 'Yes' : 'No') + '</span></td>'
+                + '<td><button class="btn btn-danger btn-small" onclick="wifiWpsAttack(\''
+                + esc(n.bssid) + '\')">Attack</button></td></tr>';
+        });
+        document.getElementById('wps-scan-results').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiWpsAttack(bssid) {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    renderOutput('wps-output', 'Starting WPS attack on ' + bssid + '...');
+    postJSON('/wifi/wps-attack', {interface: iface, bssid: bssid}).then(function(data) {
+        renderOutput('wps-output', data.message || data.error || 'Done');
+    });
+}
+
+function wifiCrackHandshake() {
+    var file = document.getElementById('crack-file').value.trim();
+    var wordlist = document.getElementById('crack-wordlist').value.trim();
+    if (!file || !wordlist) { alert('Provide both capture file and wordlist paths.'); return; }
+    var btn = document.getElementById('btn-crack');
+    setLoading(btn, true);
+    renderOutput('crack-output', 'Cracking... this may take a while.');
+    postJSON('/wifi/crack', {file: file, wordlist: wordlist}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('crack-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiSaveBaseline() {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var btn = document.getElementById('btn-baseline');
+    setLoading(btn, true);
+    postJSON('/wifi/baseline', {interface: iface}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('rogue-output', data.message || data.error || 'Baseline saved');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiDetectRogue() {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var btn = document.getElementById('btn-detect-rogue');
+    setLoading(btn, true);
+    postJSON('/wifi/detect-rogue', {interface: iface}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('rogue-output', 'Error: ' + data.error); return; }
+        var rogues = data.rogue_aps || [];
+        if (!rogues.length) {
+            renderOutput('rogue-output', 'No rogue access points detected. Environment clean.');
+            return;
+        }
+        var lines = ['=== ROGUE APs DETECTED ==='];
+        rogues.forEach(function(r) {
+            lines.push('[!] BSSID: ' + r.bssid + '  SSID: ' + (r.ssid || '<hidden>')
+                + '  Channel: ' + r.channel + '  Reason: ' + (r.reason || 'unknown'));
+        });
+        renderOutput('rogue-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function wifiStartCapture() {
+    var iface = wifiGetIface();
+    if (!iface) { alert('Select a wireless interface first.'); return; }
+    var filter = document.getElementById('cap-filter').value;
+    renderOutput('cap-live-output', 'Starting packet capture...');
+    postJSON('/wifi/packet-capture/start', {interface: iface, filter: filter}).then(function(data) {
+        renderOutput('cap-live-output', data.message || data.error || 'Capture running');
+    });
+}
+
+function wifiStopPacketCapture() {
+    postJSON('/wifi/packet-capture/stop', {}).then(function(data) {
+        renderOutput('cap-live-output', data.message || data.error || 'Capture stopped');
+        wifiListCaptures();
+    });
+}
+
+function wifiListCaptures() {
+    fetchJSON('/wifi/captures').then(function(data) {
+        if (data.error) { return; }
+        var caps = data.captures || [];
+        if (!caps.length) {
+            document.getElementById('captures-list').innerHTML =
+                '<tr><td colspan="4" class="empty-state">No saved captures.</td></tr>';
+            return;
+        }
+        var html = '';
+        caps.forEach(function(c) {
+            html += '<tr><td><code>' + esc(c.filename) + '</code></td>'
+                + '<td>' + esc(c.size || '--') + '</td>'
+                + '<td>' + esc(c.date || '--') + '</td>'
+                + '<td><button class="btn btn-small" onclick="wifiDownloadCapture(\''
+                + esc(c.filename) + '\')">Download</button> '
+                + '<button class="btn btn-danger btn-small" onclick="wifiDeleteCapture(\''
+                + esc(c.filename) + '\')">Delete</button></td></tr>';
+        });
+        document.getElementById('captures-list').innerHTML = html;
+    });
+}
+
+function wifiDownloadCapture(filename) {
+    window.open('/wifi/captures/download?file=' + encodeURIComponent(filename), '_blank');
+}
+
+function wifiDeleteCapture(filename) {
+    if (!confirm('Delete capture "' + filename + '"?')) return;
+    postJSON('/wifi/captures/delete', {filename: filename}).then(function(data) {
+        if (data.success) wifiListCaptures();
+    });
+}
+</script>
+{% endblock %}

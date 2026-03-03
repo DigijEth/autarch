@@ -1,0 +1,53 @@
+{
+  "domain": "autarch.local",
+  "soa": {
+    "primary_ns": "ns1.autarch.local",
+    "admin_email": "admin.autarch.local",
+    "serial": 1772537115,
+    "refresh": 3600,
+    "retry": 600,
+    "expire": 86400,
+    "min_ttl": 300
+  },
+  "records": [
+    {
+      "id": "ns1",
+      "type": "NS",
+      "name": "autarch.local.",
+      "value": "ns1.autarch.local.",
+      "ttl": 3600
+    },
+    {
+      "id": "mx1",
+      "type": "MX",
+      "name": "autarch.local.",
+      "value": "mx.autarch.local.",
+      "ttl": 3600,
+      "priority": 10
+    },
+    {
+      "id": "spf1",
+      "type": "TXT",
+      "name": "autarch.local.",
+      "value": "v=spf1 ip4:127.0.0.1 -all",
+      "ttl": 3600
+    },
+    {
+      "id": "dmarc1",
+      "type": "TXT",
+      "name": "_dmarc.autarch.local.",
+      "value": "v=DMARC1; p=none; rua=mailto:dmarc@autarch.local",
+      "ttl": 3600
+    },
+    {
+      "id": "r1772537722879235900",
+      "type": "A",
+      "name": "https://autarch.local",
+      "value": "10.0.0.56:8181",
+      "ttl": 300
+    }
+  ],
+  "dnssec": true,
+  "created_at": "2026-03-03T11:25:07Z",
+  "updated_at": "2026-03-03T12:24:00Z"
+}

@@ -538,38 +538,75 @@ class MSFManager:
     def _find_msfrpcd_pid(self) -> Optional[str]:
         """Find the PID of running msfrpcd process.
 
+        Works on both Linux (pgrep, /proc) and Windows (tasklist, wmic).
+
         Returns:
             PID as string, or None if not found
         """
-        try:
-            # Use pgrep to find msfrpcd
-            result = subprocess.run(
-                ['pgrep', '-f', 'msfrpcd'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                # Return first PID found
-                pids = result.stdout.strip().split('\n')
-                return pids[0] if pids else None
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        import sys
+        is_win = sys.platform == 'win32'
 
-        # Fallback: check /proc on Linux
-        try:
-            for pid_dir in os.listdir('/proc'):
-                if pid_dir.isdigit():
-                    try:
-                        cmdline_path = f'/proc/{pid_dir}/cmdline'
-                        with open(cmdline_path, 'r') as f:
-                            cmdline = f.read()
-                            if 'msfrpcd' in cmdline:
-                                return pid_dir
-                    except (IOError, PermissionError):
-                        continue
-        except Exception:
-            pass
+        if is_win:
+            # Windows: use tasklist to find ruby/msfrpcd processes
+            for search_term in ['msfrpcd', 'thin', 'ruby']:
+                try:
+                    result = subprocess.run(
+                        ['tasklist', '/FI', f'IMAGENAME eq {search_term}*',
+                         '/FO', 'CSV', '/NH'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0:
+                        for line in result.stdout.strip().split('\n'):
+                            line = line.strip().strip('"')
+                            if line and 'INFO:' not in line:
+                                parts = line.split('","')
+                                if len(parts) >= 2:
+                                    return parts[1].strip('"')
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
+
+            # Fallback: wmic for command-line matching
+            try:
+                result = subprocess.run(
+                    ['wmic', 'process', 'where',
+                     "commandline like '%msfrpcd%' or commandline like '%thin%msf%'",
+                     'get', 'processid'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    for line in result.stdout.strip().split('\n'):
+                        line = line.strip()
+                        if line.isdigit():
+                            return line
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+        else:
+            # Linux: use pgrep
+            try:
+                result = subprocess.run(
+                    ['pgrep', '-f', 'msfrpcd'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    pids = result.stdout.strip().split('\n')
+                    return pids[0] if pids else None
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+            # Fallback: check /proc on Linux
+            try:
+                for pid_dir in os.listdir('/proc'):
+                    if pid_dir.isdigit():
+                        try:
+                            cmdline_path = f'/proc/{pid_dir}/cmdline'
+                            with open(cmdline_path, 'r') as f:
+                                cmdline = f.read()
+                                if 'msfrpcd' in cmdline:
+                                    return pid_dir
+                        except (IOError, PermissionError):
+                            continue
+            except Exception:
+                pass
 
         return None
 
@@ -577,11 +614,15 @@ class MSFManager:
         """Kill any running msfrpcd server.
 
         Args:
-            use_sudo: Use sudo for killing (needed if server was started with sudo)
+            use_sudo: Use sudo for killing (needed if server was started with sudo).
+                      Ignored on Windows.
 
         Returns:
             True if server was killed or no server was running
         """
+        import sys
+        is_win = sys.platform == 'win32'
+
         is_running, pid = self.detect_server()
 
         if not is_running:
@@ -591,62 +632,120 @@ class MSFManager:
         if self.is_connected:
             self.disconnect()
 
-        # Kill the process
-        if pid:
-            try:
-                # Try without sudo first
-                os.kill(int(pid), signal.SIGTERM)
-                # Wait a bit for graceful shutdown
-                time.sleep(1)
-
-                # Check if still running, force kill if needed
+        if is_win:
+            # Windows: use taskkill
+            if pid:
                 try:
-                    os.kill(int(pid), 0)  # Check if process exists
-                    os.kill(int(pid), signal.SIGKILL)
-                    time.sleep(0.5)
-                except ProcessLookupError:
-                    pass  # Process already dead
+                    subprocess.run(
+                        ['taskkill', '/F', '/PID', str(pid)],
+                        capture_output=True, timeout=10
+                    )
+                    time.sleep(1)
+                    return True
+                except Exception as e:
+                    print(f"{Colors.RED}[X] Failed to kill msfrpcd (PID {pid}): {e}{Colors.RESET}")
 
-                return True
-            except PermissionError:
-                # Process owned by root, need sudo
-                if use_sudo:
-                    try:
-                        subprocess.run(['sudo', 'kill', '-TERM', str(pid)], timeout=5)
-                        time.sleep(1)
-                        # Check if still running
-                        try:
-                            os.kill(int(pid), 0)
-                            subprocess.run(['sudo', 'kill', '-KILL', str(pid)], timeout=5)
-                        except ProcessLookupError:
-                            pass
-                        return True
-                    except Exception as e:
-                        print(f"{Colors.RED}[X] Failed to kill msfrpcd with sudo (PID {pid}): {e}{Colors.RESET}")
-                        return False
-                else:
-                    print(f"{Colors.RED}[X] Failed to kill msfrpcd (PID {pid}): Permission denied{Colors.RESET}")
-                    return False
-            except ProcessLookupError:
-                return True  # Already dead
-
-        # Try pkill as fallback (with sudo if needed)
-        try:
-            if use_sudo:
-                subprocess.run(['sudo', 'pkill', '-f', 'msfrpcd'], timeout=5)
-            else:
-                subprocess.run(['pkill', '-f', 'msfrpcd'], timeout=5)
+            # Fallback: kill by image name
+            for name in ['msfrpcd', 'ruby', 'thin']:
+                try:
+                    subprocess.run(
+                        ['taskkill', '/F', '/IM', f'{name}.exe'],
+                        capture_output=True, timeout=5
+                    )
+                except Exception:
+                    pass
             time.sleep(1)
             return True
-        except Exception:
-            pass
+        else:
+            # Linux: kill by PID or pkill
+            if pid:
+                try:
+                    os.kill(int(pid), signal.SIGTERM)
+                    time.sleep(1)
+                    try:
+                        os.kill(int(pid), 0)
+                        os.kill(int(pid), signal.SIGKILL)
+                        time.sleep(0.5)
+                    except ProcessLookupError:
+                        pass
+                    return True
+                except PermissionError:
+                    if use_sudo:
+                        try:
+                            subprocess.run(['sudo', 'kill', '-TERM', str(pid)], timeout=5)
+                            time.sleep(1)
+                            try:
+                                os.kill(int(pid), 0)
+                                subprocess.run(['sudo', 'kill', '-KILL', str(pid)], timeout=5)
+                            except ProcessLookupError:
+                                pass
+                            return True
+                        except Exception as e:
+                            print(f"{Colors.RED}[X] Failed to kill msfrpcd with sudo (PID {pid}): {e}{Colors.RESET}")
+                            return False
+                    else:
+                        print(f"{Colors.RED}[X] Failed to kill msfrpcd (PID {pid}): Permission denied{Colors.RESET}")
+                        return False
+                except ProcessLookupError:
+                    return True
+
+            # Try pkill as fallback
+            try:
+                if use_sudo:
+                    subprocess.run(['sudo', 'pkill', '-f', 'msfrpcd'], timeout=5)
+                else:
+                    subprocess.run(['pkill', '-f', 'msfrpcd'], timeout=5)
+                time.sleep(1)
+                return True
+            except Exception:
+                pass
 
         return False
+
+    def _find_msf_install(self) -> Optional[str]:
+        """Find the Metasploit Framework installation directory.
+
+        Returns:
+            Path to the MSF install directory, or None if not found.
+        """
+        import sys
+        is_win = sys.platform == 'win32'
+
+        if is_win:
+            # Common Windows Metasploit install paths
+            candidates = [
+                os.path.join(os.environ.get('ProgramFiles', r'C:\Program Files'), 'Metasploit'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)'), 'Metasploit'),
+                r'C:\metasploit-framework',
+                os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Metasploit'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Rapid7', 'Metasploit'),
+            ]
+            for c in candidates:
+                if c and os.path.isdir(c):
+                    return c
+                # Also check with -framework suffix
+                cf = c + '-framework' if not c.endswith('-framework') else c
+                if cf and os.path.isdir(cf):
+                    return cf
+        else:
+            candidates = [
+                '/opt/metasploit-framework',
+                '/usr/share/metasploit-framework',
+                '/opt/metasploit',
+                os.path.expanduser('~/.msf4'),
+            ]
+            for c in candidates:
+                if os.path.isdir(c):
+                    return c
+
+        return None
 
     def start_server(self, username: str, password: str,
                      host: str = "127.0.0.1", port: int = 55553,
                      use_ssl: bool = True, use_sudo: bool = True) -> bool:
         """Start the msfrpcd server with given credentials.
+
+        Works on both Linux and Windows.
 
         Args:
             username: RPC username
@@ -654,14 +753,47 @@ class MSFManager:
             host: Host to bind to
             port: Port to listen on
             use_ssl: Whether to use SSL
-            use_sudo: Run msfrpcd with sudo (required for raw socket modules like SYN scan)
+            use_sudo: Run msfrpcd with sudo (Linux only; ignored on Windows)
 
         Returns:
             True if server started successfully
         """
-        # Build msfrpcd command
+        import sys
+        is_win = sys.platform == 'win32'
+
+        # Find msfrpcd binary
         from core.paths import find_tool
-        msfrpcd_bin = find_tool('msfrpcd') or 'msfrpcd'
+        msfrpcd_bin = find_tool('msfrpcd')
+
+        if not msfrpcd_bin and is_win:
+            # Windows: look for msfrpcd.bat in common locations
+            msf_dir = self._find_msf_install()
+            if msf_dir:
+                for candidate in [
+                    os.path.join(msf_dir, 'bin', 'msfrpcd.bat'),
+                    os.path.join(msf_dir, 'bin', 'msfrpcd'),
+                    os.path.join(msf_dir, 'msfrpcd.bat'),
+                    os.path.join(msf_dir, 'embedded', 'bin', 'ruby.exe'),
+                ]:
+                    if os.path.isfile(candidate):
+                        msfrpcd_bin = candidate
+                        break
+
+            if not msfrpcd_bin:
+                # Try PATH with .bat extension
+                for ext in ['.bat', '.cmd', '.exe', '']:
+                    for p in os.environ.get('PATH', '').split(os.pathsep):
+                        candidate = os.path.join(p, f'msfrpcd{ext}')
+                        if os.path.isfile(candidate):
+                            msfrpcd_bin = candidate
+                            break
+                    if msfrpcd_bin:
+                        break
+
+        if not msfrpcd_bin:
+            msfrpcd_bin = 'msfrpcd'  # Last resort: hope it's on PATH
+
+        # Build command
         cmd = [
             msfrpcd_bin,
             '-U', username,
@@ -674,21 +806,32 @@ class MSFManager:
         if not use_ssl:
             cmd.append('-S')  # Disable SSL
 
-        # Prepend sudo if requested
-        if use_sudo:
+        # On Windows, if it's a .bat file, run through cmd
+        if is_win and msfrpcd_bin.endswith('.bat'):
+            cmd = ['cmd', '/c'] + cmd
+
+        # Prepend sudo on Linux if requested
+        if not is_win and use_sudo:
             cmd = ['sudo'] + cmd
 
         try:
             # Start msfrpcd in background
-            self._server_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True  # Detach from our process group
-            )
+            popen_kwargs = {
+                'stdout': subprocess.DEVNULL,
+                'stderr': subprocess.DEVNULL,
+            }
+            if is_win:
+                popen_kwargs['creationflags'] = (
+                    subprocess.CREATE_NEW_PROCESS_GROUP |
+                    subprocess.CREATE_NO_WINDOW
+                )
+            else:
+                popen_kwargs['start_new_session'] = True
+
+            self._server_process = subprocess.Popen(cmd, **popen_kwargs)
 
             # Wait for server to start (check port becomes available)
-            max_wait = 30  # seconds
+            max_wait = 30
             start_time = time.time()
             port_open = False
 
@@ -712,9 +855,8 @@ class MSFManager:
                 return False
 
             # Port is open, but server needs time to initialize RPC layer
-            # msfrpcd can take 5-10 seconds to fully initialize on some systems
             print(f"{Colors.DIM}  Waiting for RPC initialization...{Colors.RESET}")
-            time.sleep(5)  # Give server time to fully initialize
+            time.sleep(5)
 
             # Try a test connection to verify server is really ready
             for attempt in range(10):
@@ -726,7 +868,7 @@ class MSFManager:
                     test_rpc.connect(password)
                     test_rpc.disconnect()
                     return True
-                except MSFError as e:
+                except MSFError:
                     if attempt < 9:
                         time.sleep(2)
                     continue
@@ -735,8 +877,6 @@ class MSFManager:
                         time.sleep(2)
                     continue
 
-            # Server started but auth still failing - return true anyway
-            # The server IS running, caller can retry connection
             print(f"{Colors.YELLOW}[!] Server running but authentication not ready - try connecting manually{Colors.RESET}")
             return True
 

@@ -1,4 +1,4 @@
-"""Offense category route - MSF status, module search, sessions, module browsing, module execution."""
+"""Offense category route - MSF server control, module search, sessions, browsing, execution."""
 
 import json
 import threading
@@ -24,24 +24,190 @@ def index():
 @offense_bp.route('/status')
 @login_required
 def status():
-    """Get MSF connection status."""
+    """Get MSF connection and server status."""
     try:
         from core.msf_interface import get_msf_interface
+        from core.msf import get_msf_manager
         msf = get_msf_interface()
+        mgr = get_msf_manager()
         connected = msf.is_connected
+        settings = mgr.get_settings()
 
-        result = {'connected': connected}
+        # Check if server process is running
+        server_running, server_pid = mgr.detect_server()
+
+        result = {
+            'connected': connected,
+            'server_running': server_running,
+            'server_pid': server_pid,
+            'host': settings.get('host', '127.0.0.1'),
+            'port': settings.get('port', 55553),
+            'username': settings.get('username', 'msf'),
+            'ssl': settings.get('ssl', True),
+            'has_password': bool(settings.get('password', '')),
+        }
         if connected:
             try:
-                settings = msf.manager.get_settings()
-                result['host'] = settings.get('host', 'localhost')
-                result['port'] = settings.get('port', 55553)
+                version = msf.manager.rpc.get_version()
+                result['version'] = version.get('version', '')
             except Exception:
                 pass
 
         return jsonify(result)
-    except Exception:
-        return jsonify({'connected': False})
+    except Exception as e:
+        return jsonify({'connected': False, 'server_running': False, 'error': str(e)})
+
+
+@offense_bp.route('/connect', methods=['POST'])
+@login_required
+def connect():
+    """Connect to MSF RPC server."""
+    data = request.get_json(silent=True) or {}
+    password = data.get('password', '').strip()
+
+    try:
+        from core.msf import get_msf_manager
+        mgr = get_msf_manager()
+        settings = mgr.get_settings()
+
+        # Use provided password or saved one
+        pwd = password or settings.get('password', '')
+        if not pwd:
+            return jsonify({'ok': False, 'error': 'Password required'})
+
+        mgr.connect(pwd)
+        version = mgr.rpc.get_version() if mgr.rpc else {}
+        return jsonify({
+            'ok': True,
+            'version': version.get('version', 'Connected')
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@offense_bp.route('/disconnect', methods=['POST'])
+@login_required
+def disconnect():
+    """Disconnect from MSF RPC server."""
+    try:
+        from core.msf import get_msf_manager
+        mgr = get_msf_manager()
+        mgr.disconnect()
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@offense_bp.route('/server/start', methods=['POST'])
+@login_required
+def start_server():
+    """Start the MSF RPC server."""
+    data = request.get_json(silent=True) or {}
+
+    try:
+        from core.msf import get_msf_manager
+        mgr = get_msf_manager()
+        settings = mgr.get_settings()
+
+        username = data.get('username', '').strip() or settings.get('username', 'msf')
+        password = data.get('password', '').strip() or settings.get('password', '')
+        host = data.get('host', '').strip() or settings.get('host', '127.0.0.1')
+        port = int(data.get('port', 0) or settings.get('port', 55553))
+        use_ssl = data.get('ssl', settings.get('ssl', True))
+
+        if not password:
+            return jsonify({'ok': False, 'error': 'Password required to start server'})
+
+        # Save settings
+        mgr.save_settings(host, port, username, password, use_ssl)
+
+        # Kill existing server if running
+        is_running, _ = mgr.detect_server()
+        if is_running:
+            mgr.kill_server(use_sudo=False)
+
+        # Start server (no sudo on web — would hang waiting for password)
+        import sys
+        use_sudo = sys.platform != 'win32' and data.get('sudo', False)
+        ok = mgr.start_server(username, password, host, port, use_ssl, use_sudo=use_sudo)
+
+        if ok:
+            # Auto-connect after starting
+            try:
+                mgr.connect(password)
+                version = mgr.rpc.get_version() if mgr.rpc else {}
+                return jsonify({
+                    'ok': True,
+                    'message': 'Server started and connected',
+                    'version': version.get('version', '')
+                })
+            except Exception:
+                return jsonify({'ok': True, 'message': 'Server started (connect manually)'})
+        else:
+            return jsonify({'ok': False, 'error': 'Failed to start server'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@offense_bp.route('/server/stop', methods=['POST'])
+@login_required
+def stop_server():
+    """Stop the MSF RPC server."""
+    try:
+        from core.msf import get_msf_manager
+        mgr = get_msf_manager()
+        ok = mgr.kill_server(use_sudo=False)
+        return jsonify({'ok': ok})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@offense_bp.route('/settings', methods=['POST'])
+@login_required
+def save_settings():
+    """Save MSF connection settings."""
+    data = request.get_json(silent=True) or {}
+    try:
+        from core.msf import get_msf_manager
+        mgr = get_msf_manager()
+        mgr.save_settings(
+            host=data.get('host', '127.0.0.1'),
+            port=int(data.get('port', 55553)),
+            username=data.get('username', 'msf'),
+            password=data.get('password', ''),
+            use_ssl=data.get('ssl', True),
+        )
+        return jsonify({'ok': True})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+
+
+@offense_bp.route('/jobs')
+@login_required
+def list_jobs():
+    """List running MSF jobs."""
+    try:
+        from core.msf_interface import get_msf_interface
+        msf = get_msf_interface()
+        if not msf.is_connected:
+            return jsonify({'jobs': {}, 'error': 'Not connected to MSF'})
+        jobs = msf.list_jobs()
+        return jsonify({'jobs': jobs})
+    except Exception as e:
+        return jsonify({'jobs': {}, 'error': str(e)})
+
+
+@offense_bp.route('/jobs/<job_id>/stop', methods=['POST'])
+@login_required
+def stop_job(job_id):
+    """Stop a running MSF job."""
+    try:
+        from core.msf_interface import get_msf_interface
+        msf = get_msf_interface()
+        ok = msf.stop_job(job_id)
+        return jsonify({'ok': ok})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
 
 
 @offense_bp.route('/search', methods=['POST'])

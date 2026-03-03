@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Forensics Toolkit{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Forensics Toolkit</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        File hashing, data carving, timeline analysis, and evidence chain of custody.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="forensics" data-tab="image" onclick="showTab('forensics','image')">Image</button>
+    <button class="tab" data-tab-group="forensics" data-tab="carve" onclick="showTab('forensics','carve')">Carve</button>
+    <button class="tab" data-tab-group="forensics" data-tab="timeline" onclick="showTab('forensics','timeline')">Timeline</button>
+    <button class="tab" data-tab-group="forensics" data-tab="evidence" onclick="showTab('forensics','evidence')">Evidence</button>
+</div>
+
+<!-- ══ Image Tab ══ -->
+<div class="tab-content active" data-tab-group="forensics" data-tab="image">
+
+    <!-- Hash File -->
+    <div class="section">
+        <h2>Hash File</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>File Path</label>
+                <input type="text" id="for-hash-path" placeholder="/path/to/evidence/file.dd">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-for-hash" class="btn btn-primary" onclick="forHashFile()">Compute Hashes</button>
+        </div>
+        <div id="for-hash-result" style="display:none">
+            <table class="data-table" style="max-width:700px">
+                <tbody>
+                    <tr><td style="width:80px;font-weight:600">MD5</td><td id="for-hash-md5" style="font-family:monospace;font-size:0.85rem;word-break:break-all">—</td></tr>
+                    <tr><td style="font-weight:600">SHA1</td><td id="for-hash-sha1" style="font-family:monospace;font-size:0.85rem;word-break:break-all">—</td></tr>
+                    <tr><td style="font-weight:600">SHA256</td><td id="for-hash-sha256" style="font-family:monospace;font-size:0.85rem;word-break:break-all">—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Verify Hash -->
+    <div class="section">
+        <h2>Verify Hash</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>File Path</label>
+                <input type="text" id="for-verify-path" placeholder="/path/to/evidence/file.dd">
+            </div>
+            <div class="form-group" style="flex:2">
+                <label>Expected Hash (MD5, SHA1, or SHA256)</label>
+                <input type="text" id="for-verify-hash" placeholder="e3b0c44298fc1c149afbf4c8996fb924...">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-for-verify" class="btn btn-primary" onclick="forVerifyHash()">Verify</button>
+        </div>
+        <div id="for-verify-result" class="progress-text"></div>
+    </div>
+
+    <!-- Disk Image Creator -->
+    <div class="section">
+        <h2>Disk Image Creator</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Source (device or file)</label>
+                <input type="text" id="for-image-source" placeholder="/dev/sda1 or /path/to/source">
+            </div>
+            <div class="form-group">
+                <label>Output File</label>
+                <input type="text" id="for-image-output" placeholder="/path/to/output/image.dd">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-for-image" class="btn btn-primary" onclick="forCreateImage()">Create Image</button>
+        </div>
+        <div id="for-image-status" class="progress-text"></div>
+        <pre class="output-panel scrollable" id="for-image-output-log" style="max-height:200px;display:none"></pre>
+    </div>
+</div>
+
+<!-- ══ Carve Tab ══ -->
+<div class="tab-content" data-tab-group="forensics" data-tab="carve">
+
+    <!-- Carve Form -->
+    <div class="section">
+        <h2>File Carving</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Source File</label>
+                <input type="text" id="for-carve-source" placeholder="/path/to/disk/image.dd">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>File Types</label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px">
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="jpg" checked> JPG</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="png" checked> PNG</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="pdf" checked> PDF</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="doc"> DOC/DOCX</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="zip"> ZIP</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="sqlite"> SQLite</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="exe"> EXE/PE</label>
+                    <label style="font-size:0.85rem;cursor:pointer"><input type="checkbox" class="for-carve-type" value="elf"> ELF</label>
+                </div>
+            </div>
+            <div class="form-group" style="max-width:160px">
+                <label>Max Files</label>
+                <input type="number" id="for-carve-max" value="100" min="1" max="10000">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-for-carve" class="btn btn-primary" onclick="forCarve()">Carve</button>
+        </div>
+        <div id="for-carve-status" class="progress-text"></div>
+    </div>
+
+    <!-- Carved Files Table -->
+    <div class="section">
+        <h2>Carved Files</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="forExportCarved()">Export List</button>
+            <button class="btn btn-small" onclick="forClearCarved()">Clear</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Offset</th>
+                    <th>Size</th>
+                    <th>MD5</th>
+                </tr>
+            </thead>
+            <tbody id="for-carved-body">
+                <tr><td colspan="5" class="empty-state">No carved files. Run file carving first.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ══ Timeline Tab ══ -->
+<div class="tab-content" data-tab-group="forensics" data-tab="timeline">
+
+    <!-- Timeline Builder -->
+    <div class="section">
+        <h2>Timeline Builder</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Directory Path</label>
+                <input type="text" id="for-timeline-path" placeholder="/path/to/evidence/directory">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-for-timeline" class="btn btn-primary" onclick="forBuildTimeline()">Build Timeline</button>
+        </div>
+        <div id="for-timeline-status" class="progress-text"></div>
+    </div>
+
+    <!-- Events Table -->
+    <div class="section">
+        <h2>Events</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="forSortTimeline('timestamp')">Sort by Time</button>
+            <button class="btn btn-small" onclick="forSortTimeline('type')">Sort by Type</button>
+            <button class="btn btn-small" onclick="forSortTimeline('size')">Sort by Size</button>
+            <button class="btn btn-small" onclick="forExportTimeline()">Export CSV</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="cursor:pointer" onclick="forSortTimeline('timestamp')">Timestamp</th>
+                    <th style="cursor:pointer" onclick="forSortTimeline('type')">Type</th>
+                    <th style="cursor:pointer" onclick="forSortTimeline('file')">File</th>
+                    <th style="cursor:pointer" onclick="forSortTimeline('size')">Size</th>
+                </tr>
+            </thead>
+            <tbody id="for-timeline-body">
+                <tr><td colspan="4" class="empty-state">No timeline data. Build a timeline from a directory.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ══ Evidence Tab ══ -->
+<div class="tab-content" data-tab-group="forensics" data-tab="evidence">
+
+    <!-- Evidence Files -->
+    <div class="section">
+        <h2>Evidence Files</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="forRefreshEvidence()">Refresh</button>
+        </div>
+        <div id="for-evidence-files">
+            <p class="empty-state" style="padding:12px;font-size:0.85rem">No evidence files registered.</p>
+        </div>
+    </div>
+
+    <!-- Carved Files List -->
+    <div class="section">
+        <h2>Carved Files</h2>
+        <div id="for-evidence-carved">
+            <p class="empty-state" style="padding:12px;font-size:0.85rem">No carved files. Use the Carve tab to extract files.</p>
+        </div>
+    </div>
+
+    <!-- Chain of Custody -->
+    <div class="section">
+        <h2>Chain of Custody Log</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="forRefreshCustody()">Refresh</button>
+            <button class="btn btn-small" onclick="forExportCustody()">Export</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Details</th>
+                    <th>Hash</th>
+                </tr>
+            </thead>
+            <tbody id="for-custody-body">
+                <tr><td colspan="5" class="empty-state">No chain of custody entries.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+/* ── Forensics Toolkit ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+var forCarvedFiles = [];
+var forTimelineEvents = [];
+var forTimelineSortKey = 'timestamp';
+var forTimelineSortAsc = true;
+
+/* ── Image Tab ── */
+function forHashFile() {
+    var path = document.getElementById('for-hash-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-for-hash');
+    setLoading(btn, true);
+    postJSON('/forensics/hash', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('for-hash-result').style.display = 'none';
+            return;
+        }
+        document.getElementById('for-hash-result').style.display = '';
+        document.getElementById('for-hash-md5').textContent = data.md5 || '—';
+        document.getElementById('for-hash-sha1').textContent = data.sha1 || '—';
+        document.getElementById('for-hash-sha256').textContent = data.sha256 || '—';
+        forLogCustody('hash', path, 'Computed hashes', data.sha256 || '');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function forVerifyHash() {
+    var path = document.getElementById('for-verify-path').value.trim();
+    var expected = document.getElementById('for-verify-hash').value.trim();
+    if (!path || !expected) return;
+    var btn = document.getElementById('btn-for-verify');
+    setLoading(btn, true);
+    postJSON('/forensics/verify', {path: path, expected: expected}).then(function(data) {
+        setLoading(btn, false);
+        var el = document.getElementById('for-verify-result');
+        if (data.error) {
+            el.textContent = 'Error: ' + data.error;
+            el.style.color = 'var(--danger)';
+            return;
+        }
+        if (data.match) {
+            el.textContent = 'MATCH — Hash verified (' + (data.algorithm || 'unknown') + ')';
+            el.style.color = 'var(--success,#4ade80)';
+        } else {
+            el.textContent = 'MISMATCH — Expected: ' + expected + ', Got: ' + (data.actual || '?');
+            el.style.color = 'var(--danger)';
+        }
+        forLogCustody('verify', path, data.match ? 'Hash verified' : 'Hash mismatch', expected);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function forCreateImage() {
+    var source = document.getElementById('for-image-source').value.trim();
+    var output = document.getElementById('for-image-output').value.trim();
+    if (!source || !output) return;
+    var btn = document.getElementById('btn-for-image');
+    var log = document.getElementById('for-image-output-log');
+    setLoading(btn, true);
+    log.style.display = 'block';
+    log.textContent = '';
+    document.getElementById('for-image-status').textContent = 'Creating disk image...';
+    postJSON('/forensics/create-image', {source: source, output: output}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('for-image-status').textContent = 'Error: ' + data.error;
+            log.textContent = data.error;
+            return;
+        }
+        document.getElementById('for-image-status').textContent = 'Image created successfully';
+        var lines = [];
+        if (data.size) lines.push('Size: ' + data.size);
+        if (data.hash) lines.push('SHA256: ' + data.hash);
+        if (data.duration) lines.push('Duration: ' + data.duration + 's');
+        log.textContent = lines.join('\n') || 'Done.';
+        forLogCustody('image', output, 'Disk image created from ' + source, data.hash || '');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Carve Tab ── */
+function forGetCarveTypes() {
+    var checked = [];
+    document.querySelectorAll('.for-carve-type:checked').forEach(function(cb) {
+        checked.push(cb.value);
+    });
+    return checked;
+}
+
+function forCarve() {
+    var source = document.getElementById('for-carve-source').value.trim();
+    if (!source) return;
+    var types = forGetCarveTypes();
+    if (!types.length) { document.getElementById('for-carve-status').textContent = 'Select at least one file type'; return; }
+    var maxFiles = parseInt(document.getElementById('for-carve-max').value) || 100;
+    var btn = document.getElementById('btn-for-carve');
+    setLoading(btn, true);
+    document.getElementById('for-carve-status').textContent = 'Carving files from image...';
+    postJSON('/forensics/carve', {source: source, types: types, max_files: maxFiles}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('for-carve-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        forCarvedFiles = data.files || [];
+        document.getElementById('for-carve-status').textContent = 'Carved ' + forCarvedFiles.length + ' file(s)';
+        forRenderCarved();
+        forLogCustody('carve', source, 'Carved ' + forCarvedFiles.length + ' files (' + types.join(',') + ')', '');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function forRenderCarved() {
+    var tbody = document.getElementById('for-carved-body');
+    if (!forCarvedFiles.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No carved files.</td></tr>';
+        return;
+    }
+    var html = '';
+    forCarvedFiles.forEach(function(f) {
+        html += '<tr>'
+            + '<td>' + esc(f.name || '—') + '</td>'
+            + '<td>' + esc(f.type || '—') + '</td>'
+            + '<td style="font-family:monospace;font-size:0.8rem">' + esc(f.offset != null ? '0x' + f.offset.toString(16) : '—') + '</td>'
+            + '<td>' + esc(forFormatSize(f.size)) + '</td>'
+            + '<td style="font-family:monospace;font-size:0.8rem">' + esc(f.md5 || '—') + '</td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function forFormatSize(bytes) {
+    if (bytes == null) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+    return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+function forExportCarved() {
+    var blob = new Blob([JSON.stringify(forCarvedFiles, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'carved_files.json';
+    a.click();
+}
+
+function forClearCarved() {
+    forCarvedFiles = [];
+    forRenderCarved();
+}
+
+/* ── Timeline Tab ── */
+function forBuildTimeline() {
+    var path = document.getElementById('for-timeline-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-for-timeline');
+    setLoading(btn, true);
+    document.getElementById('for-timeline-status').textContent = 'Building timeline...';
+    postJSON('/forensics/timeline', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('for-timeline-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        forTimelineEvents = data.events || [];
+        document.getElementById('for-timeline-status').textContent = 'Timeline built — ' + forTimelineEvents.length + ' event(s)';
+        forRenderTimeline();
+        forLogCustody('timeline', path, 'Built timeline with ' + forTimelineEvents.length + ' events', '');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function forSortTimeline(key) {
+    if (forTimelineSortKey === key) {
+        forTimelineSortAsc = !forTimelineSortAsc;
+    } else {
+        forTimelineSortKey = key;
+        forTimelineSortAsc = true;
+    }
+    forTimelineEvents.sort(function(a, b) {
+        var va = a[key] || '', vb = b[key] || '';
+        if (key === 'size') { va = Number(va) || 0; vb = Number(vb) || 0; }
+        else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
+        if (va < vb) return forTimelineSortAsc ? -1 : 1;
+        if (va > vb) return forTimelineSortAsc ? 1 : -1;
+        return 0;
+    });
+    forRenderTimeline();
+}
+
+function forRenderTimeline() {
+    var tbody = document.getElementById('for-timeline-body');
+    if (!forTimelineEvents.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No timeline data.</td></tr>';
+        return;
+    }
+    var html = '';
+    forTimelineEvents.forEach(function(e) {
+        var typeCls = '';
+        var t = (e.type || '').toLowerCase();
+        if (t === 'created') typeCls = 'color:var(--success,#4ade80)';
+        else if (t === 'modified') typeCls = 'color:var(--warning,#f59e0b)';
+        else if (t === 'deleted') typeCls = 'color:var(--danger)';
+        else if (t === 'accessed') typeCls = 'color:var(--accent)';
+        html += '<tr>'
+            + '<td style="font-family:monospace;font-size:0.8rem;white-space:nowrap">' + esc(e.timestamp || '—') + '</td>'
+            + '<td><span style="' + typeCls + '">' + esc(e.type || '—') + '</span></td>'
+            + '<td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.file || '—') + '</td>'
+            + '<td>' + esc(forFormatSize(e.size)) + '</td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function forExportTimeline() {
+    if (!forTimelineEvents.length) return;
+    var csv = 'Timestamp,Type,File,Size\n';
+    forTimelineEvents.forEach(function(e) {
+        csv += '"' + (e.timestamp || '') + '","' + (e.type || '') + '","' + (e.file || '').replace(/"/g, '""') + '",' + (e.size || 0) + '\n';
+    });
+    var blob = new Blob([csv], {type: 'text/csv'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'forensic_timeline.csv';
+    a.click();
+}
+
+/* ── Evidence Tab ── */
+var forCustodyLog = [];
+
+function forRefreshEvidence() {
+    fetchJSON('/forensics/evidence').then(function(data) {
+        var container = document.getElementById('for-evidence-files');
+        var files = data.files || [];
+        if (!files.length) {
+            container.innerHTML = '<p class="empty-state" style="padding:12px;font-size:0.85rem">No evidence files registered.</p>';
+        } else {
+            var html = '<table class="data-table"><thead><tr><th>File</th><th>Size</th><th>Hash</th><th>Added</th></tr></thead><tbody>';
+            files.forEach(function(f) {
+                html += '<tr>'
+                    + '<td>' + esc(f.name || '—') + '</td>'
+                    + '<td>' + esc(forFormatSize(f.size)) + '</td>'
+                    + '<td style="font-family:monospace;font-size:0.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.hash || '—') + '</td>'
+                    + '<td style="font-size:0.8rem">' + esc(f.added || '—') + '</td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        /* Also update carved files in evidence view */
+        var carvedContainer = document.getElementById('for-evidence-carved');
+        var carved = data.carved || forCarvedFiles;
+        if (!carved.length) {
+            carvedContainer.innerHTML = '<p class="empty-state" style="padding:12px;font-size:0.85rem">No carved files.</p>';
+        } else {
+            var chtml = '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Size</th><th>MD5</th></tr></thead><tbody>';
+            carved.forEach(function(f) {
+                chtml += '<tr>'
+                    + '<td>' + esc(f.name || '—') + '</td>'
+                    + '<td>' + esc(f.type || '—') + '</td>'
+                    + '<td>' + esc(forFormatSize(f.size)) + '</td>'
+                    + '<td style="font-family:monospace;font-size:0.8rem">' + esc(f.md5 || '—') + '</td>'
+                    + '</tr>';
+            });
+            chtml += '</tbody></table>';
+            carvedContainer.innerHTML = chtml;
+        }
+    }).catch(function() {});
+
+    forRefreshCustody();
+}
+
+function forLogCustody(action, target, details, hash) {
+    var entry = {
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        action: action,
+        target: target,
+        details: details,
+        hash: hash
+    };
+    forCustodyLog.push(entry);
+    postJSON('/forensics/custody/log', entry).catch(function() {});
+    forRenderCustody();
+}
+
+function forRefreshCustody() {
+    fetchJSON('/forensics/custody').then(function(data) {
+        if (data.entries && data.entries.length) {
+            forCustodyLog = data.entries;
+        }
+        forRenderCustody();
+    }).catch(function() { forRenderCustody(); });
+}
+
+function forRenderCustody() {
+    var tbody = document.getElementById('for-custody-body');
+    if (!forCustodyLog.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No chain of custody entries.</td></tr>';
+        return;
+    }
+    var html = '';
+    forCustodyLog.forEach(function(e) {
+        html += '<tr>'
+            + '<td style="font-size:0.8rem;white-space:nowrap">' + esc(e.timestamp || '—') + '</td>'
+            + '<td><span class="badge" style="background:rgba(99,102,241,0.15);color:var(--accent)">' + esc(e.action || '—') + '</span></td>'
+            + '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.target || '—') + '</td>'
+            + '<td style="font-size:0.85rem">' + esc(e.details || '—') + '</td>'
+            + '<td style="font-family:monospace;font-size:0.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.hash || '—') + '</td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function forExportCustody() {
+    var blob = new Blob([JSON.stringify(forCustodyLog, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chain_of_custody.json';
+    a.click();
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    forRefreshEvidence();
+});
+</script>
+{% endblock %}

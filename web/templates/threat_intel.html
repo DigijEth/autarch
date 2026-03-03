@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Threat Intelligence{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Threat Intelligence</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        IOC management, threat feeds, and correlation analysis.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ti" data-tab="iocs" onclick="showTab('ti','iocs')">IOCs</button>
+    <button class="tab" data-tab-group="ti" data-tab="feeds" onclick="showTab('ti','feeds')">Feeds</button>
+    <button class="tab" data-tab-group="ti" data-tab="correlate" onclick="showTab('ti','correlate')">Correlate</button>
+</div>
+
+<!-- ==================== IOCs TAB ==================== -->
+<div class="tab-content active" data-tab-group="ti" data-tab="iocs">
+
+<div class="section">
+    <h2>Add Indicator of Compromise</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>IOC Value</label>
+            <input type="text" id="ioc-value" placeholder="IP, domain, hash, URL, email..." oninput="iocAutoType()">
+        </div>
+        <div class="form-group" style="max-width:160px">
+            <label>Type</label>
+            <select id="ioc-type">
+                <option value="auto">Auto-detect</option>
+                <option value="ipv4">IPv4</option>
+                <option value="ipv6">IPv6</option>
+                <option value="domain">Domain</option>
+                <option value="url">URL</option>
+                <option value="email">Email</option>
+                <option value="md5">MD5</option>
+                <option value="sha1">SHA1</option>
+                <option value="sha256">SHA256</option>
+                <option value="filename">Filename</option>
+                <option value="cve">CVE</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:140px">
+            <label>Severity</label>
+            <select id="ioc-severity">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Tags (comma-separated)</label>
+            <input type="text" id="ioc-tags" placeholder="malware, phishing, c2, apt...">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" id="ioc-desc" placeholder="Brief description">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary" onclick="iocAdd()">Add IOC</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>IOC Database</h2>
+    <div class="input-row">
+        <input type="text" id="ioc-search" placeholder="Search IOCs..." oninput="iocFilter()">
+        <select id="ioc-filter-type" onchange="iocFilter()" style="max-width:150px">
+            <option value="">All Types</option>
+            <option value="ipv4">IPv4</option>
+            <option value="ipv6">IPv6</option>
+            <option value="domain">Domain</option>
+            <option value="url">URL</option>
+            <option value="email">Email</option>
+            <option value="md5">MD5</option>
+            <option value="sha1">SHA1</option>
+            <option value="sha256">SHA256</option>
+            <option value="filename">Filename</option>
+            <option value="cve">CVE</option>
+        </select>
+        <select id="ioc-filter-severity" onchange="iocFilter()" style="max-width:130px">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
+    <div style="max-height:500px;overflow-y:auto">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Value</th><th>Type</th><th>Severity</th>
+                    <th>Tags</th><th>Added</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ioc-table">
+                <tr><td colspan="6" class="empty-state">No IOCs loaded. Add one above or import.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)">
+        Showing <span id="ioc-count">0</span> indicators
+    </div>
+</div>
+
+<div class="section">
+    <h2>Bulk Import / Export</h2>
+    <div class="form-group">
+        <label>Bulk Import (one IOC per line, or paste JSON/CSV)</label>
+        <textarea id="ioc-bulk-input" rows="6" placeholder="192.168.1.1&#10;evil-domain.com&#10;d41d8cd98f00b204e9800998ecf8427e&#10;..."></textarea>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="iocBulkImport()">Import</button>
+        <button class="btn btn-small" onclick="iocExport('json')">Export JSON</button>
+        <button class="btn btn-small" onclick="iocExport('csv')">Export CSV</button>
+        <button class="btn btn-small" onclick="iocExport('stix')">Export STIX</button>
+    </div>
+    <pre class="output-panel" id="ioc-import-output" style="min-height:0"></pre>
+</div>
+
+</div>
+
+<!-- ==================== FEEDS TAB ==================== -->
+<div class="tab-content" data-tab-group="ti" data-tab="feeds">
+
+<div class="section">
+    <h2>Add Threat Feed</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Feed Name</label>
+            <input type="text" id="feed-name" placeholder="e.g. AlienVault OTX">
+        </div>
+        <div class="form-group" style="max-width:160px">
+            <label>Type</label>
+            <select id="feed-type">
+                <option value="url_list">URL List (plaintext)</option>
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="stix">STIX/TAXII</option>
+                <option value="misp">MISP</option>
+                <option value="api">REST API</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Feed URL</label>
+            <input type="text" id="feed-url" placeholder="https://feeds.example.com/indicators.txt">
+        </div>
+        <div class="form-group" style="max-width:220px">
+            <label>API Key (optional)</label>
+            <input type="password" id="feed-apikey" placeholder="API key">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary" onclick="feedAdd()">Add Feed</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Configured Feeds</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="feedRefresh()">Refresh List</button>
+        <button class="btn btn-primary btn-small" onclick="feedFetchAll()">Fetch All Feeds</button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th><th>Type</th><th>URL</th><th>IOCs</th>
+                <th>Last Fetched</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="feed-table">
+            <tr><td colspan="6" class="empty-state">No feeds configured.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Feed Statistics</h2>
+    <div class="stats-grid" id="feed-stats">
+        <div class="stat-card">
+            <div class="stat-label">Total Feeds</div>
+            <div class="stat-value" id="stat-total-feeds">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total IOCs from Feeds</div>
+            <div class="stat-value" id="stat-feed-iocs">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Last Updated</div>
+            <div class="stat-value small" id="stat-last-update">--</div>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== CORRELATE TAB ==================== -->
+<div class="tab-content" data-tab-group="ti" data-tab="correlate">
+
+<div class="section">
+    <h2>Reputation Lookup</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Check IP/domain/hash reputation against VirusTotal, AbuseIPDB, and local IOC database.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Query (IP, domain, or hash)</label>
+            <input type="text" id="rep-query" placeholder="8.8.8.8 or evil.com or sha256...">
+        </div>
+        <div class="form-group" style="max-width:180px">
+            <label>Service</label>
+            <select id="rep-service">
+                <option value="all">All Services</option>
+                <option value="local">Local IOC DB</option>
+                <option value="virustotal">VirusTotal</option>
+                <option value="abuseipdb">AbuseIPDB</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="max-width:280px">
+            <label>VirusTotal API Key</label>
+            <input type="password" id="vt-apikey" placeholder="VT API key (saved in session)">
+        </div>
+        <div class="form-group" style="max-width:280px">
+            <label>AbuseIPDB API Key</label>
+            <input type="password" id="abuse-apikey" placeholder="AbuseIPDB API key">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-rep-lookup" class="btn btn-primary" onclick="repLookup()">Lookup</button>
+    </div>
+    <pre class="output-panel scrollable" id="rep-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Blocklist Generator</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Generate blocklists from your IOC database for firewalls and security tools.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="max-width:200px">
+            <label>Output Format</label>
+            <select id="bl-format">
+                <option value="plain">Plain (one per line)</option>
+                <option value="iptables">iptables rules</option>
+                <option value="pf">PF (BSD)</option>
+                <option value="nginx">Nginx deny</option>
+                <option value="hosts">Hosts file</option>
+                <option value="snort">Snort rules</option>
+                <option value="suricata">Suricata rules</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:200px">
+            <label>Minimum Severity</label>
+            <select id="bl-severity">
+                <option value="low">Low+</option>
+                <option value="medium" selected>Medium+</option>
+                <option value="high">High+</option>
+                <option value="critical">Critical only</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:160px">
+            <label>IOC Types</label>
+            <select id="bl-type">
+                <option value="all">All</option>
+                <option value="ipv4">IPs only</option>
+                <option value="domain">Domains only</option>
+                <option value="url">URLs only</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="blGenerate()">Generate Blocklist</button>
+        <button class="btn btn-small" onclick="blCopy()">Copy to Clipboard</button>
+        <button class="btn btn-small" onclick="blDownload()">Download</button>
+    </div>
+    <pre class="output-panel scrollable" id="bl-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Alerts</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="alertsRefresh()">Refresh Alerts</button>
+        <button class="btn btn-danger btn-small" onclick="alertsClearAll()">Clear All</button>
+    </div>
+    <div id="alerts-list" style="max-height:400px;overflow-y:auto">
+        <div class="empty-state">No alerts. Alerts appear when IOCs match network traffic or log data.</div>
+    </div>
+</div>
+
+</div>
+
+<script>
+/* ── Threat Intelligence ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+var _iocCache = [];
+
+function sevBadge(sev) {
+    var cls = sev === 'critical' ? 'badge-fail' : sev === 'high' ? 'badge-high'
+            : sev === 'medium' ? 'badge-medium' : 'badge-low';
+    return '<span class="badge ' + cls + '">' + esc(sev) + '</span>';
+}
+
+/* ── Auto-detect IOC type ── */
+function iocAutoType() {
+    var v = document.getElementById('ioc-value').value.trim();
+    var sel = document.getElementById('ioc-type');
+    if (!v || sel.value !== 'auto') return;
+    // Keep on auto, but show detected type via placeholder
+}
+
+function iocDetectType(val) {
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d+)?$/.test(val)) return 'ipv4';
+    if (/^[0-9a-fA-F:]{3,}$/.test(val) && val.indexOf(':') > 0) return 'ipv6';
+    if (/^https?:\/\//i.test(val)) return 'url';
+    if (/^[^@]+@[^@]+\.[^@]+$/.test(val)) return 'email';
+    if (/^[a-fA-F0-9]{32}$/.test(val)) return 'md5';
+    if (/^[a-fA-F0-9]{40}$/.test(val)) return 'sha1';
+    if (/^[a-fA-F0-9]{64}$/.test(val)) return 'sha256';
+    if (/^CVE-\d{4}-\d+$/i.test(val)) return 'cve';
+    if (/^[a-zA-Z0-9]([a-zA-Z0-9-]*\.)+[a-zA-Z]{2,}$/.test(val)) return 'domain';
+    return 'filename';
+}
+
+function iocAdd() {
+    var value = document.getElementById('ioc-value').value.trim();
+    if (!value) { alert('Enter an IOC value.'); return; }
+    var iocType = document.getElementById('ioc-type').value;
+    if (iocType === 'auto') iocType = iocDetectType(value);
+    postJSON('/threat-intel/ioc/add', {
+        value: value,
+        type: iocType,
+        severity: document.getElementById('ioc-severity').value,
+        tags: document.getElementById('ioc-tags').value.trim(),
+        description: document.getElementById('ioc-desc').value.trim()
+    }).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        document.getElementById('ioc-value').value = '';
+        document.getElementById('ioc-tags').value = '';
+        document.getElementById('ioc-desc').value = '';
+        iocLoad();
+    });
+}
+
+function iocLoad() {
+    fetchJSON('/threat-intel/iocs').then(function(data) {
+        _iocCache = data.iocs || [];
+        iocRender(_iocCache);
+    });
+}
+
+function iocRender(iocs) {
+    var tbody = document.getElementById('ioc-table');
+    document.getElementById('ioc-count').textContent = iocs.length;
+    if (!iocs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No IOCs match filters.</td></tr>';
+        return;
+    }
+    var html = '';
+    iocs.forEach(function(ioc) {
+        var tags = (ioc.tags || '').split(',').filter(Boolean).map(function(t) {
+            return '<span style="background:var(--bg-input);padding:1px 6px;border-radius:4px;font-size:0.72rem;margin-right:3px">' + esc(t.trim()) + '</span>';
+        }).join('');
+        html += '<tr>'
+            + '<td><code style="font-size:0.8rem">' + esc(ioc.value) + '</code></td>'
+            + '<td>' + esc(ioc.type) + '</td>'
+            + '<td>' + sevBadge(ioc.severity) + '</td>'
+            + '<td>' + tags + '</td>'
+            + '<td style="font-size:0.8rem;color:var(--text-muted)">' + esc(ioc.added || '--') + '</td>'
+            + '<td><button class="btn btn-danger btn-small" onclick="iocDelete(\'' + esc(ioc.id || ioc.value) + '\')">Delete</button></td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function iocFilter() {
+    var q = document.getElementById('ioc-search').value.trim().toLowerCase();
+    var typeF = document.getElementById('ioc-filter-type').value;
+    var sevF = document.getElementById('ioc-filter-severity').value;
+    var filtered = _iocCache.filter(function(ioc) {
+        if (typeF && ioc.type !== typeF) return false;
+        if (sevF && ioc.severity !== sevF) return false;
+        if (q && ioc.value.toLowerCase().indexOf(q) < 0
+            && (ioc.tags || '').toLowerCase().indexOf(q) < 0
+            && (ioc.description || '').toLowerCase().indexOf(q) < 0) return false;
+        return true;
+    });
+    iocRender(filtered);
+}
+
+function iocDelete(id) {
+    if (!confirm('Delete this IOC?')) return;
+    postJSON('/threat-intel/ioc/delete', {id: id}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        iocLoad();
+    });
+}
+
+function iocBulkImport() {
+    var raw = document.getElementById('ioc-bulk-input').value.trim();
+    if (!raw) { alert('Enter IOCs to import.'); return; }
+    postJSON('/threat-intel/ioc/bulk-import', {data: raw}).then(function(data) {
+        if (data.error) { renderOutput('ioc-import-output', 'Error: ' + data.error); return; }
+        renderOutput('ioc-import-output', 'Imported ' + (data.imported || 0) + ' IOCs. Skipped: ' + (data.skipped || 0));
+        document.getElementById('ioc-bulk-input').value = '';
+        iocLoad();
+    });
+}
+
+function iocExport(format) {
+    window.open('/threat-intel/ioc/export?format=' + encodeURIComponent(format), '_blank');
+}
+
+/* ── Feeds ── */
+function feedAdd() {
+    var name = document.getElementById('feed-name').value.trim();
+    var url = document.getElementById('feed-url').value.trim();
+    if (!name || !url) { alert('Feed name and URL are required.'); return; }
+    postJSON('/threat-intel/feed/add', {
+        name: name,
+        type: document.getElementById('feed-type').value,
+        url: url,
+        api_key: document.getElementById('feed-apikey').value.trim()
+    }).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        document.getElementById('feed-name').value = '';
+        document.getElementById('feed-url').value = '';
+        document.getElementById('feed-apikey').value = '';
+        feedRefresh();
+    });
+}
+
+function feedRefresh() {
+    fetchJSON('/threat-intel/feeds').then(function(data) {
+        var feeds = data.feeds || [];
+        document.getElementById('stat-total-feeds').textContent = feeds.length;
+        document.getElementById('stat-feed-iocs').textContent = data.total_iocs || 0;
+        document.getElementById('stat-last-update').textContent = data.last_update || '--';
+        if (!feeds.length) {
+            document.getElementById('feed-table').innerHTML =
+                '<tr><td colspan="6" class="empty-state">No feeds configured.</td></tr>';
+            return;
+        }
+        var html = '';
+        feeds.forEach(function(f) {
+            html += '<tr>'
+                + '<td>' + esc(f.name) + '</td>'
+                + '<td>' + esc(f.type) + '</td>'
+                + '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+                + '<a href="' + esc(f.url) + '" target="_blank">' + esc(f.url) + '</a></td>'
+                + '<td>' + esc(f.ioc_count || 0) + '</td>'
+                + '<td style="font-size:0.8rem;color:var(--text-muted)">' + esc(f.last_fetched || 'never') + '</td>'
+                + '<td>'
+                + '<button class="btn btn-primary btn-small" onclick="feedFetch(\'' + esc(f.id || f.name) + '\')">Fetch</button> '
+                + '<button class="btn btn-danger btn-small" onclick="feedDelete(\'' + esc(f.id || f.name) + '\')">Delete</button>'
+                + '</td></tr>';
+        });
+        document.getElementById('feed-table').innerHTML = html;
+    });
+}
+
+function feedFetch(id) {
+    postJSON('/threat-intel/feed/fetch', {id: id}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        alert('Fetched ' + (data.new_iocs || 0) + ' new IOCs from feed.');
+        feedRefresh();
+        iocLoad();
+    });
+}
+
+function feedFetchAll() {
+    postJSON('/threat-intel/feed/fetch-all', {}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        alert('Fetched ' + (data.total_new || 0) + ' new IOCs from all feeds.');
+        feedRefresh();
+        iocLoad();
+    });
+}
+
+function feedDelete(id) {
+    if (!confirm('Delete this feed?')) return;
+    postJSON('/threat-intel/feed/delete', {id: id}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        feedRefresh();
+    });
+}
+
+/* ── Correlation ── */
+function repLookup() {
+    var query = document.getElementById('rep-query').value.trim();
+    if (!query) { alert('Enter an IP, domain, or hash to look up.'); return; }
+    var btn = document.getElementById('btn-rep-lookup');
+    setLoading(btn, true);
+    postJSON('/threat-intel/correlate/lookup', {
+        query: query,
+        service: document.getElementById('rep-service').value,
+        vt_key: document.getElementById('vt-apikey').value.trim(),
+        abuse_key: document.getElementById('abuse-apikey').value.trim()
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('rep-output', 'Error: ' + data.error); return; }
+        var lines = ['=== Reputation Report: ' + query + ' ===', ''];
+        if (data.local) {
+            lines.push('--- Local IOC DB ---');
+            lines.push('  Match: ' + (data.local.found ? 'YES' : 'No'));
+            if (data.local.found) {
+                lines.push('  Severity: ' + data.local.severity);
+                lines.push('  Tags: ' + (data.local.tags || 'none'));
+            }
+            lines.push('');
+        }
+        if (data.virustotal) {
+            lines.push('--- VirusTotal ---');
+            lines.push('  Malicious: ' + (data.virustotal.malicious || 0) + '/' + (data.virustotal.total || 0) + ' engines');
+            lines.push('  Reputation: ' + (data.virustotal.reputation || '--'));
+            if (data.virustotal.tags) lines.push('  Tags: ' + data.virustotal.tags);
+            lines.push('');
+        }
+        if (data.abuseipdb) {
+            lines.push('--- AbuseIPDB ---');
+            lines.push('  Confidence Score: ' + (data.abuseipdb.confidence || 0) + '%');
+            lines.push('  Total Reports: ' + (data.abuseipdb.total_reports || 0));
+            lines.push('  Country: ' + (data.abuseipdb.country || '--'));
+            lines.push('  ISP: ' + (data.abuseipdb.isp || '--'));
+            lines.push('');
+        }
+        renderOutput('rep-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function blGenerate() {
+    postJSON('/threat-intel/blocklist/generate', {
+        format: document.getElementById('bl-format').value,
+        min_severity: document.getElementById('bl-severity').value,
+        ioc_type: document.getElementById('bl-type').value
+    }).then(function(data) {
+        if (data.error) { renderOutput('bl-output', 'Error: ' + data.error); return; }
+        renderOutput('bl-output', data.blocklist || 'No IOCs match the selected criteria.');
+    });
+}
+
+function blCopy() {
+    var el = document.getElementById('bl-output');
+    if (!el.textContent) return;
+    navigator.clipboard.writeText(el.textContent).then(function() {
+        alert('Blocklist copied to clipboard.');
+    });
+}
+
+function blDownload() {
+    var el = document.getElementById('bl-output');
+    if (!el.textContent) return;
+    var blob = new Blob([el.textContent], {type: 'text/plain'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'blocklist_' + document.getElementById('bl-format').value + '.txt';
+    a.click();
+}
+
+function alertsRefresh() {
+    fetchJSON('/threat-intel/alerts').then(function(data) {
+        var alerts = data.alerts || [];
+        var container = document.getElementById('alerts-list');
+        if (!alerts.length) {
+            container.innerHTML = '<div class="empty-state">No alerts. Alerts appear when IOCs match network traffic or log data.</div>';
+            return;
+        }
+        var html = '';
+        alerts.forEach(function(a) {
+            var sevCls = a.severity === 'critical' ? 'badge-fail' : a.severity === 'high' ? 'badge-high'
+                       : a.severity === 'medium' ? 'badge-medium' : 'badge-low';
+            html += '<div class="threat-item">'
+                + '<span class="badge ' + sevCls + '">' + esc(a.severity) + '</span>'
+                + '<div><div class="threat-message">' + esc(a.message) + '</div>'
+                + '<div class="threat-category">' + esc(a.source || '--') + ' &mdash; ' + esc(a.timestamp || '') + '</div>'
+                + '</div></div>';
+        });
+        container.innerHTML = html;
+    });
+}
+
+function alertsClearAll() {
+    if (!confirm('Clear all alerts?')) return;
+    postJSON('/threat-intel/alerts/clear', {}).then(function(data) {
+        alertsRefresh();
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    iocLoad();
+    feedRefresh();
+});
+</script>
+{% endblock %}

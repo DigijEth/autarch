@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Reports — AUTARCH{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Reporting Engine</h1>
+    <p class="text-muted">Pentest report builder with findings, CVSS scoring, and export</p>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="switchTab('reports')">Reports</button>
+    <button class="tab" onclick="switchTab('editor')">Editor</button>
+    <button class="tab" onclick="switchTab('templates')">Finding Templates</button>
+</div>
+
+<!-- Reports List -->
+<div id="tab-reports" class="tab-content active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h3>Reports</h3>
+        <button class="btn btn-primary" onclick="showCreateReport()">New Report</button>
+    </div>
+    <div id="create-form" class="card" style="display:none;margin-bottom:1rem;max-width:600px">
+        <h4>Create Report</h4>
+        <div class="form-group"><label>Title</label><input type="text" id="cr-title" class="form-control" placeholder="Penetration Test Report"></div>
+        <div class="form-group"><label>Client</label><input type="text" id="cr-client" class="form-control" placeholder="Client name"></div>
+        <div class="form-group"><label>Scope</label><textarea id="cr-scope" class="form-control" rows="2" placeholder="Target systems and IP ranges"></textarea></div>
+        <button class="btn btn-primary" onclick="createReport()">Create</button>
+    </div>
+    <div id="reports-list"></div>
+</div>
+
+<!-- Editor -->
+<div id="tab-editor" class="tab-content" style="display:none">
+    <div id="editor-empty" class="card" style="text-align:center;color:var(--text-muted)">Select a report from the Reports tab</div>
+    <div id="editor" style="display:none">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <h3 id="ed-title" style="margin:0"></h3>
+                <div style="display:flex;gap:0.5rem">
+                    <select id="ed-status" class="form-control" style="width:auto" onchange="updateReportField('status',this.value)">
+                        <option value="draft">Draft</option>
+                        <option value="review">Review</option>
+                        <option value="final">Final</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="exportReport('html')">Export HTML</button>
+                    <button class="btn btn-sm" onclick="exportReport('markdown')">Export MD</button>
+                    <button class="btn btn-sm" onclick="exportReport('json')">Export JSON</button>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:1rem"><label>Executive Summary</label>
+                <textarea id="ed-summary" class="form-control" rows="3" onblur="updateReportField('executive_summary',this.value)"></textarea></div>
+        </div>
+
+        <!-- Severity Summary -->
+        <div id="sev-summary" style="display:flex;gap:0.75rem;margin:1rem 0"></div>
+
+        <!-- Findings -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:1rem 0">
+            <h3>Findings</h3>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-primary btn-sm" onclick="showAddFinding()">Add Finding</button>
+                <button class="btn btn-sm" onclick="showTemplateSelector()">From Template</button>
+            </div>
+        </div>
+        <div id="findings-list"></div>
+
+        <!-- Add finding form -->
+        <div id="add-finding-form" class="card" style="display:none;margin-top:1rem">
+            <h4>Add Finding</h4>
+            <div class="form-group"><label>Title</label><input type="text" id="af-title" class="form-control"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+                <div class="form-group"><label>Severity</label>
+                    <select id="af-severity" class="form-control">
+                        <option value="critical">Critical</option><option value="high">High</option>
+                        <option value="medium" selected>Medium</option><option value="low">Low</option><option value="info">Info</option>
+                    </select></div>
+                <div class="form-group"><label>CVSS Score</label><input type="number" id="af-cvss" class="form-control" value="5.0" min="0" max="10" step="0.1"></div>
+            </div>
+            <div class="form-group"><label>Description</label><textarea id="af-desc" class="form-control" rows="2"></textarea></div>
+            <div class="form-group"><label>Impact</label><textarea id="af-impact" class="form-control" rows="2"></textarea></div>
+            <div class="form-group"><label>Remediation</label><textarea id="af-remediation" class="form-control" rows="2"></textarea></div>
+            <button class="btn btn-primary" onclick="addFinding()">Add</button>
+            <button class="btn" onclick="document.getElementById('add-finding-form').style.display='none'">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Templates -->
+<div id="tab-templates" class="tab-content" style="display:none">
+    <h3>Finding Templates</h3>
+    <div id="templates-list"></div>
+</div>
+
+<style>
+.sev-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;color:#fff}
+.sev-critical{background:#dc2626}.sev-high{background:#ef4444}.sev-medium{background:#f59e0b}.sev-low{background:#22c55e}.sev-info{background:#6366f1}
+.sev-box{border:2px solid;border-radius:8px;padding:0.5rem 1rem;text-align:center;min-width:70px}
+.finding-card{border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem}
+.finding-card h4{margin:0 0 0.5rem}
+</style>
+
+<script>
+let currentReportId=null;
+
+function switchTab(name){
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['reports','editor','templates'][i]===name));
+    document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+    document.getElementById('tab-'+name).style.display='';
+    if(name==='reports') loadReports();
+    if(name==='templates') loadTemplates();
+}
+
+function loadReports(){
+    fetch('/reports/list').then(r=>r.json()).then(d=>{
+        const div=document.getElementById('reports-list');
+        const reps=d.reports||[];
+        if(!reps.length){div.innerHTML='<div class="card" style="text-align:center;color:var(--text-muted)">No reports yet</div>';return}
+        div.innerHTML=reps.map(r=>`<div class="card" style="margin-bottom:0.5rem;cursor:pointer" onclick="openReport('${r.id}')">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div><strong>${esc(r.title)}</strong> <span style="color:var(--text-muted);font-size:0.8rem">${esc(r.client)}</span></div>
+                <div style="display:flex;align-items:center;gap:0.75rem">
+                    <span style="font-size:0.8rem">${r.findings_count} findings</span>
+                    <span class="sev-badge sev-${r.status==='final'?'info':r.status==='review'?'medium':'low'}">${r.status}</span>
+                    <button class="btn btn-sm" style="color:var(--danger)" onclick="event.stopPropagation();deleteReport('${r.id}')">Delete</button>
+                </div>
+            </div></div>`).join('');
+    });
+}
+
+function showCreateReport(){document.getElementById('create-form').style.display=document.getElementById('create-form').style.display==='none'?'':'none'}
+
+function createReport(){
+    const payload={title:document.getElementById('cr-title').value||'Untitled',
+        client:document.getElementById('cr-client').value,scope:document.getElementById('cr-scope').value};
+    fetch('/reports/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+        if(d.ok){document.getElementById('create-form').style.display='none';loadReports();openReport(d.report.id)}
+    });
+}
+
+function deleteReport(id){
+    if(!confirm('Delete this report?')) return;
+    fetch('/reports/'+id,{method:'DELETE'}).then(r=>r.json()).then(()=>loadReports());
+}
+
+function openReport(id){
+    currentReportId=id;
+    fetch('/reports/'+id).then(r=>r.json()).then(d=>{
+        if(!d.ok) return;
+        const r=d.report;
+        document.getElementById('editor-empty').style.display='none';
+        document.getElementById('editor').style.display='';
+        document.getElementById('ed-title').textContent=r.title;
+        document.getElementById('ed-summary').value=r.executive_summary||'';
+        document.getElementById('ed-status').value=r.status||'draft';
+        renderFindings(r.findings||[]);
+        switchTab('editor');
+    });
+}
+
+function updateReportField(field,value){
+    if(!currentReportId) return;
+    const data={};data[field]=value;
+    fetch('/reports/'+currentReportId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+}
+
+function renderFindings(findings){
+    const sevOrder={critical:0,high:1,medium:2,low:3,info:4};
+    findings.sort((a,b)=>(sevOrder[a.severity]||5)-(sevOrder[b.severity]||5));
+    // Summary
+    const counts={};findings.forEach(f=>{counts[f.severity]=(counts[f.severity]||0)+1});
+    const colors={critical:'#dc2626',high:'#ef4444',medium:'#f59e0b',low:'#22c55e',info:'#6366f1'};
+    document.getElementById('sev-summary').innerHTML=['critical','high','medium','low','info'].map(s=>
+        `<div class="sev-box" style="border-color:${colors[s]}"><strong style="color:${colors[s]};font-size:1.2rem">${counts[s]||0}</strong><br><span style="font-size:0.7rem">${s.toUpperCase()}</span></div>`).join('');
+    // List
+    document.getElementById('findings-list').innerHTML=findings.map((f,i)=>
+        `<div class="finding-card"><div style="display:flex;justify-content:space-between;align-items:start">
+            <div><h4>${i+1}. ${esc(f.title)}</h4>
+                <span class="sev-badge sev-${f.severity}">${f.severity.toUpperCase()}</span>
+                <span style="font-size:0.8rem;margin-left:0.5rem">CVSS: ${f.cvss||'N/A'}</span></div>
+            <button class="btn btn-sm" style="color:var(--danger)" onclick="deleteFinding('${f.id}')">Remove</button>
+        </div>
+        <p style="font-size:0.85rem;margin:0.5rem 0">${esc(f.description||'')}</p>
+        ${f.impact?'<div style="font-size:0.8rem"><strong>Impact:</strong> '+esc(f.impact)+'</div>':''}
+        ${f.remediation?'<div style="font-size:0.8rem"><strong>Remediation:</strong> '+esc(f.remediation)+'</div>':''}
+        </div>`).join('');
+}
+
+function showAddFinding(){document.getElementById('add-finding-form').style.display=''}
+function showTemplateSelector(){
+    fetch('/reports/templates').then(r=>r.json()).then(d=>{
+        const templates=d.templates||[];
+        const sel=prompt('Enter template #:\n'+templates.map((t,i)=>`${i+1}. [${t.severity.toUpperCase()}] ${t.title}`).join('\n'));
+        if(!sel) return;
+        const idx=parseInt(sel)-1;
+        if(idx>=0&&idx<templates.length){
+            const t={...templates[idx]};delete t.id;
+            fetch('/reports/'+currentReportId+'/findings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(t)})
+            .then(r=>r.json()).then(()=>openReport(currentReportId));
+        }
+    });
+}
+
+function addFinding(){
+    const data={title:document.getElementById('af-title').value,
+        severity:document.getElementById('af-severity').value,
+        cvss:+document.getElementById('af-cvss').value,
+        description:document.getElementById('af-desc').value,
+        impact:document.getElementById('af-impact').value,
+        remediation:document.getElementById('af-remediation').value};
+    fetch('/reports/'+currentReportId+'/findings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+    .then(r=>r.json()).then(d=>{
+        if(d.ok){document.getElementById('add-finding-form').style.display='none';openReport(currentReportId)}
+    });
+}
+
+function deleteFinding(fid){
+    if(!confirm('Remove this finding?')) return;
+    fetch('/reports/'+currentReportId+'/findings/'+fid,{method:'DELETE'})
+    .then(r=>r.json()).then(()=>openReport(currentReportId));
+}
+
+function exportReport(fmt){
+    if(!currentReportId) return;
+    window.open('/reports/'+currentReportId+'/export/'+fmt,'_blank');
+}
+
+function loadTemplates(){
+    fetch('/reports/templates').then(r=>r.json()).then(d=>{
+        document.getElementById('templates-list').innerHTML=(d.templates||[]).map(t=>
+            `<div class="card" style="margin-bottom:0.5rem">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div><span class="sev-badge sev-${t.severity}">${t.severity.toUpperCase()}</span>
+                        <strong style="margin-left:0.5rem">${esc(t.title)}</strong>
+                        <span style="color:var(--text-muted);font-size:0.8rem;margin-left:0.5rem">CVSS ${t.cvss}</span></div>
+                </div>
+                <p style="font-size:0.8rem;margin:0.3rem 0;color:var(--text-secondary)">${esc(t.description)}</p>
+                <div style="font-size:0.75rem;color:var(--text-muted)">${(t.references||[]).join(', ')}</div>
+            </div>`).join('');
+    });
+}
+
+loadReports();
+
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
+</script>
+{% endblock %}

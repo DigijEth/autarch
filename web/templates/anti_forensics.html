@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Anti-Forensics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Anti-Forensics</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Secure deletion, timestamp manipulation, and log sanitization.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="af" data-tab="delete" onclick="showTab('af','delete')">Secure Delete</button>
+    <button class="tab" data-tab-group="af" data-tab="timestamps" onclick="showTab('af','timestamps')">Timestamps</button>
+    <button class="tab" data-tab-group="af" data-tab="logs" onclick="showTab('af','logs')">Logs</button>
+</div>
+
+<!-- ==================== SECURE DELETE TAB ==================== -->
+<div class="tab-content active" data-tab-group="af" data-tab="delete">
+
+<div class="section">
+    <h2>Secure Delete File</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Overwrite and delete a file so it cannot be recovered by forensic tools.
+    </p>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>File Path</label>
+            <input type="text" id="af-del-file" placeholder="/path/to/file">
+        </div>
+        <div class="form-group">
+            <label>Overwrite Passes</label>
+            <input type="number" id="af-del-passes" value="3" min="1" max="35">
+        </div>
+        <div class="form-group">
+            <label>Method</label>
+            <select id="af-del-method">
+                <option value="zeros">Zero fill</option>
+                <option value="random" selected>Random data</option>
+                <option value="dod">DoD 5220.22-M (3-pass)</option>
+                <option value="gutmann">Gutmann (35-pass)</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-af-del-file" class="btn btn-danger" onclick="afDeleteFile()">Secure Delete File</button>
+    </div>
+    <pre class="output-panel" id="af-del-file-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Secure Delete Directory</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Recursively overwrite and delete all files in a directory.
+    </p>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>Directory Path</label>
+            <input type="text" id="af-del-dir" placeholder="/path/to/directory">
+        </div>
+    </div>
+    <div style="margin-bottom:12px">
+        <label style="font-size:0.85rem;color:var(--text-primary);cursor:pointer">
+            <input type="checkbox" id="af-del-dir-confirm" style="margin-right:4px"> I confirm this directory should be permanently destroyed
+        </label>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-af-del-dir" class="btn btn-danger" onclick="afDeleteDir()">Secure Delete Directory</button>
+    </div>
+    <pre class="output-panel" id="af-del-dir-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Wipe Free Space</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Overwrite all free space on a mount point to prevent recovery of previously deleted files.
+    </p>
+    <div class="input-row">
+        <input type="text" id="af-wipe-mount" placeholder="Mount point (e.g. / or /home)">
+        <button id="btn-af-wipe" class="btn btn-warning" onclick="afWipeFreeSpace()">Wipe Free Space</button>
+    </div>
+    <pre class="output-panel" id="af-wipe-output" style="min-height:0"></pre>
+</div>
+
+</div>
+
+<!-- ==================== TIMESTAMPS TAB ==================== -->
+<div class="tab-content" data-tab-group="af" data-tab="timestamps">
+
+<div class="section">
+    <h2>View Timestamps</h2>
+    <div class="input-row">
+        <input type="text" id="af-ts-view-path" placeholder="File path">
+        <button id="btn-af-ts-view" class="btn btn-primary" onclick="afViewTimestamps()">View</button>
+    </div>
+    <table class="data-table" style="max-width:500px;margin-top:8px" id="af-ts-view-table">
+        <tbody>
+            <tr><td>Accessed</td><td id="af-ts-accessed">--</td></tr>
+            <tr><td>Modified</td><td id="af-ts-modified">--</td></tr>
+            <tr><td>Created</td><td id="af-ts-created">--</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Set Timestamps</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Set a specific date/time for a file's access and modification timestamps.
+    </p>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>File Path</label>
+            <input type="text" id="af-ts-set-path" placeholder="/path/to/file">
+        </div>
+        <div class="form-group">
+            <label>Date & Time</label>
+            <input type="datetime-local" id="af-ts-set-date" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);padding:8px 12px">
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-af-ts-set" class="btn btn-primary" onclick="afSetTimestamps()">Set Timestamps</button>
+    </div>
+    <pre class="output-panel" id="af-ts-set-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Clone Timestamps</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Copy timestamps from a source file to a target file.
+    </p>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group">
+            <label>Source File</label>
+            <input type="text" id="af-ts-clone-src" placeholder="Source file (timestamps to copy)">
+        </div>
+        <div class="form-group">
+            <label>Target File</label>
+            <input type="text" id="af-ts-clone-dst" placeholder="Target file (timestamps to set)">
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-af-ts-clone" class="btn btn-primary" onclick="afCloneTimestamps()">Clone Timestamps</button>
+    </div>
+    <pre class="output-panel" id="af-ts-clone-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Randomize Timestamps</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Set random plausible timestamps on a file to confuse forensic timeline analysis.
+    </p>
+    <div class="input-row">
+        <input type="text" id="af-ts-rand-path" placeholder="File path">
+        <button id="btn-af-ts-rand" class="btn btn-warning" onclick="afRandomizeTimestamps()">Randomize</button>
+    </div>
+    <pre class="output-panel" id="af-ts-rand-output" style="min-height:0"></pre>
+</div>
+
+</div>
+
+<!-- ==================== LOGS TAB ==================== -->
+<div class="tab-content" data-tab-group="af" data-tab="logs">
+
+<div class="section">
+    <h2>System Logs</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button class="btn btn-small" onclick="afLoadLogs()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Log File</th><th>Size</th><th>Writable</th><th>Action</th></tr></thead>
+        <tbody id="af-logs-table">
+            <tr><td colspan="4" class="empty-state">Click Refresh to scan system log files.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Remove Matching Entries</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Remove lines matching a regex pattern from a log file.
+    </p>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>Log File Path</label>
+            <input type="text" id="af-log-rm-path" placeholder="/var/log/auth.log">
+        </div>
+        <div class="form-group" style="flex:2">
+            <label>Pattern (regex)</label>
+            <input type="text" id="af-log-rm-pattern" placeholder="e.g. 192\\.168\\.1\\.100|Failed password">
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-af-log-rm" class="btn btn-danger" onclick="afRemoveEntries()">Remove Entries</button>
+    </div>
+    <pre class="output-panel" id="af-log-rm-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Quick Actions</h2>
+    <div class="tool-grid">
+        <div class="tool-card">
+            <h4>Clear Shell History</h4>
+            <p>Erase bash, zsh, and fish shell history for the current user.</p>
+            <button class="btn btn-danger btn-small" onclick="afClearHistory()">Clear History</button>
+            <pre class="output-panel tool-result" id="af-clear-history-output"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Scrub Image Metadata</h4>
+            <p>Remove EXIF, GPS, and other metadata from image files (JPEG, PNG, TIFF).</p>
+            <div class="input-row" style="margin-top:8px">
+                <input type="text" id="af-scrub-img-path" placeholder="Image file path" style="font-size:0.8rem">
+            </div>
+            <button class="btn btn-warning btn-small" onclick="afScrubImage()">Scrub Metadata</button>
+            <pre class="output-panel tool-result" id="af-scrub-img-output"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Scrub PDF Metadata</h4>
+            <p>Remove author, creation date, and other metadata from PDF files.</p>
+            <div class="input-row" style="margin-top:8px">
+                <input type="text" id="af-scrub-pdf-path" placeholder="PDF file path" style="font-size:0.8rem">
+            </div>
+            <button class="btn btn-warning btn-small" onclick="afScrubPDF()">Scrub Metadata</button>
+            <pre class="output-panel tool-result" id="af-scrub-pdf-output"></pre>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script>
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+/* ── Secure Delete ── */
+function afDeleteFile() {
+    var path = document.getElementById('af-del-file').value.trim();
+    if (!path) return;
+    if (!confirm('Permanently destroy "' + path + '"? This cannot be undone.')) return;
+    var btn = document.getElementById('btn-af-del-file');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/delete/file', {
+        path: path,
+        passes: parseInt(document.getElementById('af-del-passes').value) || 3,
+        method: document.getElementById('af-del-method').value
+    }).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-del-file-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afDeleteDir() {
+    var path = document.getElementById('af-del-dir').value.trim();
+    if (!path) return;
+    if (!document.getElementById('af-del-dir-confirm').checked) {
+        renderOutput('af-del-dir-output', 'You must check the confirmation box before proceeding.');
+        return;
+    }
+    if (!confirm('DANGER: Permanently destroy all files in "' + path + '"? This cannot be undone.')) return;
+    var btn = document.getElementById('btn-af-del-dir');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/delete/directory', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-del-dir-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afWipeFreeSpace() {
+    var mount = document.getElementById('af-wipe-mount').value.trim();
+    if (!mount) return;
+    if (!confirm('Wipe all free space on "' + mount + '"? This may take a long time.')) return;
+    var btn = document.getElementById('btn-af-wipe');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/wipe-free-space', {mount_point: mount}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-wipe-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Timestamps ── */
+function afViewTimestamps() {
+    var path = document.getElementById('af-ts-view-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-af-ts-view');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/timestamps/view', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('af-ts-accessed').textContent = 'Error';
+            document.getElementById('af-ts-modified').textContent = data.error;
+            document.getElementById('af-ts-created').textContent = '--';
+            return;
+        }
+        document.getElementById('af-ts-accessed').textContent = data.accessed || '--';
+        document.getElementById('af-ts-modified').textContent = data.modified || '--';
+        document.getElementById('af-ts-created').textContent = data.created || '--';
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afSetTimestamps() {
+    var path = document.getElementById('af-ts-set-path').value.trim();
+    var date = document.getElementById('af-ts-set-date').value;
+    if (!path || !date) { renderOutput('af-ts-set-output', 'File path and date are required.'); return; }
+    var btn = document.getElementById('btn-af-ts-set');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/timestamps/set', {path: path, datetime: date}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-ts-set-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afCloneTimestamps() {
+    var src = document.getElementById('af-ts-clone-src').value.trim();
+    var dst = document.getElementById('af-ts-clone-dst').value.trim();
+    if (!src || !dst) { renderOutput('af-ts-clone-output', 'Both source and target paths are required.'); return; }
+    var btn = document.getElementById('btn-af-ts-clone');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/timestamps/clone', {source: src, target: dst}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-ts-clone-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afRandomizeTimestamps() {
+    var path = document.getElementById('af-ts-rand-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-af-ts-rand');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/timestamps/randomize', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-ts-rand-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Logs ── */
+function afLoadLogs() {
+    fetchJSON('/anti-forensics/logs/list').then(function(data) {
+        var tb = document.getElementById('af-logs-table');
+        var logs = data.logs || [];
+        if (!logs.length) {
+            tb.innerHTML = '<tr><td colspan="4" class="empty-state">No log files found or insufficient permissions.</td></tr>';
+            return;
+        }
+        var html = '';
+        logs.forEach(function(l) {
+            var writeBadge = l.writable ? '<span class="badge badge-pass">Yes</span>' : '<span class="badge badge-fail">No</span>';
+            var clearBtn = l.writable ? '<button class="btn btn-danger btn-small" onclick="afClearLog(\'' + esc(l.path) + '\')">Clear</button>' : '<span style="color:var(--text-muted);font-size:0.8rem">Read-only</span>';
+            html += '<tr><td style="font-family:monospace;font-size:0.85rem">' + esc(l.path) + '</td>'
+                + '<td>' + esc(l.size) + '</td>'
+                + '<td>' + writeBadge + '</td>'
+                + '<td>' + clearBtn + '</td></tr>';
+        });
+        tb.innerHTML = html;
+    });
+}
+
+function afClearLog(path) {
+    if (!confirm('Clear log file "' + path + '"?')) return;
+    postJSON('/anti-forensics/logs/clear', {path: path}).then(function(data) {
+        if (data.success) afLoadLogs();
+        else alert(data.error || 'Failed to clear log');
+    });
+}
+
+function afRemoveEntries() {
+    var path = document.getElementById('af-log-rm-path').value.trim();
+    var pattern = document.getElementById('af-log-rm-pattern').value.trim();
+    if (!path || !pattern) { renderOutput('af-log-rm-output', 'Path and pattern are required.'); return; }
+    var btn = document.getElementById('btn-af-log-rm');
+    setLoading(btn, true);
+    postJSON('/anti-forensics/logs/remove-entries', {path: path, pattern: pattern}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('af-log-rm-output', data.message || data.error || 'Done');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afClearHistory() {
+    if (!confirm('Clear all shell history? This cannot be undone.')) return;
+    var el = document.getElementById('af-clear-history-output');
+    el.style.display = 'block';
+    el.textContent = 'Clearing...';
+    postJSON('/anti-forensics/clear-history', {}).then(function(data) {
+        el.textContent = data.message || data.error || 'Done';
+    }).catch(function() { el.textContent = 'Request failed'; });
+}
+
+function afScrubImage() {
+    var path = document.getElementById('af-scrub-img-path').value.trim();
+    if (!path) return;
+    var el = document.getElementById('af-scrub-img-output');
+    el.style.display = 'block';
+    el.textContent = 'Scrubbing...';
+    postJSON('/anti-forensics/scrub/image', {path: path}).then(function(data) {
+        el.textContent = data.message || data.error || 'Done';
+    }).catch(function() { el.textContent = 'Request failed'; });
+}
+
+function afScrubPDF() {
+    var path = document.getElementById('af-scrub-pdf-path').value.trim();
+    if (!path) return;
+    var el = document.getElementById('af-scrub-pdf-output');
+    el.style.display = 'block';
+    el.textContent = 'Scrubbing...';
+    postJSON('/anti-forensics/scrub/pdf', {path: path}).then(function(data) {
+        el.textContent = data.message || data.error || 'Done';
+    }).catch(function() { el.textContent = 'Request failed'; });
+}
+</script>
+{% endblock %}

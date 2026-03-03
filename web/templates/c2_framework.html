@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}C2 Framework — AUTARCH{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>C2 Framework</h1>
+    <p class="text-muted">Command & Control — listeners, agents, task queue</p>
+</div>
+
+<div class="tabs">
+    <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+    <button class="tab" onclick="switchTab('agents')">Agents <span id="agent-badge" class="badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('generate')">Generate</button>
+</div>
+
+<!-- Dashboard -->
+<div id="tab-dashboard" class="tab-content active">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="card">
+            <h3>Listeners</h3>
+            <div style="display:flex;gap:0.5rem;align-items:end;margin-bottom:1rem">
+                <input type="text" id="ls-name" class="form-control" placeholder="name" style="width:120px">
+                <input type="number" id="ls-port" class="form-control" placeholder="4444" value="4444" style="width:100px">
+                <button class="btn btn-primary btn-sm" onclick="startListener()">Start</button>
+            </div>
+            <div id="listeners-list"></div>
+        </div>
+        <div class="card">
+            <h3>Active Agents</h3>
+            <div id="dash-agents"></div>
+        </div>
+    </div>
+    <div class="card" style="margin-top:1rem">
+        <h3>Recent Tasks</h3>
+        <div id="dash-tasks"></div>
+    </div>
+</div>
+
+<!-- Agents -->
+<div id="tab-agents" class="tab-content" style="display:none">
+    <div id="agent-list"></div>
+    <!-- Agent Interaction -->
+    <div id="agent-shell" class="card" style="margin-top:1rem;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3>Agent: <span id="shell-agent-id" style="color:var(--accent)"></span></h3>
+            <div>
+                <button class="btn btn-sm" onclick="agentSysinfo()">Sysinfo</button>
+                <button class="btn btn-sm" style="color:var(--danger)" onclick="document.getElementById('agent-shell').style.display='none'">Close</button>
+            </div>
+        </div>
+        <div id="agent-output" style="background:#0a0a0a;color:#0f0;font-family:monospace;font-size:0.8rem;
+            padding:1rem;border-radius:var(--radius);height:350px;overflow-y:auto;white-space:pre-wrap;margin:0.5rem 0"></div>
+        <div style="display:flex;gap:0.5rem">
+            <input type="text" id="agent-cmd" class="form-control" placeholder="Command..." style="font-family:monospace"
+                   onkeypress="if(event.key==='Enter')agentExec()">
+            <button class="btn btn-primary" onclick="agentExec()">Run</button>
+        </div>
+    </div>
+</div>
+
+<!-- Generate -->
+<div id="tab-generate" class="tab-content" style="display:none">
+    <div class="card" style="max-width:700px">
+        <h3>Generate Agent Payload</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+            <div class="form-group"><label>Callback Host</label>
+                <input type="text" id="gen-host" class="form-control" placeholder="your-ip"></div>
+            <div class="form-group"><label>Callback Port</label>
+                <input type="number" id="gen-port" class="form-control" value="4444"></div>
+            <div class="form-group"><label>Agent Type</label>
+                <select id="gen-type" class="form-control">
+                    <option value="python">Python</option>
+                    <option value="bash">Bash</option>
+                    <option value="powershell">PowerShell</option>
+                </select></div>
+            <div class="form-group"><label>Beacon Interval (sec)</label>
+                <input type="number" id="gen-interval" class="form-control" value="5"></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+            <button class="btn btn-primary" onclick="generateAgent()">Generate Agent</button>
+            <button class="btn" onclick="getOneliner()">Get One-Liner</button>
+        </div>
+        <div id="gen-result" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<style>
+.badge{display:inline-block;background:var(--danger);color:#fff;border-radius:10px;padding:0 6px;font-size:0.7rem;margin-left:4px;vertical-align:top}
+.agent-status-active{color:#22c55e}.agent-status-stale{color:#f59e0b}.agent-status-dead{color:var(--danger)}
+.spinner-inline{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<script>
+let currentAgentId=null;
+let refreshTimer=null;
+
+function switchTab(name){
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dashboard','agents','generate'][i]===name));
+    document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+    document.getElementById('tab-'+name).style.display='';
+    if(name==='dashboard'||name==='agents') refreshDashboard();
+}
+
+function refreshDashboard(){
+    fetch('/c2/listeners').then(r=>r.json()).then(d=>{
+        const list=document.getElementById('listeners-list');
+        const ls=d.listeners||[];
+        list.innerHTML=ls.length?ls.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+            <div><strong>${esc(l.name)}</strong> — ${l.host}:${l.port} (${l.connections} conn)</div>
+            <button class="btn btn-sm" style="color:var(--danger)" onclick="stopListener('${esc(l.name)}')">Stop</button>
+        </div>`).join(''):'<div style="color:var(--text-muted);font-size:0.85rem">No listeners running</div>';
+    });
+
+    fetch('/c2/agents').then(r=>r.json()).then(d=>{
+        const agents=d.agents||[];
+        const badge=document.getElementById('agent-badge');
+        if(agents.length){badge.style.display='';badge.textContent=agents.length}
+        else{badge.style.display='none'}
+
+        document.getElementById('dash-agents').innerHTML=agents.length?agents.map(a=>
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="interactAgent('${a.id}')">
+                <div><span class="agent-status-${a.status}">&#x25cf;</span> <strong>${esc(a.id)}</strong>
+                    — ${esc(a.user)}@${esc(a.hostname)} (${esc(a.os)})</div>
+                <span style="font-size:0.75rem;color:var(--text-muted)">${esc(a.remote_addr)}</span>
+            </div>`).join(''):'<div style="color:var(--text-muted);font-size:0.85rem">No agents connected</div>';
+
+        document.getElementById('agent-list').innerHTML=agents.length?agents.map(a=>
+            `<div class="card" style="margin-bottom:0.5rem">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div><span class="agent-status-${a.status}">&#x25cf;</span>
+                        <strong>${esc(a.id)}</strong> — ${esc(a.user)}@${esc(a.hostname)}</div>
+                    <div style="display:flex;gap:0.5rem;align-items:center">
+                        <span style="font-size:0.75rem;color:var(--text-muted)">${esc(a.os)} ${esc(a.arch)} | ${esc(a.remote_addr)}</span>
+                        <button class="btn btn-sm btn-primary" onclick="interactAgent('${a.id}')">Interact</button>
+                        <button class="btn btn-sm" style="color:var(--danger)" onclick="removeAgent('${a.id}')">Remove</button>
+                    </div>
+                </div>
+            </div>`).join(''):'';
+    });
+
+    fetch('/c2/tasks').then(r=>r.json()).then(d=>{
+        const tasks=(d.tasks||[]).slice(0,20);
+        document.getElementById('dash-tasks').innerHTML=tasks.length?
+            '<table class="data-table"><thead><tr><th>Task</th><th>Agent</th><th>Type</th><th>Status</th><th>Time</th></tr></thead><tbody>'+
+            tasks.map(t=>`<tr><td style="font-family:monospace;font-size:0.8rem">${t.id}</td><td>${t.agent_id}</td><td>${t.type}</td>
+                <td style="color:${t.status==='completed'?'#22c55e':t.status==='failed'?'var(--danger)':'var(--text-muted)'}">${t.status}</td>
+                <td style="font-size:0.75rem">${(t.created_at||'').slice(11,19)}</td></tr>`).join('')+'</tbody></table>'
+            :'<div style="color:var(--text-muted);font-size:0.85rem">No tasks</div>';
+    });
+}
+
+function startListener(){
+    const name=document.getElementById('ls-name').value.trim()||'default';
+    const port=+document.getElementById('ls-port').value||4444;
+    fetch('/c2/listeners',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name,port})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok) alert(d.error);
+        refreshDashboard();
+    });
+}
+
+function stopListener(name){
+    fetch('/c2/listeners/'+encodeURIComponent(name),{method:'DELETE'})
+    .then(r=>r.json()).then(()=>refreshDashboard());
+}
+
+function removeAgent(id){
+    if(!confirm('Remove agent '+id+'?')) return;
+    fetch('/c2/agents/'+id,{method:'DELETE'}).then(r=>r.json()).then(()=>refreshDashboard());
+}
+
+function interactAgent(id){
+    currentAgentId=id;
+    document.getElementById('agent-shell').style.display='';
+    document.getElementById('shell-agent-id').textContent=id;
+    document.getElementById('agent-output').textContent='Connected to agent '+id+'\n';
+    document.getElementById('agent-cmd').focus();
+    switchTab('agents');
+}
+
+function agentExec(){
+    if(!currentAgentId) return;
+    const input=document.getElementById('agent-cmd');
+    const cmd=input.value.trim();
+    if(!cmd) return;
+    input.value='';
+    const out=document.getElementById('agent-output');
+    out.textContent+='> '+cmd+'\n';
+    fetch('/c2/agents/'+currentAgentId+'/exec',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({command:cmd})})
+    .then(r=>r.json()).then(d=>{
+        if(!d.ok){out.textContent+='[error] '+d.error+'\n';return}
+        pollTask(d.task_id);
+    });
+}
+
+function agentSysinfo(){
+    if(!currentAgentId) return;
+    fetch('/c2/agents/'+currentAgentId+'/exec',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({command:navigator.platform.includes('Win')?'systeminfo':'uname -a && whoami && id'})})
+    .then(r=>r.json()).then(d=>{if(d.ok) pollTask(d.task_id)});
+}
+
+function pollTask(taskId){
+    const out=document.getElementById('agent-output');
+    let attempts=0;
+    const poll=setInterval(()=>{
+        fetch('/c2/tasks/'+taskId).then(r=>r.json()).then(d=>{
+            if(d.status==='completed'||d.status==='failed'){
+                clearInterval(poll);
+                if(d.result){
+                    const stdout=d.result.stdout||'';
+                    const stderr=d.result.stderr||'';
+                    if(stdout) out.textContent+=stdout+(stdout.endsWith('\n')?'':'\n');
+                    if(stderr) out.textContent+='[stderr] '+stderr+'\n';
+                    if(d.result.error) out.textContent+='[error] '+d.result.error+'\n';
+                }
+                out.scrollTop=out.scrollHeight;
+            }
+            if(++attempts>30){clearInterval(poll);out.textContent+='[timeout]\n'}
+        });
+    },1000);
+}
+
+function generateAgent(){
+    const payload={host:document.getElementById('gen-host').value.trim(),
+        port:+document.getElementById('gen-port').value,
+        type:document.getElementById('gen-type').value,
+        interval:+document.getElementById('gen-interval').value};
+    fetch('/c2/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+        const div=document.getElementById('gen-result');
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        div.innerHTML=`<div style="margin-bottom:0.5rem"><strong>Agent ID:</strong> ${d.agent_id} | <strong>File:</strong> ${esc(d.filename)}</div>
+            <pre style="background:#0a0a0a;color:#ccc;padding:1rem;border-radius:var(--radius);max-height:300px;overflow:auto;font-size:0.75rem">${esc(d.code)}</pre>
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText(document.querySelector('#gen-result pre').textContent)">Copy to Clipboard</button>`;
+    });
+}
+
+function getOneliner(){
+    const payload={host:document.getElementById('gen-host').value.trim(),
+        port:+document.getElementById('gen-port').value,
+        type:document.getElementById('gen-type').value};
+    fetch('/c2/oneliner',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+        const div=document.getElementById('gen-result');
+        if(!d.ok){div.innerHTML='Error: '+esc(d.error);return}
+        div.innerHTML=`<div style="margin-bottom:0.5rem"><strong>One-Liner (${d.type}):</strong></div>
+            <pre style="background:#0a0a0a;color:#0f0;padding:1rem;border-radius:var(--radius);font-size:0.8rem;word-break:break-all">${esc(d.oneliner)}</pre>
+            <button class="btn btn-sm" onclick="navigator.clipboard.writeText('${esc(d.oneliner).replace(/'/g,"\\'")}')">Copy</button>`;
+    });
+}
+
+refreshDashboard();
+if(!refreshTimer) refreshTimer=setInterval(refreshDashboard,10000);
+
+function esc(s){return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):''}
+</script>
+{% endblock %}
