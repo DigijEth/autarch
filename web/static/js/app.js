@@ -41,6 +41,44 @@ function renderOutput(elementId, text) {
     if (el) el.textContent = text;
 }
 
+/* ── Refresh Modules ─────────────────────────────────────────── */
+function reloadModules() {
+    var btn = document.getElementById('btn-reload-modules');
+    if (!btn) return;
+    var origText = btn.innerHTML;
+    btn.innerHTML = '&#x21BB; Reloading...';
+    btn.disabled = true;
+    btn.style.color = 'var(--accent)';
+
+    postJSON('/api/modules/reload', {}).then(function(data) {
+        var total = data.total || 0;
+        btn.innerHTML = '&#x2713; ' + total + ' modules loaded';
+        btn.style.color = 'var(--success)';
+
+        // If on a category page, reload to reflect changes
+        var path = window.location.pathname;
+        var isCategoryPage = /^\/(defense|offense|counter|analyze|osint|simulate)\/?$/.test(path)
+                          || path === '/';
+        if (isCategoryPage) {
+            setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+            setTimeout(function() {
+                btn.innerHTML = origText;
+                btn.style.color = 'var(--text-secondary)';
+                btn.disabled = false;
+            }, 2000);
+        }
+    }).catch(function() {
+        btn.innerHTML = '&#x2717; Reload failed';
+        btn.style.color = 'var(--danger)';
+        setTimeout(function() {
+            btn.innerHTML = origText;
+            btn.style.color = 'var(--text-secondary)';
+            btn.disabled = false;
+        }, 2000);
+    });
+}
+
 function showTab(tabGroup, tabId) {
     document.querySelectorAll('[data-tab-group="' + tabGroup + '"].tab').forEach(function(t) {
         t.classList.toggle('active', t.dataset.tab === tabId);

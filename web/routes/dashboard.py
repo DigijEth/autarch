@@ -6,7 +6,7 @@ import socket
 import time
 from datetime import datetime
 from pathlib import Path
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, render_template, current_app, jsonify
 from markupsafe import Markup
 from web.auth import login_required
 
@@ -116,3 +116,27 @@ def manual_windows():
     except ImportError:
         html = '<pre>' + content.replace('<', '&lt;') + '</pre>'
     return render_template('manual.html', manual_html=Markup(html))
+
+
+@dashboard_bp.route('/api/modules/reload', methods=['POST'])
+@login_required
+def reload_modules():
+    """Re-scan modules directory and return updated counts + module list."""
+    from core.menu import MainMenu
+    menu = MainMenu()
+    menu.load_modules()
+
+    counts = {}
+    modules = []
+    for name, info in menu.modules.items():
+        cat = info.category
+        counts[cat] = counts.get(cat, 0) + 1
+        modules.append({
+            'name': name,
+            'category': cat,
+            'description': info.description,
+            'version': info.version,
+        })
+    counts['total'] = len(menu.modules)
+
+    return jsonify({'counts': counts, 'modules': modules, 'total': counts['total']})

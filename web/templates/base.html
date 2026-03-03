@@ -64,6 +64,13 @@
                     <li><a href="{{ url_for('dashboard.manual_windows') }}" class="{% if request.endpoint == 'dashboard.manual_windows' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows Guide</a></li>
                 </ul>
             </div>
+            <div style="padding:6px 12px">
+                <button id="btn-reload-modules" onclick="reloadModules()" class="btn btn-small"
+                    style="width:100%;font-size:0.75rem;padding:5px 0;background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary)"
+                    title="Re-scan modules/ directory for new or changed modules">
+                    &#x21BB; Refresh Modules
+                </button>
+            </div>
             <div class="sidebar-footer">
                 <span class="admin-name">{{ session.get('user', 'admin') }}</span>
                 <a href="{{ url_for('auth.logout') }}" class="logout-link">Logout</a>
