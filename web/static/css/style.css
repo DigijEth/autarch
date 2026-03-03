@@ -524,6 +524,74 @@ pre { background: var(--bg-primary); border: 1px solid var(--border); border-rad
 }
 .hw-checkbox input { accent-color: var(--accent); }
 
+/* ── Monitor Popup/Modal ─────────────────────────────────────── */
+.tmon-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6); z-index: 1200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.tmon-overlay.open { opacity: 1; pointer-events: auto; }
+
+.tmon-popup {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    width: 780px; max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 80px); display: flex; flex-direction: column;
+    overflow: hidden; transform: scale(0.95); transition: transform 0.15s;
+}
+.tmon-overlay.open .tmon-popup { transform: scale(1); }
+
+.tmon-popup-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.tmon-popup-header h3 { font-size: 0.95rem; font-weight: 600; margin: 0; }
+.tmon-popup-close {
+    background: none; border: none; color: var(--text-muted); font-size: 1.2rem;
+    cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.15s;
+}
+.tmon-popup-close:hover { color: var(--danger); }
+
+.tmon-popup-body {
+    flex: 1; overflow-y: auto; padding: 16px 18px;
+}
+.tmon-popup-body .data-table { width: 100%; font-size: 0.8rem; }
+
+.tmon-popup-status {
+    font-size: 0.75rem; color: var(--text-muted); padding: 8px 18px;
+    border-top: 1px solid var(--border); flex-shrink: 0; text-align: right;
+}
+
+/* Clickable stat cells in live monitor */
+.tmon-stat-clickable {
+    cursor: pointer; transition: color 0.15s;
+}
+.tmon-stat-clickable:hover {
+    color: var(--accent) !important; text-decoration: underline;
+}
+
+/* Connection detail card inside popup */
+.tmon-detail-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px; margin-bottom: 12px;
+}
+.tmon-detail-card h4 { font-size: 0.88rem; margin-bottom: 10px; color: var(--accent); }
+.tmon-detail-card table { width: 100%; font-size: 0.82rem; }
+.tmon-detail-card td:first-child { color: var(--text-muted); width: 140px; padding: 3px 0; }
+.tmon-detail-card td:last-child { color: var(--text-primary); padding: 3px 0; }
+
+.tmon-row-clickable { cursor: pointer; transition: background 0.1s; }
+.tmon-row-clickable:hover { background: var(--bg-card) !important; }
+
+.tmon-back-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 4px 12px; border-radius: 4px; font-size: 0.78rem; cursor: pointer;
+    margin-bottom: 12px; transition: all 0.15s;
+}
+.tmon-back-btn:hover { color: var(--accent); border-color: var(--accent); }
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar { display: none; }

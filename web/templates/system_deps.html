@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Dependencies - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>System Dependencies</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Check and install Python packages required by AUTARCH modules.
+        </p>
+    </div>
+</div>
+
+<!-- System Info -->
+<div class="section" id="sys-info-section" style="display:none">
+    <h2>System Info</h2>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="stat-card">
+            <div class="stat-label">Python</div>
+            <div class="stat-value small" id="sys-python">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Platform</div>
+            <div class="stat-value small" id="sys-platform">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">CUDA GPU</div>
+            <div class="stat-value small" id="sys-gpu">--</div>
+        </div>
+    </div>
+</div>
+
+<!-- Dependency Groups -->
+<div class="section">
+    <div class="tool-actions">
+        <button id="btn-check-all" class="btn btn-primary" onclick="depsCheckAll()">Check All Dependencies</button>
+        <span id="deps-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+
+    <div id="deps-groups" style="margin-top:16px">
+        <p class="empty-state">Click "Check All Dependencies" to scan installed packages.</p>
+    </div>
+</div>
+
+<!-- Quick Install -->
+<div class="section">
+    <h2>Install Packages</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Install individual packages or preset groups.
+    </p>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="flex:2">
+            <div class="input-row">
+                <input type="text" id="install-pkg" placeholder="Package name (e.g., scapy, torch, peft)">
+                <button class="btn btn-primary btn-small" onclick="depsInstallOne()">Install</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-small" onclick="depsInstallGroup('core')">Install Core</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('llm')">Install LLM</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('training')">Install Training</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('network')">Install Network</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('hardware')">Install Hardware</button>
+    </div>
+
+    <pre class="output-panel" id="install-result" style="margin-top:12px;min-height:0;display:none"></pre>
+</div>
+
+<script>
+var _depsGroupPkgs = {
+    core: ['flask', 'jinja2', 'requests', 'cryptography'],
+    llm: ['llama-cpp-python', 'transformers', 'anthropic'],
+    training: ['torch', 'peft', 'datasets', 'trl', 'accelerate', 'bitsandbytes'],
+    network: ['scapy', 'pyshark', 'miniupnpc', 'msgpack', 'paramiko'],
+    hardware: ['pyserial', 'esptool', 'adb-shell'],
+};
+
+var _depsGroupLabels = {
+    core: 'Core Framework',
+    llm: 'LLM Inference',
+    training: 'LLM Training (LoRA)',
+    network: 'Network & Packet Capture',
+    hardware: 'Hardware & Serial',
+};
+
+function depsCheckAll() {
+    var btn = document.getElementById('btn-check-all');
+    setLoading(btn, true);
+    document.getElementById('deps-status').textContent = 'Scanning...';
+    postJSON('/settings/deps/check', {}).then(function(data) {
+        setLoading(btn, false);
+        document.getElementById('deps-status').textContent = '';
+
+        // System info
+        if (data.python) {
+            document.getElementById('sys-python').textContent = data.python.version || '--';
+            document.getElementById('sys-platform').textContent = data.python.platform || '--';
+            document.getElementById('sys-info-section').style.display = '';
+        }
+        if (data.gpu) {
+            document.getElementById('sys-gpu').textContent = data.gpu.cuda_available
+                ? (data.gpu.device || 'Available') + ' (CUDA ' + (data.gpu.cuda_version || '') + ')'
+                : 'Not available';
+            document.getElementById('sys-gpu').style.color = data.gpu.cuda_available ? 'var(--success)' : 'var(--text-muted)';
+        }
+
+        // Render groups
+        var html = '';
+        var groupOrder = ['core', 'llm', 'training', 'network', 'hardware'];
+        groupOrder.forEach(function(group) {
+            var pkgs = data[group];
+            if (!pkgs) return;
+            var installed = 0, total = 0;
+            for (var k in pkgs) { total++; if (pkgs[k].installed) installed++; }
+
+            var statusColor = installed === total ? 'var(--success)' : installed > 0 ? 'var(--warning)' : 'var(--danger)';
+            html += '<div style="margin-bottom:16px">';
+            html += '<h3 style="margin-bottom:6px">' + (_depsGroupLabels[group] || group)
+                + ' <span style="font-size:0.75rem;font-weight:normal;color:' + statusColor + '">'
+                + installed + '/' + total + ' installed</span></h3>';
+            html += '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+                + '<th>Package</th><th>Status</th><th>Version</th><th>Action</th></tr></thead><tbody>';
+            for (var name in pkgs) {
+                var info = pkgs[name];
+                html += '<tr><td>' + escapeHtml(name) + '</td>'
+                    + '<td><span class="status-dot ' + (info.installed ? 'active' : 'inactive') + '"></span>'
+                    + (info.installed ? 'Installed' : 'Missing') + '</td>'
+                    + '<td>' + (info.version || '—') + '</td>'
+                    + '<td>' + (info.installed ? '' : '<button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                    + 'onclick="depsInstallPkg(\'' + escapeHtml(name) + '\',this)">Install</button>') + '</td></tr>';
+            }
+            html += '</tbody></table></div>';
+        });
+
+        document.getElementById('deps-groups').innerHTML = html;
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('deps-status').textContent = 'Error checking dependencies';
+    });
+}
+
+function depsInstallPkg(pkg, btn) {
+    if (btn) setLoading(btn, true);
+    var out = document.getElementById('install-result');
+    out.style.display = '';
+    renderOutput('install-result', 'Installing ' + pkg + '...');
+    postJSON('/settings/deps/install', {packages: [pkg]}).then(function(data) {
+        if (btn) setLoading(btn, false);
+        var results = data.results || [];
+        var lines = results.map(function(r) {
+            return r.package + ': ' + (r.success ? 'OK' : 'FAILED — ' + r.output);
+        });
+        renderOutput('install-result', lines.join('\n'));
+        // Refresh deps list
+        depsCheckAll();
+    }).catch(function() { if (btn) setLoading(btn, false); });
+}
+
+function depsInstallOne() {
+    var pkg = document.getElementById('install-pkg').value.trim();
+    if (!pkg) return;
+    depsInstallPkg(pkg, null);
+    document.getElementById('install-pkg').value = '';
+}
+
+function depsInstallGroup(group) {
+    var pkgs = _depsGroupPkgs[group];
+    if (!pkgs || !pkgs.length) return;
+    var out = document.getElementById('install-result');
+    out.style.display = '';
+    renderOutput('install-result', 'Installing ' + (_depsGroupLabels[group] || group) + ' packages: ' + pkgs.join(', ') + '...');
+    postJSON('/settings/deps/install', {packages: pkgs}).then(function(data) {
+        var results = data.results || [];
+        var lines = results.map(function(r) {
+            return r.package + ': ' + (r.success ? 'OK' : 'FAILED — ' + r.output);
+        });
+        renderOutput('install-result', lines.join('\n'));
+        depsCheckAll();
+    });
+}
+</script>
+{% endblock %}

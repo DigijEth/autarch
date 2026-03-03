@@ -1,0 +1,1286 @@
+{% extends "base.html" %}
+{% block title %}Threat Monitor - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Threat Monitor</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Real-time threat detection, network monitoring, and active counter-attack.
+        </p>
+    </div>
+    <a href="{{ url_for('defense.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Defense</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="tmon" data-tab="live" onclick="showTab('tmon','live')">Live Monitor</button>
+    <button class="tab" data-tab-group="tmon" data-tab="connections" onclick="showTab('tmon','connections')">Connections</button>
+    <button class="tab" data-tab-group="tmon" data-tab="netintel" onclick="showTab('tmon','netintel')">Network Intel</button>
+    <button class="tab" data-tab-group="tmon" data-tab="threats" onclick="showTab('tmon','threats')">Threats</button>
+    <button class="tab" data-tab-group="tmon" data-tab="capture" onclick="showTab('tmon','capture');capLoadInterfaces()">Packet Capture</button>
+    <button class="tab" data-tab-group="tmon" data-tab="ddos" onclick="showTab('tmon','ddos')">DDoS Mitigation</button>
+    <button class="tab" data-tab-group="tmon" data-tab="counter" onclick="showTab('tmon','counter')">Counter-Attack</button>
+</div>
+
+<!-- ==================== LIVE MONITOR TAB ==================== -->
+<div class="tab-content active" data-tab-group="tmon" data-tab="live">
+<div class="section">
+    <h2>Live Threat Dashboard</h2>
+    <div class="tool-actions">
+        <button id="btn-stream-toggle" class="btn btn-primary" onclick="toggleMonitorStream()">Start Live Monitor</button>
+        <span id="stream-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+
+    <!-- Threat Score + Stats -->
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-top:16px">
+        <div class="score-display">
+            <div class="score-value" id="live-threat-score">--</div>
+            <div class="score-label" id="live-threat-level">Threat Level</div>
+        </div>
+        <div style="flex:1;min-width:250px">
+            <table class="data-table" style="font-size:0.85rem">
+                <tbody>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('connections')" title="Click to view live connections">
+                        <td>Active Connections</td><td id="live-conn-count">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('logins')" title="Click to view failed logins">
+                        <td>Failed Logins (5m)</td><td id="live-fail-count">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('processes')" title="Click to view suspicious processes">
+                        <td>Suspicious Processes</td><td id="live-sus-count">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('scans')" title="Click to view scan indicators">
+                        <td>Scan Indicators</td><td id="live-scan-count">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('bandwidth')" title="Click to view bandwidth details">
+                        <td>Bandwidth (RX/TX)</td><td id="live-bandwidth">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('arp')" title="Click to view ARP table">
+                        <td>ARP Spoof Alerts</td><td id="live-arp-alerts">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('ports')" title="Click to view listening ports">
+                        <td>New Listening Ports</td><td id="live-new-ports">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('connrate')" title="Click to view connection rate">
+                        <td>Conn Rate (1m avg)</td><td id="live-conn-rate">--</td></tr>
+                    <tr class="tmon-stat-clickable" onclick="tmonPopup('ddos')" title="Click to view DDoS status">
+                        <td>DDoS Status</td><td id="live-ddos-status">--</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <pre class="output-panel scrollable" id="live-log" style="max-height:200px;margin-top:12px;font-size:0.75rem"></pre>
+</div>
+</div>
+
+<!-- ==================== CONNECTIONS TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="connections">
+<div class="section">
+    <h2>Network Connections</h2>
+    <div class="tool-actions">
+        <button id="btn-load-conns" class="btn btn-primary" onclick="loadConnections()">Load Connections</button>
+        <span id="conn-total" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+    <div style="overflow-x:auto;margin-top:12px">
+        <table class="data-table" style="font-size:0.8rem">
+            <thead><tr><th>Local</th><th>Remote</th><th>State</th><th>PID</th><th>Process</th><th>Action</th></tr></thead>
+            <tbody id="conn-table">
+                <tr><td colspan="6" class="empty-state">Click "Load Connections" to view active network connections.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>
+
+<!-- ==================== NETWORK INTEL TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="netintel">
+<div class="section">
+    <h2>Bandwidth Monitor</h2>
+    <div class="tool-actions">
+        <button id="btn-bw" class="btn btn-primary" onclick="niBandwidth()">Check Bandwidth</button>
+    </div>
+    <div id="ni-bandwidth" style="margin-top:12px"></div>
+</div>
+
+<div class="section">
+    <h2>ARP Spoof Detection</h2>
+    <div class="tool-actions">
+        <button id="btn-arp" class="btn btn-primary" onclick="niArpCheck()">Scan ARP Table</button>
+    </div>
+    <div id="ni-arp" style="margin-top:12px">
+        <p class="empty-state">Click "Scan ARP Table" to check for spoofing.</p>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Listening Port Monitor</h2>
+    <div class="tool-actions">
+        <button id="btn-ports" class="btn btn-primary" onclick="niNewPorts()">Check New Ports</button>
+    </div>
+    <p style="font-size:0.75rem;color:var(--text-muted)">First click establishes a baseline. Subsequent clicks detect new listeners.</p>
+    <div id="ni-ports" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h2>GeoIP Lookup</h2>
+    <div class="input-row" style="margin-bottom:8px">
+        <input type="text" id="ni-geoip-input" placeholder="IP address (e.g., 8.8.8.8)">
+        <button id="btn-geoip" class="btn btn-primary" onclick="niGeoip()">Lookup</button>
+    </div>
+    <div id="ni-geoip-result"></div>
+</div>
+
+<div class="section">
+    <h2>Connections + GeoIP</h2>
+    <div class="tool-actions">
+        <button id="btn-conns-geo" class="btn btn-primary" onclick="niConnsGeo()">Load with GeoIP</button>
+        <span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">May take a few seconds for API lookups</span>
+    </div>
+    <div style="overflow-x:auto;margin-top:12px">
+        <table class="data-table" style="font-size:0.8rem;display:none" id="ni-geo-table">
+            <thead><tr><th>Remote</th><th>Port</th><th>State</th><th>Country</th><th>ISP</th><th>Process</th></tr></thead>
+            <tbody id="ni-geo-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Connection Rate</h2>
+    <div class="tool-actions">
+        <button id="btn-conn-rate" class="btn btn-primary" onclick="niConnRate()">Check Rate</button>
+    </div>
+    <div id="ni-conn-rate" style="margin-top:12px"></div>
+</div>
+</div>
+
+<!-- ==================== THREATS TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="threats">
+<div class="section">
+    <h2>Threat Analysis</h2>
+    <div class="tool-actions">
+        <button id="btn-threat-report" class="btn btn-primary" onclick="loadThreatReport()">Generate Report</button>
+    </div>
+    <pre class="output-panel scrollable" id="threat-output" style="margin-top:12px">Click "Generate Report" for a full threat analysis.</pre>
+</div>
+</div>
+
+<!-- ==================== PACKET CAPTURE TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="capture">
+<div class="section">
+    <h2>Packet Capture</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Live packet capture via Scapy. Requires root/admin privileges.
+    </p>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+            <label>Interface</label>
+            <select id="cap-interface">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>BPF Filter</label>
+            <input type="text" id="cap-filter" placeholder="e.g., tcp port 80, udp, host 10.0.0.1">
+        </div>
+        <div class="form-group">
+            <label>Duration (sec)</label>
+            <input type="number" id="cap-duration" value="30" min="5" max="300" style="max-width:100px">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-cap-start" class="btn btn-primary" onclick="capStart()">Start Capture</button>
+        <button id="btn-cap-stop" class="btn btn-danger" onclick="capStop()" style="display:none">Stop Capture</button>
+        <span id="cap-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+
+    <!-- Live Packets -->
+    <div id="cap-live-packets" class="output-panel scrollable" style="display:none;max-height:300px;font-size:0.78rem;margin-top:12px"></div>
+</div>
+
+<div class="section">
+    <h2>Capture Analysis</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="capProtocols()">Protocol Distribution</button>
+        <button class="btn btn-small" onclick="capConversations()">Top Conversations</button>
+    </div>
+    <div id="cap-analysis" style="margin-top:12px"></div>
+</div>
+</div>
+
+<!-- ==================== DDOS MITIGATION TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="ddos">
+<div class="section">
+    <h2>DDoS Detection</h2>
+    <div class="tool-actions">
+        <button id="btn-ddos-detect" class="btn btn-primary" onclick="ddosDetect()">Run Detection</button>
+    </div>
+    <div id="ddos-status" style="margin-top:12px"></div>
+</div>
+
+<div class="section">
+    <h2>Top Talkers</h2>
+    <div class="tool-actions">
+        <button id="btn-ddos-talkers" class="btn btn-small" onclick="ddosTopTalkers()">Refresh</button>
+    </div>
+    <div style="overflow-x:auto;margin-top:8px">
+        <table class="data-table" style="font-size:0.8rem;display:none" id="ddos-talkers-table">
+            <thead><tr><th>IP</th><th>Connections</th><th>%</th><th>States</th><th>Action</th></tr></thead>
+            <tbody id="ddos-talkers-tbody"></tbody>
+        </table>
+    </div>
+    <div id="ddos-talkers-empty">
+        <p class="empty-state">Click "Refresh" to load top talkers.</p>
+    </div>
+</div>
+
+<div class="section">
+    <h2>SYN Flood Protection</h2>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span id="syn-status-text" style="font-size:0.85rem">Status: checking...</span>
+        <button id="btn-syn-enable" class="btn btn-small" onclick="ddosSynEnable()">Enable</button>
+        <button id="btn-syn-disable" class="btn btn-danger btn-small" onclick="ddosSynDisable()">Disable</button>
+    </div>
+    <p style="font-size:0.75rem;color:var(--text-muted)">Enables SYN cookies (Linux) or SynAttackProtect (Windows) to mitigate SYN floods.</p>
+</div>
+
+<div class="section">
+    <h2>Rate Limiting</h2>
+    <div class="input-row" style="margin-bottom:8px">
+        <input type="text" id="ddos-rl-ip" placeholder="IP address">
+        <input type="text" id="ddos-rl-rate" placeholder="25/min" value="25/min" style="max-width:120px">
+        <button class="btn btn-primary btn-small" onclick="ddosRateLimit()">Apply Rate Limit</button>
+        <button class="btn btn-small" onclick="ddosRateLimitRemove()">Remove</button>
+    </div>
+    <pre class="output-panel" id="ddos-rl-result" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Auto-Mitigation</h2>
+    <div id="ddos-config-panel" style="margin-bottom:12px">
+        <label><input type="checkbox" id="ddos-cfg-enabled"> Enable auto-mitigation</label><br>
+        <label><input type="checkbox" id="ddos-cfg-block" checked> Auto-block top talkers</label><br>
+        <label><input type="checkbox" id="ddos-cfg-syn" checked> Auto-enable SYN cookies</label><br>
+        <div class="form-row" style="margin-top:8px">
+            <div class="form-group">
+                <label>Connection Threshold</label>
+                <input type="number" id="ddos-cfg-conn-thresh" value="100" min="10" style="max-width:100px">
+            </div>
+            <div class="form-group">
+                <label>SYN Threshold</label>
+                <input type="number" id="ddos-cfg-syn-thresh" value="50" min="10" style="max-width:100px">
+            </div>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="ddosSaveConfig()">Save Config</button>
+        <button class="btn btn-danger btn-small" onclick="ddosAutoMitigate()">Run Auto-Mitigation Now</button>
+    </div>
+    <pre class="output-panel" id="ddos-auto-result" style="min-height:0;margin-top:8px"></pre>
+</div>
+
+<div class="section">
+    <h2>Mitigation History</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="ddosHistory()">Refresh</button>
+        <button class="btn btn-danger btn-small" onclick="ddosClearHistory()">Clear</button>
+    </div>
+    <div id="ddos-history" style="margin-top:8px">
+        <p class="empty-state">Click "Refresh" to load history.</p>
+    </div>
+</div>
+</div>
+
+<!-- ==================== COUNTER-ATTACK TAB ==================== -->
+<div class="tab-content" data-tab-group="tmon" data-tab="counter">
+<div class="section">
+    <h2>Counter-Attack</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Active response tools. Use with caution — actions are immediate and may affect network connectivity.
+    </p>
+
+    <!-- Block IP -->
+    <div style="margin-bottom:16px">
+        <h4>Block IP Address</h4>
+        <div class="input-row">
+            <input type="text" id="counter-block-ip" placeholder="IP address">
+            <button class="btn btn-danger btn-small" onclick="counterBlockIP()">Block IP</button>
+        </div>
+    </div>
+
+    <!-- Kill Process -->
+    <div style="margin-bottom:16px">
+        <h4>Kill Process</h4>
+        <div class="input-row">
+            <input type="number" id="counter-kill-pid" placeholder="Process ID (PID)">
+            <button class="btn btn-danger btn-small" onclick="counterKillProcess()">Kill Process</button>
+        </div>
+    </div>
+
+    <!-- Block Port -->
+    <div style="margin-bottom:16px">
+        <h4>Block Port</h4>
+        <div class="input-row">
+            <input type="number" id="counter-block-port" placeholder="Port number">
+            <select id="counter-block-dir" style="max-width:120px">
+                <option value="in">Inbound</option>
+                <option value="out">Outbound</option>
+            </select>
+            <button class="btn btn-danger btn-small" onclick="counterBlockPort()">Block Port</button>
+        </div>
+    </div>
+
+    <pre class="output-panel" id="counter-result" style="min-height:0"></pre>
+
+    <!-- Blocklist -->
+    <h4 style="margin-top:24px">Persistent Blocklist</h4>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="loadBlocklist()">Refresh Blocklist</button>
+    </div>
+    <div id="blocklist-container" style="margin-top:8px">
+        <p class="empty-state">Click "Refresh Blocklist" to load.</p>
+    </div>
+</div>
+</div>
+
+<!-- ==================== DRILL-DOWN POPUP ==================== -->
+<div id="tmon-overlay" class="tmon-overlay" onclick="if(event.target===this)tmonPopupClose()">
+    <div class="tmon-popup">
+        <div class="tmon-popup-header">
+            <h3 id="tmon-popup-title">Details</h3>
+            <button class="tmon-popup-close" onclick="tmonPopupClose()" title="Close">&times;</button>
+        </div>
+        <div class="tmon-popup-body" id="tmon-popup-body">
+            <p class="empty-state">Loading...</p>
+        </div>
+        <div class="tmon-popup-status" id="tmon-popup-status"></div>
+    </div>
+</div>
+
+<script>
+/* ══════════════ LIVE MONITOR ══════════════ */
+var _monitorSSE = null;
+
+function toggleMonitorStream() {
+    var btn = document.getElementById('btn-stream-toggle');
+    if (_monitorSSE) {
+        _monitorSSE.close();
+        _monitorSSE = null;
+        btn.textContent = 'Start Live Monitor';
+        document.getElementById('stream-status').textContent = 'Stopped';
+        return;
+    }
+    btn.textContent = 'Stop Live Monitor';
+    document.getElementById('stream-status').textContent = 'Connecting...';
+    _monitorSSE = new EventSource('/defense/monitor/stream');
+    _monitorSSE.onmessage = function(e) {
+        try {
+            var d = JSON.parse(e.data);
+            // Handle initial heartbeat
+            if (d.type === 'heartbeat') {
+                document.getElementById('stream-status').textContent = 'Connected — gathering data...';
+                return;
+            }
+            document.getElementById('stream-status').textContent = 'Live — ' + d.timestamp;
+
+            // Threat score
+            var sc = d.threat_score || {};
+            var scoreEl = document.getElementById('live-threat-score');
+            scoreEl.textContent = sc.score;
+            scoreEl.style.color = sc.score >= 40 ? 'var(--danger)' : sc.score >= 15 ? 'var(--warning)' : 'var(--success)';
+            document.getElementById('live-threat-level').textContent = sc.level || 'Unknown';
+
+            // Core metrics
+            document.getElementById('live-conn-count').textContent = d.connection_count || 0;
+            document.getElementById('live-fail-count').textContent = d.failed_logins || 0;
+            document.getElementById('live-sus-count').textContent = d.suspicious_processes || 0;
+            document.getElementById('live-scan-count').textContent = d.scan_indicators || 0;
+
+            // Enhanced metrics
+            var bw = d.bandwidth || {};
+            document.getElementById('live-bandwidth').textContent =
+                (bw.rx_mbps || 0).toFixed(2) + ' / ' + (bw.tx_mbps || 0).toFixed(2) + ' MB/s';
+
+            document.getElementById('live-arp-alerts').textContent = d.arp_alerts || 0;
+            var npEl = document.getElementById('live-new-ports');
+            npEl.textContent = d.new_ports || 0;
+            if (d.new_ports > 0) npEl.style.color = 'var(--warning)';
+
+            var cr = d.connection_rate || {};
+            document.getElementById('live-conn-rate').textContent =
+                (cr.avg_rate_1m || 0) + ' (peak: ' + (cr.peak_rate || 0) + ')';
+
+            var ddos = d.ddos || {};
+            var ddosEl = document.getElementById('live-ddos-status');
+            if (ddos.under_attack) {
+                ddosEl.textContent = ddos.attack_type.toUpperCase();
+                ddosEl.style.color = 'var(--danger)';
+                ddosEl.style.fontWeight = 'bold';
+            } else {
+                ddosEl.textContent = 'Clear';
+                ddosEl.style.color = 'var(--success)';
+                ddosEl.style.fontWeight = 'normal';
+            }
+
+            // Log line
+            var log = document.getElementById('live-log');
+            var line = '[' + new Date().toLocaleTimeString() + '] Score:' + sc.score
+                + ' Conns:' + d.connection_count + ' BW:' + (bw.rx_mbps||0).toFixed(1) + 'MB/s'
+                + ' ARP:' + (d.arp_alerts||0) + ' DDoS:' + (ddos.under_attack ? ddos.attack_type : 'clear');
+            if (d.new_port_details) {
+                d.new_port_details.forEach(function(p) {
+                    line += '\n  NEW PORT: ' + p.port + ' (' + (p.process||'unknown') + ')';
+                });
+            }
+            log.textContent = line + '\n' + (log.textContent || '').split('\n').slice(0, 80).join('\n');
+        } catch(ex) {}
+    };
+    _monitorSSE.onerror = function() {
+        document.getElementById('stream-status').textContent = 'Connection lost — retrying...';
+    };
+}
+
+/* ══════════════ DRILL-DOWN POPUP ══════════════ */
+var _popupRefresh = null;  // interval for auto-refreshing popup data
+
+function tmonPopupClose() {
+    document.getElementById('tmon-overlay').classList.remove('open');
+    if (_popupRefresh) { clearInterval(_popupRefresh); _popupRefresh = null; }
+}
+
+function tmonPopup(kind) {
+    var overlay = document.getElementById('tmon-overlay');
+    var title = document.getElementById('tmon-popup-title');
+    var body = document.getElementById('tmon-popup-body');
+    var status = document.getElementById('tmon-popup-status');
+
+    if (_popupRefresh) { clearInterval(_popupRefresh); _popupRefresh = null; }
+    body.innerHTML = '<p class="empty-state">Loading...</p>';
+    status.textContent = '';
+    overlay.classList.add('open');
+
+    var loaders = {
+        connections: { title: 'Active Connections', fn: _popupConnections, refresh: 5000 },
+        logins:      { title: 'Failed Logins (Last 10 min)', fn: _popupLogins },
+        processes:   { title: 'Suspicious Processes', fn: _popupProcesses },
+        scans:       { title: 'Port Scan Indicators', fn: _popupScans },
+        bandwidth:   { title: 'Bandwidth by Interface', fn: _popupBandwidth, refresh: 3000 },
+        arp:         { title: 'ARP Table & Spoof Alerts', fn: _popupArp },
+        ports:       { title: 'Listening Ports', fn: _popupPorts },
+        connrate:    { title: 'Connection Rate', fn: _popupConnRate, refresh: 3000 },
+        ddos:        { title: 'DDoS Detection Status', fn: _popupDdos, refresh: 5000 },
+    };
+
+    var cfg = loaders[kind];
+    if (!cfg) { body.innerHTML = '<p>Unknown view</p>'; return; }
+
+    title.textContent = cfg.title;
+    cfg.fn(body, status);
+    if (cfg.refresh) {
+        _popupRefresh = setInterval(function() {
+            if (!overlay.classList.contains('open')) { clearInterval(_popupRefresh); return; }
+            cfg.fn(body, status);
+        }, cfg.refresh);
+    }
+}
+
+/* Close on Escape key */
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') tmonPopupClose();
+});
+
+/* ── Connections popup (live, clickable rows) ── */
+function _popupConnections(body, status) {
+    postJSON('/defense/monitor/connections', {}).then(function(data) {
+        var conns = data.connections || [];
+        status.textContent = conns.length + ' connections — ' + new Date().toLocaleTimeString();
+        if (!conns.length) { body.innerHTML = '<p class="empty-state">No active connections.</p>'; return; }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>Local</th><th>Remote</th><th>State</th><th>PID</th><th>Process</th></tr></thead><tbody>';
+        conns.forEach(function(c, i) {
+            var ext = c.remote_addr && c.remote_addr !== '0.0.0.0' && c.remote_addr !== '::' && c.remote_addr !== '127.0.0.1' && c.remote_addr !== '::1';
+            var style = ext ? ' style="color:var(--warning)"' : '';
+            html += '<tr class="tmon-row-clickable"' + style + ' onclick="_popupConnDetail(this,' + i + ')" data-conn=\'' + escapeAttr(JSON.stringify(c)) + '\'>'
+                + '<td>' + escapeHtml(c.local_addr + ':' + c.local_port) + '</td>'
+                + '<td>' + escapeHtml(c.remote_addr + ':' + c.remote_port) + '</td>'
+                + '<td>' + escapeHtml(c.state || '') + '</td>'
+                + '<td>' + (c.pid || '') + '</td>'
+                + '<td>' + escapeHtml(c.process || '') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+function escapeAttr(s) { return s.replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function _popupConnDetail(row, idx) {
+    var c;
+    try { c = JSON.parse(row.getAttribute('data-conn')); } catch(e) { return; }
+    var body = document.getElementById('tmon-popup-body');
+    var status = document.getElementById('tmon-popup-status');
+
+    // Pause auto-refresh while viewing detail
+    if (_popupRefresh) { clearInterval(_popupRefresh); _popupRefresh = null; }
+
+    var ext = c.remote_addr && c.remote_addr !== '0.0.0.0' && c.remote_addr !== '::' && c.remote_addr !== '127.0.0.1' && c.remote_addr !== '::1';
+
+    var html = '<button class="tmon-back-btn" onclick="tmonPopup(\'connections\')">&larr; Back to connections</button>';
+    html += '<div class="tmon-detail-card"><h4>Connection Details</h4><table>'
+        + '<tr><td>Local Address</td><td>' + escapeHtml(c.local_addr) + '</td></tr>'
+        + '<tr><td>Local Port</td><td>' + c.local_port + '</td></tr>'
+        + '<tr><td>Remote Address</td><td>' + escapeHtml(c.remote_addr) + '</td></tr>'
+        + '<tr><td>Remote Port</td><td>' + c.remote_port + '</td></tr>'
+        + '<tr><td>State</td><td>' + escapeHtml(c.state || 'Unknown') + '</td></tr>'
+        + '<tr><td>PID</td><td>' + (c.pid || '—') + '</td></tr>'
+        + '<tr><td>Process</td><td>' + escapeHtml(c.process || '—') + '</td></tr>'
+        + '</table></div>';
+
+    // Actions
+    html += '<div class="tmon-detail-card"><h4>Actions</h4><div class="tool-actions">';
+    if (ext) {
+        html += '<button class="btn btn-danger btn-small" onclick="counterBlockIP(\'' + escapeHtml(c.remote_addr) + '\');tmonPopupClose()">Block IP</button> ';
+        html += '<button class="btn btn-small" onclick="_popupGeoLookup(\'' + escapeHtml(c.remote_addr) + '\')">GeoIP Lookup</button> ';
+    }
+    if (c.pid) {
+        html += '<button class="btn btn-danger btn-small" onclick="if(confirm(\'Kill PID ' + c.pid + '?\')){counterKillPid(' + c.pid + ')}">Kill Process</button>';
+    }
+    html += '</div></div>';
+
+    // GeoIP placeholder
+    html += '<div id="popup-geo-result"></div>';
+
+    body.innerHTML = html;
+    status.textContent = 'Connection detail view';
+}
+
+function counterKillPid(pid) {
+    postJSON('/defense/monitor/kill-process', {pid: pid}).then(function(data) {
+        var el = document.getElementById('popup-geo-result');
+        if (el) el.innerHTML = '<div class="tmon-detail-card"><h4>Result</h4><p>' + escapeHtml(data.message || data.error) + '</p></div>';
+    });
+}
+
+function _popupGeoLookup(ip) {
+    var el = document.getElementById('popup-geo-result');
+    if (!el) return;
+    el.innerHTML = '<div class="tmon-detail-card"><h4>GeoIP — Loading...</h4></div>';
+    postJSON('/defense/monitor/geoip', {ip: ip}).then(function(data) {
+        if (data.error) { el.innerHTML = '<div class="tmon-detail-card"><h4>GeoIP</h4><p>' + escapeHtml(data.error) + '</p></div>'; return; }
+        el.innerHTML = '<div class="tmon-detail-card"><h4>GeoIP — ' + escapeHtml(ip) + '</h4><table>'
+            + '<tr><td>Country</td><td>' + escapeHtml(data.country || '—') + ' (' + escapeHtml(data.country_code || '') + ')</td></tr>'
+            + '<tr><td>City</td><td>' + escapeHtml(data.city || '—') + '</td></tr>'
+            + '<tr><td>ISP</td><td>' + escapeHtml(data.isp || '—') + '</td></tr>'
+            + '<tr><td>Org</td><td>' + escapeHtml(data.org || '—') + '</td></tr>'
+            + '<tr><td>ASN</td><td>' + (data.asn || '—') + '</td></tr>'
+            + '</table></div>';
+    });
+}
+
+/* ── Failed Logins popup ── */
+function _popupLogins(body, status) {
+    postJSON('/defense/monitor/threats', {}).then(function(data) {
+        var logins = data.recent_failed_logins || [];
+        status.textContent = logins.length + ' failed logins';
+        if (!logins.length) { body.innerHTML = '<p class="empty-state">No recent failed logins.</p>'; return; }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>Time</th><th>IP Address</th><th>Username</th></tr></thead><tbody>';
+        logins.forEach(function(l) {
+            html += '<tr><td>' + escapeHtml(l.time || '') + '</td>'
+                + '<td>' + escapeHtml(l.ip || '') + '</td>'
+                + '<td>' + escapeHtml(l.user || '') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── Suspicious Processes popup ── */
+function _popupProcesses(body, status) {
+    postJSON('/defense/monitor/processes', {}).then(function(data) {
+        var procs = data.processes || [];
+        status.textContent = procs.length + ' suspicious processes';
+        if (!procs.length) { body.innerHTML = '<p class="empty-state" style="color:var(--success)">No suspicious processes detected.</p>'; return; }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>PID</th><th>Name</th><th>Reason</th><th>Severity</th><th>Action</th></tr></thead><tbody>';
+        procs.forEach(function(p) {
+            html += '<tr style="color:var(--danger)"><td>' + (p.pid || '') + '</td>'
+                + '<td>' + escapeHtml(p.name || '') + '</td>'
+                + '<td style="font-size:0.75rem">' + escapeHtml(p.reason || '') + '</td>'
+                + '<td>' + escapeHtml(p.severity || '') + '</td>'
+                + '<td><button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="if(confirm(\'Kill PID ' + p.pid + '?\')){counterKillPid(' + p.pid + ')}">Kill</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── Scan Indicators popup ── */
+function _popupScans(body, status) {
+    postJSON('/defense/monitor/threats', {}).then(function(data) {
+        var scans = data.scan_indicators || [];
+        status.textContent = scans.length + ' scan indicators';
+        if (!scans.length) { body.innerHTML = '<p class="empty-state" style="color:var(--success)">No port scan activity detected.</p>'; return; }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>Type</th><th>Source IP</th><th>Detail</th><th>Severity</th><th>Action</th></tr></thead><tbody>';
+        scans.forEach(function(s) {
+            html += '<tr style="color:var(--danger)"><td>' + escapeHtml(s.type || '') + '</td>'
+                + '<td>' + escapeHtml(s.ip || '') + '</td>'
+                + '<td>' + escapeHtml(s.detail || '') + '</td>'
+                + '<td>' + escapeHtml(s.severity || '') + '</td>'
+                + '<td><button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="counterBlockIP(\'' + escapeHtml(s.ip || '') + '\')">Block</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── Bandwidth popup (live) ── */
+function _popupBandwidth(body, status) {
+    postJSON('/defense/monitor/bandwidth', {}).then(function(data) {
+        var ifaces = data.interfaces || [];
+        status.textContent = ifaces.length + ' interfaces — ' + new Date().toLocaleTimeString();
+        if (!ifaces.length) { body.innerHTML = '<p class="empty-state">No interface data available.</p>'; return; }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>Interface</th><th>RX Total</th><th>TX Total</th><th>RX Delta</th><th>TX Delta</th></tr></thead><tbody>';
+        ifaces.forEach(function(i) {
+            html += '<tr><td>' + escapeHtml(i.interface) + '</td>'
+                + '<td>' + formatBytes(i.rx_bytes) + '</td>'
+                + '<td>' + formatBytes(i.tx_bytes) + '</td>'
+                + '<td style="color:var(--analyze)">' + formatBytes(i.rx_delta) + '</td>'
+                + '<td style="color:var(--warning)">' + formatBytes(i.tx_delta) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── ARP Table popup ── */
+function _popupArp(body, status) {
+    postJSON('/defense/monitor/arp-check', {}).then(function(data) {
+        var alerts = data.alerts || [];
+        status.textContent = alerts.length ? alerts.length + ' spoof alerts!' : 'No spoofing detected';
+        if (!alerts.length) {
+            body.innerHTML = '<p class="empty-state" style="color:var(--success)">ARP table is clean — no spoofing detected.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>IP Address</th><th>MAC Addresses</th><th>Severity</th></tr></thead><tbody>';
+        alerts.forEach(function(a) {
+            html += '<tr style="color:var(--danger)"><td>' + escapeHtml(a.ip) + '</td>'
+                + '<td>' + a.macs.map(escapeHtml).join('<br>') + '</td>'
+                + '<td>' + escapeHtml(a.severity) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── Listening Ports popup ── */
+function _popupPorts(body, status) {
+    postJSON('/defense/monitor/new-ports', {}).then(function(data) {
+        var ports = data.new_ports || [];
+        status.textContent = ports.length ? ports.length + ' new ports since last check' : 'No new ports (baseline updated)';
+        if (!ports.length) {
+            body.innerHTML = '<p class="empty-state">No new listening ports since last check. Click again to re-check.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem">'
+            + '<thead><tr><th>Port</th><th>PID</th><th>Process</th><th>Action</th></tr></thead><tbody>';
+        ports.forEach(function(p) {
+            html += '<tr style="color:var(--warning)"><td>' + p.port + '</td>'
+                + '<td>' + (p.pid || '') + '</td>'
+                + '<td>' + escapeHtml(p.process || '') + '</td>'
+                + '<td><button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="counterBlockPort(\'' + p.port + '\',\'in\')">Block Port</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    });
+}
+
+function counterBlockPort(port, dir) {
+    postJSON('/defense/monitor/block-port', {port: parseInt(port), direction: dir}).then(function(data) {
+        var el = document.getElementById('popup-geo-result') || document.getElementById('tmon-popup-status');
+        if (el) el.textContent = data.message || data.error;
+    });
+}
+
+/* ── Connection Rate popup (live) ── */
+function _popupConnRate(body, status) {
+    postJSON('/defense/monitor/connection-rate', {}).then(function(data) {
+        status.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        var html = '<div class="tmon-detail-card"><h4>Connection Rate Metrics</h4><table>'
+            + '<tr><td>Current Connections</td><td style="font-size:1.1rem;font-weight:600">' + (data.current_rate || 0) + '</td></tr>'
+            + '<tr><td>1-Minute Average</td><td>' + (data.avg_rate_1m || 0) + '</td></tr>'
+            + '<tr><td>5-Minute Average</td><td>' + (data.avg_rate_5m || 0) + '</td></tr>'
+            + '<tr><td>Peak (5m window)</td><td style="color:var(--warning)">' + (data.peak_rate || 0) + '</td></tr>'
+            + '</table></div>';
+        body.innerHTML = html;
+    });
+}
+
+/* ── DDoS Status popup (live) ── */
+function _popupDdos(body, status) {
+    postJSON('/defense/monitor/ddos/detect', {}).then(function(data) {
+        var under = data.under_attack;
+        status.textContent = under ? 'ATTACK DETECTED' : 'No attack — ' + new Date().toLocaleTimeString();
+
+        var html = '<div class="tmon-detail-card"><h4>Detection Status</h4><table>'
+            + '<tr><td>Status</td><td style="color:' + (under ? 'var(--danger);font-weight:bold' : 'var(--success)') + '">'
+            + (under ? 'UNDER ATTACK' : 'Clear') + '</td></tr>'
+            + '<tr><td>Attack Type</td><td>' + escapeHtml(data.attack_type || 'none') + '</td></tr>'
+            + '<tr><td>Severity</td><td>' + escapeHtml(data.severity || 'LOW') + '</td></tr>'
+            + '<tr><td>Total Connections</td><td>' + (data.total_connections || 0) + '</td></tr>'
+            + '<tr><td>SYN/Half-Open</td><td>' + (data.syn_count || 0) + '</td></tr>'
+            + '</table></div>';
+
+        if (data.indicators && data.indicators.length) {
+            html += '<div class="tmon-detail-card"><h4>Indicators</h4><ul style="padding-left:18px;font-size:0.82rem">';
+            data.indicators.forEach(function(ind) {
+                html += '<li style="color:var(--danger);margin-bottom:4px">' + escapeHtml(ind) + '</li>';
+            });
+            html += '</ul></div>';
+        }
+
+        if (data.top_talkers && data.top_talkers.length) {
+            html += '<div class="tmon-detail-card"><h4>Top Talkers</h4>'
+                + '<table class="data-table" style="font-size:0.8rem">'
+                + '<thead><tr><th>IP</th><th>Connections</th><th>Action</th></tr></thead><tbody>';
+            data.top_talkers.slice(0, 10).forEach(function(t) {
+                html += '<tr><td>' + escapeHtml(t.ip) + '</td><td>' + t.connections + '</td>'
+                    + '<td><button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                    + 'onclick="counterBlockIP(\'' + escapeHtml(t.ip) + '\')">Block</button></td></tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+
+        body.innerHTML = html;
+    });
+}
+
+/* ══════════════ CONNECTIONS ══════════════ */
+function loadConnections() {
+    var btn = document.getElementById('btn-load-conns');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/connections', {}).then(function(data) {
+        setLoading(btn, false);
+        document.getElementById('conn-total').textContent = (data.total || 0) + ' connections';
+        var html = '';
+        (data.connections || []).forEach(function(c) {
+            var isExternal = c.remote_addr && c.remote_addr !== '0.0.0.0' && c.remote_addr !== '::' && c.remote_addr !== '127.0.0.1';
+            var rowClass = isExternal ? ' style="color:var(--warning)"' : '';
+            html += '<tr' + rowClass + '>'
+                + '<td>' + escapeHtml(c.local_addr + ':' + c.local_port) + '</td>'
+                + '<td>' + escapeHtml(c.remote_addr + ':' + c.remote_port) + '</td>'
+                + '<td>' + escapeHtml(c.state || '') + '</td>'
+                + '<td>' + (c.pid || '') + '</td>'
+                + '<td>' + escapeHtml(c.process || '') + '</td>'
+                + '<td>'
+                + (isExternal ? '<button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" onclick="counterBlockIP(\'' + escapeHtml(c.remote_addr) + '\')">Block</button>' : '')
+                + '</td></tr>';
+        });
+        document.getElementById('conn-table').innerHTML = html || '<tr><td colspan="6">No connections found</td></tr>';
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ══════════════ NETWORK INTEL ══════════════ */
+function niBandwidth() {
+    var btn = document.getElementById('btn-bw');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/bandwidth', {}).then(function(data) {
+        setLoading(btn, false);
+        var ifaces = data.interfaces || [];
+        if (!ifaces.length) {
+            document.getElementById('ni-bandwidth').innerHTML = '<p class="empty-state">No interface data</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+            + '<th>Interface</th><th>RX Total</th><th>TX Total</th><th>RX Delta</th><th>TX Delta</th></tr></thead><tbody>';
+        ifaces.forEach(function(i) {
+            html += '<tr><td>' + escapeHtml(i.interface) + '</td>'
+                + '<td>' + formatBytes(i.rx_bytes) + '</td>'
+                + '<td>' + formatBytes(i.tx_bytes) + '</td>'
+                + '<td>' + formatBytes(i.rx_delta) + '</td>'
+                + '<td>' + formatBytes(i.tx_delta) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('ni-bandwidth').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function niArpCheck() {
+    var btn = document.getElementById('btn-arp');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/arp-check', {}).then(function(data) {
+        setLoading(btn, false);
+        var alerts = data.alerts || [];
+        if (!alerts.length) {
+            document.getElementById('ni-arp').innerHTML = '<p style="color:var(--success)">No ARP spoofing detected.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+            + '<th>IP</th><th>MACs</th><th>Severity</th></tr></thead><tbody>';
+        alerts.forEach(function(a) {
+            html += '<tr style="color:var(--danger)"><td>' + escapeHtml(a.ip) + '</td>'
+                + '<td>' + a.macs.map(escapeHtml).join(', ') + '</td>'
+                + '<td>' + a.severity + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('ni-arp').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function niNewPorts() {
+    var btn = document.getElementById('btn-ports');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/new-ports', {}).then(function(data) {
+        setLoading(btn, false);
+        var ports = data.new_ports || [];
+        if (!ports.length) {
+            document.getElementById('ni-ports').innerHTML = '<p style="color:var(--success)">No new listening ports detected.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+            + '<th>Port</th><th>PID</th><th>Process</th></tr></thead><tbody>';
+        ports.forEach(function(p) {
+            html += '<tr style="color:var(--warning)"><td>' + p.port + '</td>'
+                + '<td>' + (p.pid || '') + '</td>'
+                + '<td>' + escapeHtml(p.process || '') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('ni-ports').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function niGeoip() {
+    var ip = document.getElementById('ni-geoip-input').value.trim();
+    if (!ip) return;
+    var btn = document.getElementById('btn-geoip');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/geoip', {ip: ip}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('ni-geoip-result').innerHTML = '<p style="color:var(--text-muted)">' + escapeHtml(data.error) + '</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.82rem"><tbody>'
+            + '<tr><td>IP</td><td>' + escapeHtml(data.ip) + '</td></tr>'
+            + '<tr><td>Country</td><td>' + escapeHtml(data.country) + ' (' + escapeHtml(data.country_code) + ')</td></tr>'
+            + '<tr><td>City</td><td>' + escapeHtml(data.city || '—') + '</td></tr>'
+            + '<tr><td>ISP</td><td>' + escapeHtml(data.isp || '—') + '</td></tr>'
+            + '<tr><td>Org</td><td>' + escapeHtml(data.org || '—') + '</td></tr>'
+            + '<tr><td>ASN</td><td>' + (data.asn || '—') + '</td></tr>'
+            + '</tbody></table>';
+        document.getElementById('ni-geoip-result').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function niConnsGeo() {
+    var btn = document.getElementById('btn-conns-geo');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/connections-geo', {}).then(function(data) {
+        setLoading(btn, false);
+        var conns = data.connections || [];
+        var ext = conns.filter(function(c) {
+            return c.remote_addr && c.remote_addr !== '0.0.0.0' && c.remote_addr !== '::' && c.remote_addr !== '127.0.0.1';
+        });
+        if (!ext.length) {
+            document.getElementById('ni-geo-table').style.display = 'none';
+            return;
+        }
+        document.getElementById('ni-geo-table').style.display = '';
+        var html = '';
+        ext.forEach(function(c) {
+            var geo = c.geo || {};
+            html += '<tr><td>' + escapeHtml(c.remote_addr) + '</td>'
+                + '<td>' + c.remote_port + '</td>'
+                + '<td>' + escapeHtml(c.state || '') + '</td>'
+                + '<td>' + escapeHtml(geo.country || '—') + '</td>'
+                + '<td>' + escapeHtml(geo.isp || '—') + '</td>'
+                + '<td>' + escapeHtml(c.process || '') + '</td></tr>';
+        });
+        document.getElementById('ni-geo-tbody').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function niConnRate() {
+    var btn = document.getElementById('btn-conn-rate');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/connection-rate', {}).then(function(data) {
+        setLoading(btn, false);
+        var html = '<table class="data-table" style="font-size:0.82rem"><tbody>'
+            + '<tr><td>Current Connections</td><td>' + (data.current_rate || 0) + '</td></tr>'
+            + '<tr><td>1-Min Average</td><td>' + (data.avg_rate_1m || 0) + '</td></tr>'
+            + '<tr><td>5-Min Average</td><td>' + (data.avg_rate_5m || 0) + '</td></tr>'
+            + '<tr><td>Peak</td><td>' + (data.peak_rate || 0) + '</td></tr>'
+            + '</tbody></table>';
+        document.getElementById('ni-conn-rate').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function formatBytes(b) {
+    if (b > 1073741824) return (b/1073741824).toFixed(2) + ' GB';
+    if (b > 1048576) return (b/1048576).toFixed(1) + ' MB';
+    if (b > 1024) return (b/1024).toFixed(0) + ' KB';
+    return b + ' B';
+}
+
+/* ══════════════ THREATS ══════════════ */
+function loadThreatReport() {
+    var btn = document.getElementById('btn-threat-report');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/threats', {}).then(function(data) {
+        setLoading(btn, false);
+        var lines = [];
+        var ts = data.threat_score || {};
+        lines.push('=== Threat Score: ' + ts.score + '/100 (' + ts.level + ') ===');
+        if (ts.details && ts.details.length) {
+            ts.details.forEach(function(d) { lines.push('  - ' + d); });
+        } else { lines.push('  No active threats detected.'); }
+        lines.push('\n=== Connection Summary ===');
+        lines.push('Active connections: ' + (data.connection_count || 0));
+        if (data.scan_indicators && data.scan_indicators.length) {
+            lines.push('\n=== Port Scan Indicators ===');
+            data.scan_indicators.forEach(function(s) { lines.push('  [' + s.severity + '] ' + s.detail); });
+        }
+        if (data.suspicious_processes && data.suspicious_processes.length) {
+            lines.push('\n=== Suspicious Processes ===');
+            data.suspicious_processes.forEach(function(p) { lines.push('  PID ' + p.pid + ' — ' + p.name + ': ' + p.reason); });
+        }
+        if (data.recent_failed_logins && data.recent_failed_logins.length) {
+            lines.push('\n=== Recent Failed Logins ===');
+            data.recent_failed_logins.forEach(function(l) { lines.push('  ' + l.time + ' — ' + l.ip + ' (' + l.user + ')'); });
+        }
+        if (data.blocklist && data.blocklist.length) {
+            lines.push('\n=== Blocklist (' + data.blocklist.length + ' IPs) ===');
+            data.blocklist.forEach(function(ip) { lines.push('  ' + ip); });
+        }
+        renderOutput('threat-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ══════════════ PACKET CAPTURE ══════════════ */
+var _capSSE = null;
+
+function capLoadInterfaces() {
+    fetchJSON('/defense/monitor/capture/interfaces').then(function(data) {
+        var sel = document.getElementById('cap-interface');
+        sel.innerHTML = '<option value="">Auto (default)</option>';
+        (data.interfaces || []).forEach(function(i) {
+            var name = i.name || i;
+            sel.innerHTML += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+        });
+    }).catch(function() {
+        document.getElementById('cap-interface').innerHTML = '<option value="">No interfaces (Scapy not available?)</option>';
+    });
+}
+
+function capStart() {
+    var iface = document.getElementById('cap-interface').value;
+    var filter = document.getElementById('cap-filter').value;
+    var duration = document.getElementById('cap-duration').value;
+
+    postJSON('/defense/monitor/capture/start', {
+        interface: iface, filter: filter, duration: parseInt(duration)
+    }).then(function(data) {
+        if (data.error) {
+            document.getElementById('cap-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('btn-cap-start').style.display = 'none';
+        document.getElementById('btn-cap-stop').style.display = '';
+        document.getElementById('cap-status').textContent = 'Capturing...';
+        document.getElementById('cap-live-packets').style.display = 'block';
+        document.getElementById('cap-live-packets').textContent = '';
+
+        // Start SSE stream
+        _capSSE = new EventSource('/defense/monitor/capture/stream');
+        _capSSE.onmessage = function(e) {
+            try {
+                var d = JSON.parse(e.data);
+                var panel = document.getElementById('cap-live-packets');
+                if (d.type === 'packet') {
+                    var line = (d.time||'') + '  ' + (d.src||'?') + ' → ' + (d.dst||'?')
+                        + '  ' + (d.protocol||'?') + '  len:' + (d.length||0)
+                        + (d.info ? '  ' + d.info : '');
+                    panel.textContent += line + '\n';
+                    panel.scrollTop = panel.scrollHeight;
+                } else if (d.type === 'stats') {
+                    document.getElementById('cap-status').textContent = 'Capturing... ' + d.packet_count + ' packets';
+                } else if (d.type === 'done') {
+                    capDone(d);
+                }
+            } catch(ex) {}
+        };
+        _capSSE.onerror = function() {
+            capDone({});
+        };
+    });
+}
+
+function capStop() {
+    postJSON('/defense/monitor/capture/stop', {}).then(function() {
+        capDone({});
+    });
+}
+
+function capDone(stats) {
+    if (_capSSE) { _capSSE.close(); _capSSE = null; }
+    document.getElementById('btn-cap-start').style.display = '';
+    document.getElementById('btn-cap-stop').style.display = 'none';
+    document.getElementById('cap-status').textContent = 'Capture complete' + (stats.packet_count ? ' — ' + stats.packet_count + ' packets' : '');
+}
+
+function capProtocols() {
+    postJSON('/defense/monitor/capture/protocols', {}).then(function(data) {
+        var protos = data.protocols || {};
+        var html = '<h4>Protocol Distribution</h4>';
+        if (protos.protocols && Object.keys(protos.protocols).length) {
+            html += '<table class="data-table" style="font-size:0.82rem"><thead><tr><th>Protocol</th><th>Count</th><th>%</th></tr></thead><tbody>';
+            var total = protos.total_packets || 1;
+            var sorted = Object.entries(protos.protocols).sort(function(a,b){return b[1]-a[1]});
+            sorted.forEach(function(p) {
+                html += '<tr><td>' + escapeHtml(p[0]) + '</td><td>' + p[1] + '</td><td>' + ((p[1]/total)*100).toFixed(1) + '%</td></tr>';
+            });
+            html += '</tbody></table>';
+        } else {
+            html += '<p class="empty-state">No packet data. Run a capture first.</p>';
+        }
+        document.getElementById('cap-analysis').innerHTML = html;
+    });
+}
+
+function capConversations() {
+    postJSON('/defense/monitor/capture/conversations', {}).then(function(data) {
+        var convos = data.conversations || [];
+        var html = '<h4>Top Conversations</h4>';
+        if (convos.length) {
+            html += '<table class="data-table" style="font-size:0.82rem"><thead><tr><th>Source</th><th>Destination</th><th>Packets</th><th>Bytes</th></tr></thead><tbody>';
+            convos.slice(0, 20).forEach(function(c) {
+                html += '<tr><td>' + escapeHtml(c.src||'') + '</td><td>' + escapeHtml(c.dst||'') + '</td>'
+                    + '<td>' + (c.packets||0) + '</td><td>' + formatBytes(c.bytes||0) + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        } else {
+            html += '<p class="empty-state">No conversation data. Run a capture first.</p>';
+        }
+        document.getElementById('cap-analysis').innerHTML = html;
+    });
+}
+
+/* ══════════════ DDOS MITIGATION ══════════════ */
+function ddosDetect() {
+    var btn = document.getElementById('btn-ddos-detect');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/ddos/detect', {}).then(function(data) {
+        setLoading(btn, false);
+        var html = '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">';
+        html += '<div class="stat-card"><div class="stat-label">Status</div><div class="stat-value small" style="color:'
+            + (data.under_attack ? 'var(--danger)' : 'var(--success)') + '">'
+            + (data.under_attack ? 'UNDER ATTACK' : 'Clear') + '</div></div>';
+        html += '<div class="stat-card"><div class="stat-label">Attack Type</div><div class="stat-value small">'
+            + (data.attack_type || 'none') + '</div></div>';
+        html += '<div class="stat-card"><div class="stat-label">Severity</div><div class="stat-value small">'
+            + (data.severity || 'LOW') + '</div></div>';
+        html += '<div class="stat-card"><div class="stat-label">Total Conns</div><div class="stat-value small">'
+            + (data.total_connections || 0) + '</div></div>';
+        html += '<div class="stat-card"><div class="stat-label">SYN Count</div><div class="stat-value small">'
+            + (data.syn_count || 0) + '</div></div>';
+        html += '</div>';
+        if (data.indicators && data.indicators.length) {
+            html += '<pre class="output-panel" style="margin-top:8px;font-size:0.78rem">' + data.indicators.map(escapeHtml).join('\n') + '</pre>';
+        }
+        document.getElementById('ddos-status').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function ddosTopTalkers() {
+    var btn = document.getElementById('btn-ddos-talkers');
+    setLoading(btn, true);
+    postJSON('/defense/monitor/ddos/top-talkers', {limit: 20}).then(function(data) {
+        setLoading(btn, false);
+        var talkers = data.talkers || [];
+        if (!talkers.length) {
+            document.getElementById('ddos-talkers-table').style.display = 'none';
+            document.getElementById('ddos-talkers-empty').innerHTML = '<p class="empty-state">No external connections.</p>';
+            return;
+        }
+        document.getElementById('ddos-talkers-table').style.display = '';
+        document.getElementById('ddos-talkers-empty').innerHTML = '';
+        var html = '';
+        talkers.forEach(function(t) {
+            var states = Object.entries(t.state_breakdown || {}).map(function(s){return s[0]+':'+s[1]}).join(', ');
+            html += '<tr><td>' + escapeHtml(t.ip) + '</td>'
+                + '<td>' + t.connections + '</td>'
+                + '<td>' + t.percent + '%</td>'
+                + '<td style="font-size:0.7rem">' + escapeHtml(states) + '</td>'
+                + '<td>'
+                + '<button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px;margin-right:2px" onclick="counterBlockIP(\'' + escapeHtml(t.ip) + '\')">Block</button>'
+                + '<button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px" onclick="document.getElementById(\'ddos-rl-ip\').value=\'' + escapeHtml(t.ip) + '\'">Rate Limit</button>'
+                + '</td></tr>';
+        });
+        document.getElementById('ddos-talkers-tbody').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function ddosSynCheck() {
+    fetchJSON('/defense/monitor/ddos/syn-status').then(function(data) {
+        var el = document.getElementById('syn-status-text');
+        el.textContent = 'Status: ' + (data.enabled ? 'Enabled' : 'Disabled') + ' (' + data.platform + ')';
+        el.style.color = data.enabled ? 'var(--success)' : 'var(--text-muted)';
+    });
+}
+
+function ddosSynEnable() {
+    postJSON('/defense/monitor/ddos/syn-enable', {}).then(function(data) {
+        renderOutput('ddos-rl-result', data.message || data.error);
+        ddosSynCheck();
+    });
+}
+
+function ddosSynDisable() {
+    postJSON('/defense/monitor/ddos/syn-disable', {}).then(function(data) {
+        renderOutput('ddos-rl-result', data.message || data.error);
+        ddosSynCheck();
+    });
+}
+
+function ddosRateLimit() {
+    var ip = document.getElementById('ddos-rl-ip').value.trim();
+    var rate = document.getElementById('ddos-rl-rate').value.trim() || '25/min';
+    if (!ip) return;
+    postJSON('/defense/monitor/ddos/rate-limit', {ip: ip, rate: rate}).then(function(data) {
+        renderOutput('ddos-rl-result', data.message || data.error);
+    });
+}
+
+function ddosRateLimitRemove() {
+    var ip = document.getElementById('ddos-rl-ip').value.trim();
+    if (!ip) return;
+    postJSON('/defense/monitor/ddos/rate-limit/remove', {ip: ip}).then(function(data) {
+        renderOutput('ddos-rl-result', data.message || data.error);
+    });
+}
+
+function ddosLoadConfig() {
+    fetchJSON('/defense/monitor/ddos/config').then(function(data) {
+        document.getElementById('ddos-cfg-enabled').checked = data.enabled || false;
+        document.getElementById('ddos-cfg-block').checked = data.auto_block_top_talkers !== false;
+        document.getElementById('ddos-cfg-syn').checked = data.auto_enable_syn_cookies !== false;
+        document.getElementById('ddos-cfg-conn-thresh').value = data.connection_threshold || 100;
+        document.getElementById('ddos-cfg-syn-thresh').value = data.syn_threshold || 50;
+    });
+}
+
+function ddosSaveConfig() {
+    var config = {
+        enabled: document.getElementById('ddos-cfg-enabled').checked,
+        auto_block_top_talkers: document.getElementById('ddos-cfg-block').checked,
+        auto_enable_syn_cookies: document.getElementById('ddos-cfg-syn').checked,
+        connection_threshold: parseInt(document.getElementById('ddos-cfg-conn-thresh').value),
+        syn_threshold: parseInt(document.getElementById('ddos-cfg-syn-thresh').value),
+    };
+    postJSON('/defense/monitor/ddos/config', config).then(function(data) {
+        renderOutput('ddos-auto-result', 'Config saved');
+    });
+}
+
+function ddosAutoMitigate() {
+    postJSON('/defense/monitor/ddos/auto-mitigate', {}).then(function(data) {
+        if (data.message) {
+            renderOutput('ddos-auto-result', data.message);
+            return;
+        }
+        var lines = ['Auto-mitigation results:'];
+        (data.actions || []).forEach(function(a) {
+            lines.push('  ' + (a.success ? '[OK]' : '[FAIL]') + ' ' + a.action + ' — ' + a.target + ': ' + a.message);
+        });
+        if (!data.actions || !data.actions.length) lines.push('  No actions taken.');
+        renderOutput('ddos-auto-result', lines.join('\n'));
+    });
+}
+
+function ddosHistory() {
+    fetchJSON('/defense/monitor/ddos/history').then(function(data) {
+        var history = data.history || [];
+        if (!history.length) {
+            document.getElementById('ddos-history').innerHTML = '<p class="empty-state">No mitigation history.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>'
+            + '<th>Time</th><th>Action</th><th>Target</th><th>Reason</th></tr></thead><tbody>';
+        history.slice(-30).reverse().forEach(function(h) {
+            html += '<tr><td>' + escapeHtml(h.timestamp.substring(0,19).replace('T',' ')) + '</td>'
+                + '<td>' + escapeHtml(h.action) + '</td>'
+                + '<td>' + escapeHtml(h.target) + '</td>'
+                + '<td>' + escapeHtml(h.reason) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('ddos-history').innerHTML = html;
+    });
+}
+
+function ddosClearHistory() {
+    if (!confirm('Clear all mitigation history?')) return;
+    postJSON('/defense/monitor/ddos/history/clear', {}).then(function() {
+        document.getElementById('ddos-history').innerHTML = '<p class="empty-state">History cleared.</p>';
+    });
+}
+
+/* ══════════════ COUNTER-ATTACK ══════════════ */
+function counterBlockIP(ip) {
+    if (!ip) ip = document.getElementById('counter-block-ip').value.trim();
+    if (!ip) return;
+    postJSON('/defense/monitor/block-ip', {ip: ip}).then(function(data) {
+        renderOutput('counter-result', data.message || data.error);
+        if (data.success) document.getElementById('counter-block-ip').value = '';
+    });
+}
+
+function counterKillProcess() {
+    var pid = document.getElementById('counter-kill-pid').value.trim();
+    if (!pid) return;
+    postJSON('/defense/monitor/kill-process', {pid: parseInt(pid)}).then(function(data) {
+        renderOutput('counter-result', data.message || data.error);
+        if (data.success) document.getElementById('counter-kill-pid').value = '';
+    });
+}
+
+function counterBlockPort() {
+    var port = document.getElementById('counter-block-port').value.trim();
+    var dir = document.getElementById('counter-block-dir').value;
+    if (!port) return;
+    postJSON('/defense/monitor/block-port', {port: parseInt(port), direction: dir}).then(function(data) {
+        renderOutput('counter-result', data.message || data.error);
+        if (data.success) document.getElementById('counter-block-port').value = '';
+    });
+}
+
+function loadBlocklist() {
+    fetchJSON('/defense/monitor/blocklist').then(function(data) {
+        var ips = data.blocked_ips || [];
+        var container = document.getElementById('blocklist-container');
+        if (!ips.length) {
+            container.innerHTML = '<p class="empty-state">Blocklist is empty.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr><th>IP Address</th><th>Action</th></tr></thead><tbody>';
+        ips.forEach(function(ip) {
+            html += '<tr><td>' + escapeHtml(ip) + '</td>'
+                + '<td><button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="removeFromBlocklist(\'' + escapeHtml(ip) + '\')">Remove</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    });
+}
+
+function removeFromBlocklist(ip) {
+    postJSON('/defense/monitor/blocklist/remove', {ip: ip}).then(function(data) {
+        if (data.success) loadBlocklist();
+    });
+}
+
+/* ══════════════ INIT ══════════════ */
+document.addEventListener('DOMContentLoaded', function() {
+    ddosSynCheck();
+    ddosLoadConfig();
+});
+</script>
+{% endblock %}

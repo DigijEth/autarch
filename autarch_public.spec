@@ -95,8 +95,21 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         # Exclude heavy optional deps not needed at runtime
-        'torch', 'transformers', 'llama_cpp', 'anthropic',
+        'torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
         'tkinter', 'matplotlib', 'numpy',
+        # CUDA / quantization libraries (bitsandbytes ships 169MB of CUDA DLLs)
+        'bitsandbytes',
+        # HuggingFace ecosystem (pulled in by llama_cpp_python)
+        'huggingface_hub', 'safetensors', 'tokenizers',
+        # MCP/uvicorn/starlette (heavy server stack not needed in frozen exe)
+        'mcp', 'uvicorn', 'starlette', 'anyio', 'httpx', 'httpx_sse',
+        'httpcore', 'h11', 'h2', 'hpack', 'hyperframe',
+        # Pydantic (pulled in by MCP/huggingface)
+        'pydantic', 'pydantic_core', 'pydantic_settings',
+        # Other heavy / unnecessary packages
+        'scipy', 'pandas', 'tensorflow', 'keras',
+        'IPython', 'notebook', 'jupyterlab',
+        'fsspec', 'rich', 'typer',
     ],
     noarchive=False,
     optimize=0,

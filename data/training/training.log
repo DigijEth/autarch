@@ -1,0 +1,14 @@
+C:\she\autarch\data\training\train_lora.py:50: SyntaxWarning: invalid escape sequence '\s'
+  with open("C:\she\autarch\data\training\autarch_dataset_20260302_202634.jsonl", "r") as f:
+C:\she\autarch\data\training\train_lora.py:76: SyntaxWarning: invalid escape sequence '\s'
+  output_dir="C:\she\autarch\data\training\output",
+C:\she\autarch\data\training\train_lora.py:95: SyntaxWarning: invalid escape sequence '\s'
+  model.save_pretrained("C:\she\autarch\data\training\output/lora_adapter")
+C:\she\autarch\data\training\train_lora.py:96: SyntaxWarning: invalid escape sequence '\s'
+  tokenizer.save_pretrained("C:\she\autarch\data\training\output/lora_adapter")
+C:\she\autarch\data\training\train_lora.py:97: SyntaxWarning: invalid escape sequence '\s'
+  print(f"LoRA adapter saved to C:\she\autarch\data\training\output/lora_adapter")
+Traceback (most recent call last):
+  File "C:\she\autarch\data\training\train_lora.py", line 5, in <module>
+    from datasets import Dataset
+ModuleNotFoundError: No module named 'datasets'

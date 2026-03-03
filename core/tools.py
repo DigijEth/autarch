@@ -200,6 +200,19 @@ class ToolRegistry:
             category="filesystem"
         ))
 
+        # Create module
+        self.register(Tool(
+            name="create_module",
+            description="Create a new AUTARCH module. Writes a Python file to the modules/ directory that becomes available in the dashboard.",
+            function=self._tool_create_module,
+            parameters=[
+                ToolParameter("name", "Module filename without .py extension (e.g., port_scanner)", "string", True),
+                ToolParameter("category", "Module category: defense, offense, counter, analyze, osint, or simulate", "string", True),
+                ToolParameter("code", "Complete Python source code for the module", "string", True),
+            ],
+            category="development"
+        ))
+
         # Task complete
         self.register(Tool(
             name="task_complete",
@@ -420,6 +433,60 @@ class ToolRegistry:
             return "[error]: Search timed out"
         except Exception as e:
             return f"[error]: {str(e)}"
+
+    def _tool_create_module(self, name: str, category: str, code: str) -> str:
+        """Create a new AUTARCH module in the modules/ directory."""
+        import importlib.util as ilu
+
+        valid_categories = ('defense', 'offense', 'counter', 'analyze', 'osint', 'simulate')
+        category = category.lower().strip()
+        if category not in valid_categories:
+            return f"[error]: Invalid category '{category}'. Must be one of: {', '.join(valid_categories)}"
+
+        # Sanitize name
+        name = name.strip().replace(' ', '_').replace('-', '_').lower()
+        if not name.replace('_', '').isalnum():
+            return f"[error]: Invalid module name '{name}'. Use only letters, numbers, and underscores."
+
+        # Check required attributes in source code
+        required = ['DESCRIPTION', 'VERSION', 'CATEGORY', 'def run(']
+        missing = [r for r in required if r not in code]
+        if missing:
+            return f"[error]: Module code is missing required elements: {', '.join(missing)}"
+
+        # Determine modules directory
+        modules_dir = Path(__file__).parent.parent / 'modules'
+        module_path = modules_dir / f'{name}.py'
+
+        if module_path.exists():
+            return f"[error]: Module '{name}' already exists at {module_path}. Choose a different name."
+
+        # Write the module file
+        try:
+            module_path.write_text(code, encoding='utf-8')
+        except Exception as e:
+            return f"[error]: Failed to write module: {e}"
+
+        # Validate by attempting to import
+        try:
+            spec = ilu.spec_from_file_location(name, module_path)
+            mod = ilu.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+
+            # Verify it has run()
+            if not hasattr(mod, 'run'):
+                module_path.unlink()
+                return "[error]: Module loaded but has no run() function. Module deleted."
+
+        except Exception as e:
+            # Import failed — delete the bad module
+            try:
+                module_path.unlink()
+            except Exception:
+                pass
+            return f"[error]: Module failed to import: {e}. Module deleted."
+
+        return f"Module '{name}' created successfully at {module_path}. Category: {category}. It is now available in the dashboard."
 
     def _tool_task_complete(self, summary: str) -> str:
         """Mark task as complete - this is a control signal."""

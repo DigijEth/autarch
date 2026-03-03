@@ -24,11 +24,15 @@
             <div class="nav-section">
                 <div class="nav-section-title">Categories</div>
                 <ul class="nav-links">
-                    <li><a href="{{ url_for('defense.index') }}" class="{% if request.blueprint == 'defense' %}active{% endif %}">Defense</a></li>
+                    <li><a href="{{ url_for('defense.index') }}" class="{% if request.blueprint == 'defense' and request.endpoint not in ('defense.linux_index', 'defense.windows_index', 'defense.monitor_index') %}active{% endif %}">Defense</a></li>
+                    <li><a href="{{ url_for('defense.linux_index') }}" class="{% if request.endpoint == 'defense.linux_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Linux</a></li>
+                    <li><a href="{{ url_for('defense.windows_index') }}" class="{% if request.endpoint == 'defense.windows_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows</a></li>
+                    <li><a href="{{ url_for('defense.monitor_index') }}" class="{% if request.endpoint == 'defense.monitor_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Threat Monitor</a></li>
                     <li><a href="{{ url_for('offense.index') }}" class="{% if request.blueprint == 'offense' %}active{% endif %}">Offense</a></li>
                     <li><a href="{{ url_for('counter.index') }}" class="{% if request.blueprint == 'counter' %}active{% endif %}">Counter</a></li>
                     <li><a href="{{ url_for('analyze.index') }}" class="{% if request.blueprint == 'analyze' and request.endpoint != 'analyze.hash_detection' %}active{% endif %}">Analyze</a></li>
                     <li><a href="{{ url_for('analyze.hash_detection') }}" class="{% if request.endpoint == 'analyze.hash_detection' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Hash Toolkit</a></li>
+                    <li><a href="{{ url_for('llm_trainer.index') }}" class="{% if request.blueprint == 'llm_trainer' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Trainer</a></li>
                     <li><a href="{{ url_for('osint.index') }}" class="{% if request.blueprint == 'osint' %}active{% endif %}">OSINT</a></li>
                     <li><a href="{{ url_for('simulate.index') }}" class="{% if request.blueprint == 'simulate' and request.endpoint != 'simulate.legendary_creator' %}active{% endif %}">Simulate</a></li>
                     <li><a href="{{ url_for('simulate.legendary_creator') }}" class="{% if request.endpoint == 'simulate.legendary_creator' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Legendary Creator</a></li>
@@ -53,8 +57,9 @@
                     <li><a href="{{ url_for('upnp.index') }}" class="{% if request.blueprint == 'upnp' %}active{% endif %}">UPnP</a></li>
                     <li><a href="{{ url_for('wireguard.index') }}" class="{% if request.blueprint == 'wireguard' %}active{% endif %}">WireGuard</a></li>
                     <li><a href="{{ url_for('msf.index') }}" class="{% if request.blueprint == 'msf' %}active{% endif %}">MSF Console</a></li>
-                    <li><a href="{{ url_for('settings.index') }}" class="{% if request.blueprint == 'settings' and request.endpoint != 'settings.llm_settings' %}active{% endif %}">Settings</a></li>
+                    <li><a href="{{ url_for('settings.index') }}" class="{% if request.blueprint == 'settings' and request.endpoint not in ('settings.llm_settings', 'settings.deps_index') %}active{% endif %}">Settings</a></li>
                     <li><a href="{{ url_for('settings.llm_settings') }}" class="{% if request.endpoint == 'settings.llm_settings' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Config</a></li>
+                    <li><a href="{{ url_for('settings.deps_index') }}" class="{% if request.endpoint == 'settings.deps_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Dependencies</a></li>
                     <li><a href="{{ url_for('dashboard.manual') }}" class="{% if request.endpoint == 'dashboard.manual' %}active{% endif %}">User Manual</a></li>
                     <li><a href="{{ url_for('dashboard.manual_windows') }}" class="{% if request.endpoint == 'dashboard.manual_windows' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows Guide</a></li>
                 </ul>

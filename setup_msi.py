@@ -50,8 +50,16 @@ build_exe_options = {
         'web.routes.msf', 'web.routes.chat',
         'web.routes.targets', 'web.routes.encmodules',
     ],
-    'excludes': ['torch', 'transformers', 'llama_cpp', 'anthropic',
-                 'tkinter', 'matplotlib', 'numpy'],
+    'excludes': ['torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
+                 'tkinter', 'matplotlib', 'numpy',
+                 'bitsandbytes',
+                 'huggingface_hub', 'safetensors', 'tokenizers',
+                 'mcp', 'uvicorn', 'starlette', 'anyio', 'httpx', 'httpx_sse',
+                 'httpcore', 'h11', 'h2', 'hpack', 'hyperframe',
+                 'pydantic', 'pydantic_core', 'pydantic_settings',
+                 'scipy', 'pandas', 'tensorflow', 'keras',
+                 'IPython', 'notebook', 'jupyterlab',
+                 'fsspec', 'rich', 'typer'],
     'include_files': include_files,
 }
 

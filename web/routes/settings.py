@@ -4,6 +4,9 @@ import collections
 import json
 import logging
 import os
+import platform
+import re
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -475,3 +478,131 @@ def debug_test():
     except ValueError:
         log.exception('EXCEPTION — error with full traceback')
     return jsonify({'ok': True, 'sent': 5})
+
+
+# ==================== DEPENDENCIES ====================
+
+@settings_bp.route('/deps')
+@login_required
+def deps_index():
+    """Dependencies management page."""
+    return render_template('system_deps.html')
+
+
+@settings_bp.route('/deps/check', methods=['POST'])
+@login_required
+def deps_check():
+    """Check all system dependencies."""
+    import sys as _sys
+
+    groups = {
+        'core': {
+            'flask': 'import flask; print(flask.__version__)',
+            'jinja2': 'import jinja2; print(jinja2.__version__)',
+            'requests': 'import requests; print(requests.__version__)',
+            'cryptography': 'import cryptography; print(cryptography.__version__)',
+        },
+        'llm': {
+            'llama-cpp-python': 'import llama_cpp; print(llama_cpp.__version__)',
+            'transformers': 'import transformers; print(transformers.__version__)',
+            'anthropic': 'import anthropic; print(anthropic.__version__)',
+        },
+        'training': {
+            'torch': 'import torch; print(torch.__version__)',
+            'peft': 'import peft; print(peft.__version__)',
+            'datasets': 'import datasets; print(datasets.__version__)',
+            'trl': 'import trl; print(trl.__version__)',
+            'accelerate': 'import accelerate; print(accelerate.__version__)',
+            'bitsandbytes': 'import bitsandbytes; print(bitsandbytes.__version__)',
+            'unsloth': 'import unsloth; print(unsloth.__version__)',
+        },
+        'network': {
+            'scapy': 'import scapy; print(scapy.VERSION)',
+            'pyshark': 'import pyshark; print(pyshark.__version__)',
+            'miniupnpc': 'import miniupnpc; print("installed")',
+            'msgpack': 'import msgpack; print(msgpack.version)',
+            'paramiko': 'import paramiko; print(paramiko.__version__)',
+        },
+        'hardware': {
+            'pyserial': 'import serial; print(serial.__version__)',
+            'esptool': 'import esptool; print(esptool.__version__)',
+            'adb-shell': 'import adb_shell; print("installed")',
+        },
+    }
+
+    results = {}
+    for group, packages in groups.items():
+        results[group] = {}
+        for name, cmd in packages.items():
+            try:
+                result = subprocess.run(
+                    [_sys.executable, '-c', cmd],
+                    capture_output=True, text=True, timeout=15
+                )
+                if result.returncode == 0:
+                    results[group][name] = {'installed': True, 'version': result.stdout.strip()}
+                else:
+                    results[group][name] = {'installed': False, 'version': None}
+            except Exception:
+                results[group][name] = {'installed': False, 'version': None}
+
+    # GPU info
+    gpu = {}
+    try:
+        result = subprocess.run(
+            [_sys.executable, '-c',
+             'import torch; print(torch.cuda.is_available()); '
+             'print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "none"); '
+             'print(torch.version.cuda or "none")'],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            gpu['cuda_available'] = lines[0].strip() == 'True'
+            gpu['device'] = lines[1].strip() if len(lines) > 1 else 'none'
+            gpu['cuda_version'] = lines[2].strip() if len(lines) > 2 else 'none'
+    except Exception:
+        gpu['cuda_available'] = False
+    results['gpu'] = gpu
+
+    # Python info
+    import sys as _s
+    results['python'] = {
+        'version': _s.version.split()[0],
+        'executable': _s.executable,
+        'platform': platform.platform(),
+    }
+
+    return jsonify(results)
+
+
+@settings_bp.route('/deps/install', methods=['POST'])
+@login_required
+def deps_install():
+    """Install packages."""
+    import sys as _sys
+    data = request.get_json(silent=True) or {}
+    packages = data.get('packages', [])
+    if not packages:
+        return jsonify({'error': 'No packages specified'}), 400
+
+    results = []
+    for pkg in packages:
+        # Sanitize package name
+        if not re.match(r'^[a-zA-Z0-9_\-\[\]]+$', pkg):
+            results.append({'package': pkg, 'success': False, 'output': 'Invalid package name'})
+            continue
+        try:
+            result = subprocess.run(
+                [_sys.executable, '-m', 'pip', 'install', pkg, '--quiet'],
+                capture_output=True, text=True, timeout=300
+            )
+            results.append({
+                'package': pkg,
+                'success': result.returncode == 0,
+                'output': result.stdout.strip() or result.stderr.strip()[:200],
+            })
+        except Exception as e:
+            results.append({'package': pkg, 'success': False, 'output': str(e)[:200]})
+
+    return jsonify({'results': results})

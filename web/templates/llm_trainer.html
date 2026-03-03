@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+{% block title %}LLM Trainer - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>LLM Trainer</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Fine-tune language models on the AUTARCH codebase. Generate datasets, train LoRA adapters, convert to GGUF.
+        </p>
+    </div>
+    <a href="{{ url_for('analyze.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Analyze</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="trainer" data-tab="dataset" onclick="showTab('trainer','dataset')">Dataset</button>
+    <button class="tab" data-tab-group="trainer" data-tab="training" onclick="showTab('trainer','training')">Training</button>
+    <button class="tab" data-tab-group="trainer" data-tab="convert" onclick="showTab('trainer','convert')">Convert</button>
+    <button class="tab" data-tab-group="trainer" data-tab="evaluate" onclick="showTab('trainer','evaluate')">Evaluate</button>
+</div>
+
+<!-- ==================== DATASET TAB ==================== -->
+<div class="tab-content active" data-tab-group="trainer" data-tab="dataset">
+<div class="section">
+    <h2>Codebase Scan</h2>
+    <div class="tool-actions">
+        <button id="btn-scan" class="btn btn-primary" onclick="trScanCodebase()">Scan Codebase</button>
+    </div>
+    <div id="scan-result" style="margin-top:12px"></div>
+</div>
+
+<div class="section">
+    <h2>Generate Training Dataset</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Extracts code, architecture Q&A, and module creation examples from the AUTARCH codebase into JSONL training data.
+    </p>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+            <label>Format</label>
+            <select id="ds-format">
+                <option value="sharegpt">ShareGPT (conversations)</option>
+                <option value="instruction">Alpaca (instruction/output)</option>
+            </select>
+        </div>
+    </div>
+    <div style="margin-bottom:12px">
+        <label><input type="checkbox" id="ds-source" checked> Include source code understanding</label><br>
+        <label><input type="checkbox" id="ds-qa" checked> Include architecture Q&A</label><br>
+        <label><input type="checkbox" id="ds-modules" checked> Include module creation examples</label>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-generate" class="btn btn-primary" onclick="trGenerateDataset()">Generate Dataset</button>
+    </div>
+    <pre class="output-panel" id="gen-result" style="margin-top:12px;min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Saved Datasets</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="trListDatasets()">Refresh</button>
+    </div>
+    <div id="datasets-list" style="margin-top:12px">
+        <p class="empty-state">Click "Refresh" to load datasets.</p>
+    </div>
+</div>
+</div>
+
+<!-- ==================== TRAINING TAB ==================== -->
+<div class="tab-content" data-tab-group="trainer" data-tab="training">
+<div class="section">
+    <h2>LoRA Fine-Tuning</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Fine-tune a base model with LoRA adapters on your generated dataset. Requires a HuggingFace model ID or local path.
+    </p>
+
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>Base Model (local path)</label>
+            <div class="input-row">
+                <input type="text" id="tr-base-model" placeholder="Click Browse or paste a local model path...">
+                <button class="btn btn-small" onclick="trOpenBrowser()">Browse</button>
+            </div>
+        </div>
+        <div class="form-group" style="flex:1">
+            <label>Dataset</label>
+            <select id="tr-dataset">
+                <option value="">Select dataset...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- File Browser Modal -->
+    <div id="model-browser-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;width:90%;max-width:700px;max-height:80vh;display:flex;flex-direction:column;padding:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+                <h3 style="margin:0;flex:1">Select Base Model</h3>
+                <button class="btn btn-small" onclick="trCloseBrowser()">Close</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <button class="btn btn-small" onclick="trBrowseUp()" title="Parent directory">&uarr; Up</button>
+                <code id="browser-path" style="flex:1;font-size:0.78rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></code>
+            </div>
+            <div id="browser-entries" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:4px;font-size:0.82rem"></div>
+            <p style="font-size:0.72rem;color:var(--text-muted);margin:8px 0 0">Select a directory containing config.json + model weights, or navigate to find your model.</p>
+        </div>
+    </div>
+
+    <details style="margin-bottom:12px">
+        <summary style="cursor:pointer;font-size:0.85rem;color:var(--accent)">Advanced Settings</summary>
+        <div class="form-row" style="margin-top:8px">
+            <div class="form-group">
+                <label>LoRA Rank (r)</label>
+                <input type="number" id="tr-lora-r" value="16" min="4" max="128" style="max-width:80px">
+            </div>
+            <div class="form-group">
+                <label>LoRA Alpha</label>
+                <input type="number" id="tr-lora-alpha" value="32" min="8" max="256" style="max-width:80px">
+            </div>
+            <div class="form-group">
+                <label>Dropout</label>
+                <input type="number" id="tr-dropout" value="0.05" step="0.01" min="0" max="0.5" style="max-width:80px">
+            </div>
+            <div class="form-group">
+                <label>Epochs</label>
+                <input type="number" id="tr-epochs" value="3" min="1" max="20" style="max-width:80px">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Batch Size</label>
+                <input type="number" id="tr-batch" value="4" min="1" max="32" style="max-width:80px">
+            </div>
+            <div class="form-group">
+                <label>Grad Accum Steps</label>
+                <input type="number" id="tr-grad-accum" value="4" min="1" max="32" style="max-width:80px">
+            </div>
+            <div class="form-group">
+                <label>Learning Rate</label>
+                <input type="text" id="tr-lr" value="2e-4" style="max-width:100px">
+            </div>
+            <div class="form-group">
+                <label>Max Seq Length</label>
+                <input type="number" id="tr-seq-len" value="2048" min="512" max="8192" style="max-width:100px">
+            </div>
+        </div>
+        <div style="margin-top:4px">
+            <label><input type="checkbox" id="tr-4bit" checked> Use 4-bit quantization (QLoRA)</label><br>
+            <label><input type="checkbox" id="tr-unsloth"> Use Unsloth (faster, if installed)</label>
+        </div>
+    </details>
+
+    <div class="tool-actions">
+        <button id="btn-train-start" class="btn btn-primary" onclick="trStartTraining()">Start Training</button>
+        <button id="btn-train-stop" class="btn btn-danger" onclick="trStopTraining()" style="display:none">Stop Training</button>
+    </div>
+
+    <div id="training-status" style="margin-top:12px">
+        <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))">
+            <div class="stat-card">
+                <div class="stat-label">Phase</div>
+                <div class="stat-value small" id="tr-phase">Idle</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Progress</div>
+                <div class="stat-value small" id="tr-progress">0%</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Status</div>
+                <div class="stat-value small" id="tr-message">Ready</div>
+            </div>
+        </div>
+    </div>
+
+    <h4 style="margin-top:16px">Training Log</h4>
+    <pre class="output-panel scrollable" id="training-log" style="max-height:300px;font-size:0.75rem">Training log will appear here...</pre>
+</div>
+</div>
+
+<!-- ==================== CONVERT TAB ==================== -->
+<div class="tab-content" data-tab-group="trainer" data-tab="convert">
+<div class="section">
+    <h2>GGUF Conversion</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Merge a trained LoRA adapter with its base model and convert to GGUF format for local inference.
+    </p>
+
+    <h4>Saved LoRA Adapters</h4>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="trListAdapters()">Refresh Adapters</button>
+    </div>
+    <div id="adapters-list" style="margin-top:8px">
+        <p class="empty-state">Click "Refresh" to load adapters.</p>
+    </div>
+
+    <h4 style="margin-top:16px">Convert to GGUF</h4>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="flex:2">
+            <label>Adapter Path</label>
+            <input type="text" id="cv-adapter" placeholder="Path to LoRA adapter directory">
+        </div>
+        <div class="form-group">
+            <label>Output Name</label>
+            <input type="text" id="cv-output" placeholder="e.g., Hal_v3" value="Hal_v3">
+        </div>
+        <div class="form-group">
+            <label>Quantization</label>
+            <select id="cv-quant">
+                <option value="Q4_K_M">Q4_K_M (small, fast)</option>
+                <option value="Q5_K_M" selected>Q5_K_M (balanced)</option>
+                <option value="Q6_K">Q6_K (quality)</option>
+                <option value="Q8_0">Q8_0 (high quality)</option>
+                <option value="F16">F16 (unquantized)</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-convert" class="btn btn-primary" onclick="trConvert()">Merge & Convert</button>
+    </div>
+    <pre class="output-panel" id="convert-result" style="margin-top:12px;min-height:0"></pre>
+
+    <h4 style="margin-top:16px">Available GGUF Models</h4>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="trListModels()">Refresh Models</button>
+    </div>
+    <div id="models-list" style="margin-top:8px">
+        <p class="empty-state">Click "Refresh" to load models.</p>
+    </div>
+</div>
+</div>
+
+<!-- ==================== EVALUATE TAB ==================== -->
+<div class="tab-content" data-tab-group="trainer" data-tab="evaluate">
+<div class="section">
+    <h2>Model Evaluation</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Test a GGUF model with sample prompts to verify it learned the AUTARCH codebase.
+    </p>
+
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="flex:2">
+            <label>Model Path</label>
+            <select id="ev-model">
+                <option value="">Select model...</option>
+            </select>
+        </div>
+    </div>
+
+    <h4>Test Prompts</h4>
+    <div id="eval-prompts">
+        <div class="input-row" style="margin-bottom:4px">
+            <input type="text" class="eval-prompt" value="What is AUTARCH?" style="flex:1">
+        </div>
+        <div class="input-row" style="margin-bottom:4px">
+            <input type="text" class="eval-prompt" value="How do I create a new defense module?" style="flex:1">
+        </div>
+        <div class="input-row" style="margin-bottom:4px">
+            <input type="text" class="eval-prompt" value="What module categories does AUTARCH support?" style="flex:1">
+        </div>
+        <div class="input-row" style="margin-bottom:4px">
+            <input type="text" class="eval-prompt" value="Create a module that scans for open ports on localhost." style="flex:1">
+        </div>
+    </div>
+    <button class="btn btn-small" onclick="trAddPrompt()" style="margin-top:4px">+ Add Prompt</button>
+
+    <div class="tool-actions" style="margin-top:12px">
+        <button id="btn-evaluate" class="btn btn-primary" onclick="trEvaluate()">Run Evaluation</button>
+    </div>
+
+    <div id="eval-results" style="margin-top:12px"></div>
+</div>
+</div>
+
+<script>
+/* ── LLM Trainer ── */
+var _trPollInterval = null;
+
+function trScanCodebase() {
+    var btn = document.getElementById('btn-scan');
+    setLoading(btn, true);
+    postJSON('/llm-trainer/scan', {}).then(function(data) {
+        setLoading(btn, false);
+        var inv = data.inventory || {};
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+            + '<th>Category</th><th>Files</th><th>Lines</th></tr></thead><tbody>';
+        var cats = ['modules','core','routes','templates','configs','other'];
+        cats.forEach(function(cat) {
+            var files = inv[cat] || [];
+            var lines = files.reduce(function(s,f){return s+f.lines},0);
+            html += '<tr><td>' + cat + '</td><td>' + files.length + '</td><td>' + lines.toLocaleString() + '</td></tr>';
+        });
+        html += '<tr style="font-weight:bold"><td>Total</td><td>' + data.total_files
+            + '</td><td>' + data.total_lines.toLocaleString() + '</td></tr>';
+        html += '</tbody></table>';
+        document.getElementById('scan-result').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function trGenerateDataset() {
+    var btn = document.getElementById('btn-generate');
+    setLoading(btn, true);
+    postJSON('/llm-trainer/dataset/generate', {
+        format: document.getElementById('ds-format').value,
+        include_source: document.getElementById('ds-source').checked,
+        include_qa: document.getElementById('ds-qa').checked,
+        include_module_creation: document.getElementById('ds-modules').checked,
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            renderOutput('gen-result', 'Error: ' + data.error);
+            return;
+        }
+        var lines = [
+            'Dataset Generated!',
+            '  File: ' + data.filename,
+            '  Samples: ' + data.sample_count,
+            '  Format: ' + data.format,
+            '  Size: ' + (data.size_bytes / 1024).toFixed(1) + ' KB',
+            '',
+            'Preview (first sample):',
+        ];
+        if (data.preview && data.preview.length) {
+            lines.push(JSON.stringify(data.preview[0], null, 2));
+        }
+        renderOutput('gen-result', lines.join('\n'));
+        trListDatasets();
+        trRefreshDatasetSelect();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function trListDatasets() {
+    fetchJSON('/llm-trainer/dataset/list').then(function(data) {
+        var ds = data.datasets || [];
+        var container = document.getElementById('datasets-list');
+        if (!ds.length) {
+            container.innerHTML = '<p class="empty-state">No datasets generated yet.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>'
+            + '<th>File</th><th>Samples</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+        ds.forEach(function(d) {
+            html += '<tr><td>' + escapeHtml(d.filename) + '</td>'
+                + '<td>' + d.sample_count + '</td>'
+                + '<td>' + (d.size_bytes/1024).toFixed(1) + ' KB</td>'
+                + '<td>' + d.created.substring(0,16).replace('T',' ') + '</td>'
+                + '<td>'
+                + '<button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px;margin-right:4px" '
+                + 'onclick="trPreviewDataset(\'' + escapeHtml(d.filename) + '\')">Preview</button>'
+                + '<button class="btn btn-danger btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="trDeleteDataset(\'' + escapeHtml(d.filename) + '\')">Delete</button>'
+                + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    });
+}
+
+function trPreviewDataset(filename) {
+    postJSON('/llm-trainer/dataset/preview', {filename: filename, limit: 5}).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        var html = '<h4>Preview: ' + escapeHtml(filename) + '</h4>';
+        (data.samples || []).forEach(function(s, i) {
+            html += '<pre class="output-panel" style="font-size:0.75rem;margin-bottom:4px;max-height:150px;overflow-y:auto">'
+                + escapeHtml(JSON.stringify(s, null, 2)) + '</pre>';
+        });
+        document.getElementById('datasets-list').innerHTML += html;
+    });
+}
+
+function trDeleteDataset(filename) {
+    if (!confirm('Delete ' + filename + '?')) return;
+    postJSON('/llm-trainer/dataset/delete', {filename: filename}).then(function() {
+        trListDatasets();
+        trRefreshDatasetSelect();
+    });
+}
+
+function trRefreshDatasetSelect() {
+    fetchJSON('/llm-trainer/dataset/list').then(function(data) {
+        var sel = document.getElementById('tr-dataset');
+        sel.innerHTML = '<option value="">Select dataset...</option>';
+        (data.datasets || []).forEach(function(d) {
+            sel.innerHTML += '<option value="' + escapeHtml(d.path) + '">' + escapeHtml(d.filename)
+                + ' (' + d.sample_count + ' samples)</option>';
+        });
+    });
+}
+
+/* ── Model Browser ── */
+var _browserCurrentDir = '';
+var _browserParentDir = '';
+
+function trOpenBrowser() {
+    document.getElementById('model-browser-overlay').style.display = 'flex';
+    trBrowseDir('');  // starts at models/ directory
+}
+
+function trCloseBrowser() {
+    document.getElementById('model-browser-overlay').style.display = 'none';
+}
+
+function trBrowseUp() {
+    if (_browserParentDir) trBrowseDir(_browserParentDir);
+}
+
+function trBrowseDir(dir) {
+    postJSON('/llm-trainer/browse', {directory: dir}).then(function(data) {
+        if (data.error) {
+            document.getElementById('browser-entries').innerHTML = '<p style="padding:8px;color:var(--danger)">' + escapeHtml(data.error) + '</p>';
+            return;
+        }
+        _browserCurrentDir = data.current_dir || '';
+        _browserParentDir = data.parent_dir || '';
+        document.getElementById('browser-path').textContent = _browserCurrentDir;
+
+        var entries = data.entries || [];
+        if (!entries.length) {
+            document.getElementById('browser-entries').innerHTML = '<p style="padding:8px;color:var(--text-muted)">Empty directory</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem;margin:0"><tbody>';
+        entries.forEach(function(e) {
+            if (e.is_dir) {
+                var icon = e.is_model ? '&#x1F4E6;' : '&#x1F4C1;';
+                var label = e.is_model
+                    ? '<span style="color:var(--success);font-weight:bold">' + escapeHtml(e.name) + '</span> <span style="font-size:0.7rem;color:var(--text-muted)">(HF model)</span>'
+                    : escapeHtml(e.name);
+                html += '<tr><td style="cursor:pointer" onclick="trBrowseDir(\'' + escapeHtml(e.path) + '\')">' + icon + ' ' + label + '</td>';
+                if (e.is_model) {
+                    html += '<td><button class="btn btn-small" style="font-size:0.65rem;padding:2px 8px" onclick="trSelectModel(\'' + escapeHtml(e.path) + '\')">Select</button></td>';
+                } else {
+                    html += '<td></td>';
+                }
+                html += '</tr>';
+            } else {
+                var size = e.size_gb !== undefined ? e.size_gb + ' GB' : '';
+                html += '<tr><td>&#x1F4C4; ' + escapeHtml(e.name) + '</td><td style="font-size:0.7rem;color:var(--text-muted)">' + size + '</td></tr>';
+            }
+        });
+        html += '</tbody></table>';
+        document.getElementById('browser-entries').innerHTML = html;
+    });
+}
+
+function trSelectModel(path) {
+    document.getElementById('tr-base-model').value = path;
+    trCloseBrowser();
+}
+
+/* ── Training ── */
+function trStartTraining() {
+    var baseModel = document.getElementById('tr-base-model').value.trim();
+    var dataset = document.getElementById('tr-dataset').value;
+    if (!baseModel) { alert('Click Browse to select a base model'); return; }
+    if (!dataset) { alert('Please select a dataset'); return; }
+
+    var config = {
+        base_model: baseModel,
+        dataset: dataset,
+        lora_r: parseInt(document.getElementById('tr-lora-r').value),
+        lora_alpha: parseInt(document.getElementById('tr-lora-alpha').value),
+        lora_dropout: parseFloat(document.getElementById('tr-dropout').value),
+        num_epochs: parseInt(document.getElementById('tr-epochs').value),
+        batch_size: parseInt(document.getElementById('tr-batch').value),
+        gradient_accumulation_steps: parseInt(document.getElementById('tr-grad-accum').value),
+        learning_rate: parseFloat(document.getElementById('tr-lr').value),
+        max_seq_length: parseInt(document.getElementById('tr-seq-len').value),
+        use_4bit: document.getElementById('tr-4bit').checked,
+        use_unsloth: document.getElementById('tr-unsloth').checked,
+    };
+
+    var btn = document.getElementById('btn-train-start');
+    setLoading(btn, true);
+    postJSON('/llm-trainer/train/start', config).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            alert('Training failed: ' + data.error);
+            return;
+        }
+        document.getElementById('btn-train-start').style.display = 'none';
+        document.getElementById('btn-train-stop').style.display = '';
+        trStartPolling();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function trStopTraining() {
+    postJSON('/llm-trainer/train/stop', {}).then(function() {
+        trStopPolling();
+        document.getElementById('btn-train-start').style.display = '';
+        document.getElementById('btn-train-stop').style.display = 'none';
+        trUpdateStatus();
+    });
+}
+
+function trStartPolling() {
+    if (_trPollInterval) clearInterval(_trPollInterval);
+    _trPollInterval = setInterval(trUpdateStatus, 3000);
+    trUpdateStatus();
+}
+
+function trStopPolling() {
+    if (_trPollInterval) { clearInterval(_trPollInterval); _trPollInterval = null; }
+}
+
+function trUpdateStatus() {
+    fetchJSON('/llm-trainer/train/status').then(function(data) {
+        document.getElementById('tr-phase').textContent = data.phase || 'idle';
+        document.getElementById('tr-progress').textContent = (data.progress || 0) + '%';
+        document.getElementById('tr-message').textContent = data.message || '';
+        if (data.training_log) {
+            document.getElementById('training-log').textContent = data.training_log;
+            var log = document.getElementById('training-log');
+            log.scrollTop = log.scrollHeight;
+        }
+        if (!data.training_running && _trPollInterval) {
+            trStopPolling();
+            document.getElementById('btn-train-start').style.display = '';
+            document.getElementById('btn-train-stop').style.display = 'none';
+        }
+    });
+}
+
+/* ── Conversion ── */
+function trListAdapters() {
+    fetchJSON('/llm-trainer/adapters').then(function(data) {
+        var adapters = data.adapters || [];
+        var container = document.getElementById('adapters-list');
+        if (!adapters.length) {
+            container.innerHTML = '<p class="empty-state">No LoRA adapters found. Train a model first.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>'
+            + '<th>Name</th><th>Base Model</th><th>LoRA r</th><th>Action</th></tr></thead><tbody>';
+        adapters.forEach(function(a) {
+            html += '<tr><td>' + escapeHtml(a.name) + '</td>'
+                + '<td>' + escapeHtml(a.base_model || '—') + '</td>'
+                + '<td>' + (a.r || '—') + '</td>'
+                + '<td><button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                + 'onclick="document.getElementById(\'cv-adapter\').value=\'' + escapeHtml(a.path) + '\'">Select</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    });
+}
+
+function trConvert() {
+    var adapter = document.getElementById('cv-adapter').value.trim();
+    var output = document.getElementById('cv-output').value.trim();
+    var quant = document.getElementById('cv-quant').value;
+    if (!adapter) { alert('Enter or select an adapter path'); return; }
+    if (!output) { alert('Enter an output name'); return; }
+
+    var btn = document.getElementById('btn-convert');
+    setLoading(btn, true);
+    renderOutput('convert-result', 'Merging and converting — this may take a while...');
+    postJSON('/llm-trainer/convert', {
+        adapter_path: adapter,
+        output_name: output,
+        quantization: quant,
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            renderOutput('convert-result', 'Error: ' + data.error);
+        } else if (data.partial) {
+            renderOutput('convert-result', data.message);
+        } else {
+            renderOutput('convert-result', 'GGUF model saved!\n  Path: ' + data.output_path
+                + '\n  Size: ' + (data.size_bytes / (1024*1024*1024)).toFixed(2) + ' GB');
+            trListModels();
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function trListModels() {
+    fetchJSON('/llm-trainer/models').then(function(data) {
+        var models = data.models || [];
+        var container = document.getElementById('models-list');
+        if (!models.length) {
+            container.innerHTML = '<p class="empty-state">No GGUF models found.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>'
+            + '<th>Name</th><th>Size</th><th>Modified</th></tr></thead><tbody>';
+        models.forEach(function(m) {
+            html += '<tr><td>' + escapeHtml(m.filename) + '</td>'
+                + '<td>' + m.size_gb + ' GB</td>'
+                + '<td>' + m.modified.substring(0,16).replace('T',' ') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+
+        // Update evaluate model select
+        var sel = document.getElementById('ev-model');
+        sel.innerHTML = '<option value="">Select model...</option>';
+        models.forEach(function(m) {
+            sel.innerHTML += '<option value="' + escapeHtml(m.path) + '">' + escapeHtml(m.filename)
+                + ' (' + m.size_gb + ' GB)</option>';
+        });
+    });
+}
+
+/* ── Evaluate ── */
+function trAddPrompt() {
+    var div = document.createElement('div');
+    div.className = 'input-row';
+    div.style.marginBottom = '4px';
+    div.innerHTML = '<input type="text" class="eval-prompt" placeholder="Enter test prompt..." style="flex:1">'
+        + '<button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px;margin-left:4px" '
+        + 'onclick="this.parentElement.remove()">X</button>';
+    document.getElementById('eval-prompts').appendChild(div);
+}
+
+function trEvaluate() {
+    var model = document.getElementById('ev-model').value;
+    if (!model) { alert('Select a model to evaluate'); return; }
+
+    var prompts = [];
+    document.querySelectorAll('.eval-prompt').forEach(function(el) {
+        if (el.value.trim()) prompts.push(el.value.trim());
+    });
+    if (!prompts.length) { alert('Add at least one test prompt'); return; }
+
+    var btn = document.getElementById('btn-evaluate');
+    setLoading(btn, true);
+    document.getElementById('eval-results').innerHTML = '<p style="color:var(--text-muted)">Running evaluation — loading model and generating responses...</p>';
+
+    postJSON('/llm-trainer/evaluate', {model_path: model, prompts: prompts}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('eval-results').innerHTML = '<p style="color:var(--danger)">Error: ' + escapeHtml(data.error) + '</p>';
+            return;
+        }
+        var html = '';
+        (data.results || []).forEach(function(r, i) {
+            html += '<div style="margin-bottom:12px;border:1px solid var(--border);border-radius:6px;padding:12px">'
+                + '<div style="font-weight:bold;margin-bottom:6px;color:var(--accent)">Prompt: ' + escapeHtml(r.prompt) + '</div>'
+                + '<pre class="output-panel scrollable" style="max-height:200px;font-size:0.78rem;margin:0">'
+                + escapeHtml(r.response) + '</pre>'
+                + '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">Response length: ' + r.length + ' chars</div>'
+                + '</div>';
+        });
+        document.getElementById('eval-results').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    trRefreshDatasetSelect();
+    trListModels();
+});
+</script>
+{% endblock %}

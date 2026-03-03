@@ -2088,8 +2088,9 @@ function halSend() {
     var msg = inp.value.trim();
     if (!msg) return;
     inp.value = '';
+    inp.disabled = true;
     halAppend('user', msg);
-    var botDiv = halAppend('bot', '');
+    var container = document.getElementById('hal-messages');
 
     fetch('/api/chat', {
         method: 'POST',
@@ -2101,7 +2102,7 @@ function halSend() {
         var buf = '';
         function pump() {
             reader.read().then(function(chunk) {
-                if (chunk.done) return;
+                if (chunk.done) { inp.disabled = false; inp.focus(); return; }
                 buf += dec.decode(chunk.value, {stream: true});
                 var parts = buf.split('\n\n');
                 buf = parts.pop();
@@ -2110,8 +2111,30 @@ function halSend() {
                     if (!line) return;
                     try {
                         var d = JSON.parse(line);
-                        if (d.token) { botDiv.textContent += d.token; halScroll(); }
-                        if (d.error) { botDiv.textContent = 'Error: ' + d.error; }
+                        if (d.type === 'thought') {
+                            halAppendStyled('thought', d.content);
+                        } else if (d.type === 'action') {
+                            halAppendStyled('action', d.content);
+                        } else if (d.type === 'result') {
+                            halAppendStyled('result', d.content);
+                        } else if (d.type === 'answer') {
+                            halAppendStyled('bot', d.content);
+                        } else if (d.type === 'status') {
+                            halAppendStyled('status', d.content);
+                        } else if (d.type === 'error') {
+                            halAppendStyled('error', d.content);
+                        } else if (d.token) {
+                            // Legacy streaming token mode
+                            var last = container.lastElementChild;
+                            if (!last || !last.classList.contains('hal-msg-bot')) {
+                                last = halAppend('bot', '');
+                            }
+                            last.textContent += d.token;
+                            halScroll();
+                        } else if (d.done) {
+                            inp.disabled = false;
+                            inp.focus();
+                        }
                     } catch(e) {}
                 });
                 pump();
@@ -2119,8 +2142,36 @@ function halSend() {
         }
         pump();
     }).catch(function(e) {
-        if (botDiv) botDiv.textContent = 'Error: ' + e.message;
+        halAppendStyled('error', e.message);
+        inp.disabled = false;
     });
+}
+
+function halAppendStyled(type, text) {
+    var msgs = document.getElementById('hal-messages');
+    if (!msgs) return;
+    var div = document.createElement('div');
+    div.className = 'hal-msg hal-msg-' + type;
+    if (type === 'thought') {
+        div.style.cssText = 'font-style:italic;color:var(--text-muted,#888);font-size:0.8rem';
+        div.textContent = text;
+    } else if (type === 'action') {
+        div.style.cssText = 'font-family:monospace;color:var(--accent,#0af);font-size:0.78rem;background:rgba(0,170,255,0.08);padding:4px 8px;border-radius:4px';
+        div.textContent = '> ' + text;
+    } else if (type === 'result') {
+        div.style.cssText = 'font-family:monospace;color:var(--text-secondary,#aaa);font-size:0.75rem;max-height:100px;overflow-y:auto;white-space:pre-wrap;background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:4px';
+        div.textContent = text;
+    } else if (type === 'status') {
+        div.style.cssText = 'color:var(--text-muted,#666);font-size:0.78rem;font-style:italic';
+        div.textContent = text;
+    } else if (type === 'error') {
+        div.style.cssText = 'color:var(--danger,#f55);font-size:0.82rem';
+        div.textContent = 'Error: ' + text;
+    } else {
+        div.textContent = text;
+    }
+    msgs.appendChild(div);
+    halScroll();
 }
 
 function halAppend(role, text) {

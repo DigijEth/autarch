@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Linux Defense - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Linux Defense</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Linux system hardening, iptables firewall management, and log analysis.
+        </p>
+    </div>
+    <a href="{{ url_for('defense.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Defense</a>
+</div>
+
+<!-- Security Audit -->
+<div class="section">
+    <h2>Security Audit</h2>
+    <div class="tool-actions">
+        <button id="btn-audit" class="btn btn-primary" onclick="linuxRunAudit()">Run Full Audit</button>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="score-display">
+            <div class="score-value" id="audit-score">--</div>
+            <div class="score-label">Security Score</div>
+        </div>
+        <div style="flex:1;min-width:300px">
+            <table class="data-table">
+                <thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead>
+                <tbody id="audit-results">
+                    <tr><td colspan="3" class="empty-state">Run an audit to see results.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Individual Checks -->
+<div class="section">
+    <h2>Quick Checks</h2>
+    <div class="tool-grid">
+        <div class="tool-card">
+            <h4>Firewall</h4>
+            <p>Check iptables/ufw/firewalld status</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('firewall')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-firewall"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>SSH Config</h4>
+            <p>Check SSH hardening settings</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('ssh')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-ssh"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Open Ports</h4>
+            <p>Scan for high-risk listening ports</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('ports')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-ports"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Users</h4>
+            <p>Check UID 0 users and empty passwords</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('users')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-users"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Permissions</h4>
+            <p>Check critical file permissions</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('permissions')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-permissions"></pre>
+        </div>
+        <div class="tool-card">
+            <h4>Services</h4>
+            <p>Check for dangerous services</p>
+            <button class="btn btn-small" onclick="linuxRunCheck('services')">Run</button>
+            <pre class="output-panel tool-result" id="check-result-services"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Firewall Manager -->
+<div class="section">
+    <h2>Firewall Manager (iptables)</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="linuxLoadFwRules()">Refresh Rules</button>
+    </div>
+    <pre class="output-panel scrollable" id="fw-rules">Click "Refresh Rules" to load current iptables rules.</pre>
+    <div style="margin-top:12px">
+        <div class="input-row">
+            <input type="text" id="block-ip" placeholder="IP address to block">
+            <button class="btn btn-danger btn-small" onclick="linuxBlockIP()">Block IP</button>
+            <button class="btn btn-small" onclick="linuxUnblockIP()">Unblock IP</button>
+        </div>
+        <pre class="output-panel" id="fw-result" style="min-height:0"></pre>
+    </div>
+</div>
+
+<!-- Log Analysis -->
+<div class="section">
+    <h2>Log Analysis</h2>
+    <div class="tool-actions">
+        <button id="btn-logs" class="btn btn-primary" onclick="linuxAnalyzeLogs()">Analyze Logs</button>
+    </div>
+    <pre class="output-panel scrollable" id="log-output">Click "Analyze Logs" to parse auth and web server logs.</pre>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Defense Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<script>
+/* ── Linux Defense (routes prefixed with /defense/linux/) ── */
+function linuxRunAudit() {
+    var btn = document.getElementById('btn-audit');
+    setLoading(btn, true);
+    postJSON('/defense/linux/audit', {}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('audit-results', 'Error: ' + data.error); return; }
+        var scoreEl = document.getElementById('audit-score');
+        if (scoreEl) {
+            scoreEl.textContent = data.score + '%';
+            scoreEl.style.color = data.score >= 80 ? 'var(--success)' : data.score >= 50 ? 'var(--warning)' : 'var(--danger)';
+        }
+        var html = '';
+        (data.checks || []).forEach(function(c) {
+            html += '<tr><td>' + escapeHtml(c.name) + '</td><td><span class="badge ' + (c.passed ? 'badge-pass' : 'badge-fail') + '">'
+                + (c.passed ? 'PASS' : 'FAIL') + '</span></td><td>' + escapeHtml(c.details || '') + '</td></tr>';
+        });
+        document.getElementById('audit-results').innerHTML = html || '<tr><td colspan="3">No results</td></tr>';
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function linuxRunCheck(name) {
+    var el = document.getElementById('check-result-' + name);
+    if (el) { el.textContent = 'Running...'; el.style.display = 'block'; }
+    postJSON('/defense/linux/check/' + name, {}).then(function(data) {
+        if (data.error) { if (el) el.textContent = 'Error: ' + data.error; return; }
+        var lines = (data.checks || []).map(function(c) {
+            return (c.passed ? '[PASS] ' : '[FAIL] ') + c.name + (c.details ? ' — ' + c.details : '');
+        });
+        if (el) el.textContent = lines.join('\n') || 'No results';
+    }).catch(function() { if (el) el.textContent = 'Request failed'; });
+}
+
+function linuxLoadFwRules() {
+    fetchJSON('/defense/linux/firewall/rules').then(function(data) {
+        renderOutput('fw-rules', data.rules || 'Could not load rules');
+    });
+}
+
+function linuxBlockIP() {
+    var ip = document.getElementById('block-ip').value.trim();
+    if (!ip) return;
+    postJSON('/defense/linux/firewall/block', {ip: ip}).then(function(data) {
+        renderOutput('fw-result', data.message || data.error);
+        if (data.success) { document.getElementById('block-ip').value = ''; linuxLoadFwRules(); }
+    });
+}
+
+function linuxUnblockIP() {
+    var ip = document.getElementById('block-ip').value.trim();
+    if (!ip) return;
+    postJSON('/defense/linux/firewall/unblock', {ip: ip}).then(function(data) {
+        renderOutput('fw-result', data.message || data.error);
+        if (data.success) linuxLoadFwRules();
+    });
+}
+
+function linuxAnalyzeLogs() {
+    var btn = document.getElementById('btn-logs');
+    setLoading(btn, true);
+    postJSON('/defense/linux/logs/analyze', {}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('log-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        if (data.auth_results && data.auth_results.length) {
+            lines.push('=== Auth Log Analysis ===');
+            data.auth_results.forEach(function(r) {
+                lines.push(r.ip + ': ' + r.count + ' failures (' + (r.usernames || []).join(', ') + ')');
+            });
+        } else { lines.push('No auth log entries found.'); }
+        if (data.web_results && data.web_results.length) {
+            lines.push('\n=== Web Log Analysis ===');
+            data.web_results.forEach(function(r) {
+                lines.push(r.ip + ': ' + r.count + ' suspicious requests');
+            });
+        }
+        renderOutput('log-output', lines.join('\n') || 'No findings.');
+    }).catch(function() { setLoading(btn, false); });
+}
+</script>
+{% endblock %}

@@ -4,96 +4,44 @@
 {% block content %}
 <div class="page-header">
     <h1>System Defense</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Security hardening, firewall management, and threat monitoring.
+    </p>
 </div>
 
-<!-- Security Audit -->
+<!-- Platform Info -->
 <div class="section">
-    <h2>Security Audit</h2>
-    <div class="tool-actions">
-        <button id="btn-audit" class="btn btn-primary" onclick="runDefenseAudit()">Run Full Audit</button>
-    </div>
-    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
-        <div class="score-display">
-            <div class="score-value" id="audit-score">--</div>
-            <div class="score-label">Security Score</div>
-        </div>
-        <div style="flex:1;min-width:300px">
-            <table class="data-table">
-                <thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead>
-                <tbody id="audit-results">
-                    <tr><td colspan="3" class="empty-state">Run an audit to see results.</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <h2>System Overview</h2>
+    <table class="data-table" style="max-width:500px">
+        <tbody>
+            <tr><td>Platform</td><td><strong>{{ sys_info.platform }}</strong></td></tr>
+            <tr><td>Hostname</td><td>{{ sys_info.hostname }}</td></tr>
+            <tr><td>OS</td><td>{{ sys_info.os_version }}</td></tr>
+            <tr><td>IP</td><td>{{ sys_info.ip }}</td></tr>
+        </tbody>
+    </table>
 </div>
 
-<!-- Individual Checks -->
+<!-- Sub-page Cards -->
 <div class="section">
-    <h2>Quick Checks</h2>
+    <h2>Defense Tools</h2>
     <div class="tool-grid">
         <div class="tool-card">
-            <h4>Firewall</h4>
-            <p>Check iptables/ufw/firewalld status</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('firewall')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-firewall"></pre>
+            <h4>Linux Defense</h4>
+            <p>iptables firewall, SSH hardening, systemd services, auth logs, SELinux/AppArmor checks.</p>
+            <a href="{{ url_for('defense.linux_index') }}" class="btn btn-primary btn-small">Open</a>
         </div>
         <div class="tool-card">
-            <h4>SSH Config</h4>
-            <p>Check SSH hardening settings</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('ssh')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-ssh"></pre>
+            <h4>Windows Defense</h4>
+            <p>Windows Firewall, UAC, Defender AV, event logs, OpenSSH, services, NTFS permissions.</p>
+            <a href="{{ url_for('defense.windows_index') }}" class="btn btn-primary btn-small">Open</a>
         </div>
-        <div class="tool-card">
-            <h4>Open Ports</h4>
-            <p>Scan for high-risk listening ports</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('ports')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-ports"></pre>
-        </div>
-        <div class="tool-card">
-            <h4>Users</h4>
-            <p>Check UID 0 users and empty passwords</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('users')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-users"></pre>
-        </div>
-        <div class="tool-card">
-            <h4>Permissions</h4>
-            <p>Check critical file permissions</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('permissions')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-permissions"></pre>
-        </div>
-        <div class="tool-card">
-            <h4>Services</h4>
-            <p>Check for dangerous services</p>
-            <button class="btn btn-small" onclick="runDefenseCheck('services')">Run</button>
-            <pre class="output-panel tool-result" id="check-result-services"></pre>
+        <div class="tool-card" style="border-color:var(--danger)">
+            <h4 style="color:var(--danger)">Threat Monitor</h4>
+            <p>Real-time connection monitoring, port scan detection, suspicious process alerts, and counter-attack tools.</p>
+            <a href="{{ url_for('defense.monitor_index') }}" class="btn btn-danger btn-small">Open</a>
         </div>
     </div>
-</div>
-
-<!-- Firewall Manager -->
-<div class="section">
-    <h2>Firewall Manager</h2>
-    <div class="tool-actions">
-        <button class="btn btn-small" onclick="loadFirewallRules()">Refresh Rules</button>
-    </div>
-    <pre class="output-panel scrollable" id="fw-rules">Click "Refresh Rules" to load current iptables rules.</pre>
-    <div style="margin-top:12px">
-        <div class="input-row">
-            <input type="text" id="block-ip" placeholder="IP address to block">
-            <button class="btn btn-danger btn-small" onclick="blockIP()">Block IP</button>
-        </div>
-        <pre class="output-panel" id="fw-result" style="min-height:0"></pre>
-    </div>
-</div>
-
-<!-- Log Analysis -->
-<div class="section">
-    <h2>Log Analysis</h2>
-    <div class="tool-actions">
-        <button id="btn-logs" class="btn btn-primary" onclick="analyzeLogs()">Analyze Logs</button>
-    </div>
-    <pre class="output-panel scrollable" id="log-output">Click "Analyze Logs" to parse auth and web server logs.</pre>
 </div>
 
 {% if modules %}
