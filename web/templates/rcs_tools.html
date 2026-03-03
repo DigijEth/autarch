@@ -88,8 +88,9 @@
 <div class="section">
     <h3>bugle_db Extraction</h3>
     <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px">
-        Extract the Google Messages database directly. Messages are stored as <strong>plaintext</strong> &mdash;
-        no decryption needed. Tries: Archon relay &rarr; CVE-2024-0044 &rarr; root &rarr; ADB backup.
+        Extract the Google Messages RCS database. The database is <strong>encrypted at rest</strong> &mdash;
+        raw file extraction also requires the encryption key. Best method: Archon relay (queries from
+        decrypted app context). Fallback: CVE-2024-0044 (app-UID access) &rarr; root (DB + keys) &rarr; ADB backup.
     </p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         <button class="btn btn-danger" onclick="rcsExtractBugle()">Extract bugle_db</button>

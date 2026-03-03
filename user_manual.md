@@ -964,9 +964,10 @@ bugle_db are stored as **plaintext** — no decryption needed.
 - **Extract** — Read SMS/MMS via content providers, query AOSP RCS provider (`content://rcs/`),
   enumerate all accessible messaging content providers, filter by address/keyword/thread, export
   to JSON/CSV/XML (SMS Backup & Restore format)
-- **Database** — Extract Google Messages bugle_db directly (plaintext messages), run arbitrary
-  SQL queries against extracted databases, extract RCS-only messages, conversation exports,
-  message edit history, preset queries for common forensic tasks
+- **Database** — Extract Google Messages bugle_db (encrypted at rest — requires key extraction
+  or Archon relay for decrypted access), run arbitrary SQL queries against extracted databases,
+  extract RCS-only messages, conversation exports, message edit history, preset queries for
+  common forensic tasks
 - **Forge** — Insert fake SMS/MMS/RCS messages with arbitrary sender, body, timestamp, and
   direction. Forge entire conversations, bulk insert, import SMS Backup & Restore XML files.
   RCS forging via Archon relay for direct bugle_db insertion
@@ -984,12 +985,20 @@ bugle_db are stored as **plaintext** — no decryption needed.
 - **Monitor** — Real-time SMS/RCS interception via logcat, intercepted message feed with
   auto-refresh
 
-**Key bugle_db Tables:**
+**Key bugle_db Tables** (encrypted at rest — requires decryption key or app-context access):
 - `conversations` — Thread metadata, snippet, participants
 - `messages` — `message_protocol` field: 0=SMS, 1=MMS, 2+=RCS
-- `parts` — Plaintext message bodies in `text` column, attachment URIs
+- `parts` — Message bodies in `text` column, attachment URIs
 - `participants` — Phone numbers and contact names
 - `message_edits` — RCS message edit history
+
+**Database Encryption:**
+- bugle_db uses SQLCipher / Android encrypted SQLite — raw file is unreadable without key
+- Key stored in `shared_prefs/` XML files or Android Keystore (hardware-backed)
+- Samsung devices add additional proprietary encryption layer
+- Best extraction: Archon relay queries from decrypted app context (no key needed)
+- CVE-2024-0044: run as app UID, can open DB with app's own key
+- Root: extract DB + shared_prefs/ + files/ for offline key recovery
 
 **AOSP RCS Provider URIs (content://rcs/):**
 - `content://rcs/thread`, `content://rcs/p2p_thread`, `content://rcs/group_thread`
@@ -997,7 +1006,7 @@ bugle_db are stored as **plaintext** — no decryption needed.
 
 **Archon Integration:**
 - Set Archon as default SMS app for full message access
-- Extract bugle_db via Shizuku-elevated shell (UID 2000)
+- Query decrypted messages from within app context (bypasses DB encryption)
 - Forge/modify RCS messages directly in bugle_db via broadcast commands
 - Full backup including RCS messages and attachments
 
