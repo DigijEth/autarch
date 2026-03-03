@@ -16,6 +16,7 @@ include_files = [
     (str(SRC / 'web' / 'static'),    'web/static'),
     (str(SRC / 'data'),              'data'),
     (str(SRC / 'modules'),           'modules'),
+    (str(SRC / 'models' / 'Hal_v2.gguf'), 'models/Hal_v2.gguf'),
     (str(SRC / 'autarch_settings.conf'), 'autarch_settings.conf'),
     (str(SRC / 'user_manual.md'),        'user_manual.md'),
     (str(SRC / 'windows_manual.md'),     'windows_manual.md'),
@@ -27,10 +28,11 @@ include_files = [(s, d) for s, d in include_files if Path(s).exists()]
 build_exe_options = {
     'packages': [
         'flask', 'jinja2', 'werkzeug', 'markupsafe',
-        'bcrypt', 'requests', 'core', 'web', 'web.routes', 'modules',
+        'bcrypt', 'requests', 'pystray', 'PIL',
+        'core', 'web', 'web.routes', 'modules',
     ],
     'includes': [
-        'core.config', 'core.paths', 'core.banner', 'core.menu',
+        'core.config', 'core.paths', 'core.banner', 'core.menu', 'core.tray',
         'core.llm', 'core.agent', 'core.tools',
         'core.msf', 'core.msf_interface',
         'core.hardware', 'core.android_protect',
@@ -49,6 +51,7 @@ build_exe_options = {
         'web.routes.revshell', 'web.routes.archon',
         'web.routes.msf', 'web.routes.chat',
         'web.routes.targets', 'web.routes.encmodules',
+        'web.routes.llm_trainer',
     ],
     'excludes': ['torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
                  'tkinter', 'matplotlib', 'numpy',
@@ -66,7 +69,7 @@ build_exe_options = {
 bdist_msi_options = {
     'upgrade_code': '{A07B3D2E-5F1C-4D8A-9E6B-0C2F7A8D4E1B}',
     'add_to_path': False,
-    'initial_target_dir': r'[ProgramFilesFolder]\AUTARCH',
+    'initial_target_dir': r'[LocalAppDataFolder]\AUTARCH',
 }
 
 setup(
@@ -81,8 +84,13 @@ setup(
     executables=[
         Executable(
             'autarch.py',
-            target_name='autarch_public',
-            base=None,  # console application
+            target_name='autarch',
+            base=None,  # console application (CLI)
+        ),
+        Executable(
+            'autarch_web.py',
+            target_name='autarch_web',
+            base='Win32GUI',  # no console window (tray icon only)
         ),
     ],
 )

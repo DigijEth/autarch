@@ -14,22 +14,60 @@ from typing import Optional, List
 
 
 # ── Application Root ────────────────────────────────────────────────
+#
+# Two directories matter:
+#   _BUNDLE_DIR — read-only bundled assets (templates, static, default modules)
+#                 Points to sys._MEIPASS in a frozen PyInstaller build,
+#                 otherwise same as _APP_DIR.
+#   _APP_DIR    — writable application root (config, data, results, user modules)
+#                 Points to the .exe's parent directory in a frozen build,
+#                 otherwise the project root (parent of core/).
 
-# Computed once: the autarch project root (parent of core/)
-_APP_DIR = Path(__file__).resolve().parent.parent
+import sys as _sys
+
+_FROZEN = getattr(_sys, 'frozen', False)
+
+if _FROZEN:
+    # PyInstaller frozen build
+    _BUNDLE_DIR = Path(_sys._MEIPASS)
+    _APP_DIR = Path(_sys.executable).resolve().parent
+else:
+    # Normal Python execution
+    _APP_DIR = Path(__file__).resolve().parent.parent
+    _BUNDLE_DIR = _APP_DIR
+
+
+def is_frozen() -> bool:
+    """Return True if running from a PyInstaller bundle."""
+    return _FROZEN
 
 
 def get_app_dir() -> Path:
-    """Return the AUTARCH application root directory."""
+    """Return the writable application root directory."""
     return _APP_DIR
 
 
+def get_bundle_dir() -> Path:
+    """Return the bundle directory (read-only assets: templates, static, default modules)."""
+    return _BUNDLE_DIR
+
+
 def get_core_dir() -> Path:
-    return _APP_DIR / 'core'
+    return _BUNDLE_DIR / 'core'
 
 
 def get_modules_dir() -> Path:
-    return _APP_DIR / 'modules'
+    """Return the bundled modules directory (read-only in frozen mode)."""
+    return _BUNDLE_DIR / 'modules'
+
+
+def get_user_modules_dir() -> Path:
+    """Return the user modules directory (writable, next to exe).
+    New or modified modules go here; scanned in addition to bundled modules."""
+    d = _APP_DIR / 'modules'
+    if _FROZEN:
+        d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 def get_data_dir() -> Path:
@@ -39,7 +77,15 @@ def get_data_dir() -> Path:
 
 
 def get_config_path() -> Path:
-    return _APP_DIR / 'autarch_settings.conf'
+    """Return config path.  Writable copy lives next to the exe;
+    falls back to the bundled default if the writable copy doesn't exist yet."""
+    writable = _APP_DIR / 'autarch_settings.conf'
+    if not writable.exists() and _FROZEN:
+        bundled = _BUNDLE_DIR / 'autarch_settings.conf'
+        if bundled.exists():
+            import shutil as _sh
+            _sh.copy2(str(bundled), str(writable))
+    return writable
 
 
 def get_results_dir() -> Path:

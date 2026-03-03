@@ -1,7 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for AUTARCH Public Release
-# Build: pyinstaller autarch_public.spec
-# Output: dist/autarch_public.exe (single-file executable)
+#
+# Build:   pyinstaller autarch_public.spec
+# Output:  dist/autarch/
+#            ├── autarch.exe       (CLI — full framework, console window)
+#            └── autarch_web.exe   (Web — double-click to launch dashboard + tray icon, no console)
 
 import sys
 from pathlib import Path
@@ -11,24 +14,30 @@ SRC = Path(SPECPATH)
 block_cipher = None
 
 # ── Data files (non-Python assets to bundle) ─────────────────────────────────
-added_files = [
+# Only include files that actually exist to prevent build failures
+_candidate_files = [
     # Web assets
-    (str(SRC / 'web' / 'templates'), 'web/templates'),
-    (str(SRC / 'web' / 'static'),    'web/static'),
+    (SRC / 'web' / 'templates', 'web/templates'),
+    (SRC / 'web' / 'static',    'web/static'),
 
     # Data (SQLite DBs, site lists, config defaults)
-    (str(SRC / 'data'),              'data'),
+    (SRC / 'data',              'data'),
 
-    # Modules directory (dynamically loaded)
-    (str(SRC / 'modules'),           'modules'),
+    # Modules directory (dynamically loaded at runtime)
+    (SRC / 'modules',           'modules'),
+
+    # LLM model
+    (SRC / 'models' / 'Hal_v2.gguf', 'models'),
 
     # Root-level config and docs
-    (str(SRC / 'autarch_settings.conf'),         '.'),
-    (str(SRC / 'user_manual.md'),                '.'),
-    (str(SRC / 'windows_manual.md'),             '.'),
-    (str(SRC / 'custom_sites.inf'),              '.'),
-    (str(SRC / 'custom_adultsites.json'),        '.'),
+    (SRC / 'autarch_settings.conf',  '.'),
+    (SRC / 'user_manual.md',         '.'),
+    (SRC / 'windows_manual.md',      '.'),
+    (SRC / 'custom_sites.inf',       '.'),
+    (SRC / 'custom_adultsites.json', '.'),
 ]
+
+added_files = [(str(src), dst) for src, dst in _candidate_files if src.exists()]
 
 # ── Hidden imports ────────────────────────────────────────────────────────────
 hidden_imports = [
@@ -39,10 +48,13 @@ hidden_imports = [
 
     # Core libraries
     'bcrypt', 'requests', 'msgpack', 'pyserial', 'qrcode', 'PIL',
-    'PIL.Image', 'PIL.ImageDraw', 'cryptography',
+    'PIL.Image', 'PIL.ImageDraw', 'PIL.ImageFont', 'cryptography',
+
+    # System tray
+    'pystray', 'pystray._win32',
 
     # AUTARCH core modules
-    'core.config', 'core.paths', 'core.banner', 'core.menu',
+    'core.config', 'core.paths', 'core.banner', 'core.menu', 'core.tray',
     'core.llm', 'core.agent', 'core.tools',
     'core.msf', 'core.msf_interface',
     'core.hardware', 'core.android_protect',
@@ -74,6 +86,7 @@ hidden_imports = [
     'web.routes.chat',
     'web.routes.targets',
     'web.routes.encmodules',
+    'web.routes.llm_trainer',
 
     # Standard library (sometimes missed on Windows)
     'email.mime.text', 'email.mime.multipart',
@@ -82,9 +95,30 @@ hidden_imports = [
     'threading', 'queue', 'uuid', 'hashlib', 'zlib',
     'configparser', 'platform', 'socket', 'shutil',
     'importlib', 'importlib.util', 'importlib.metadata',
+    'webbrowser', 'ssl',
 ]
 
-a = Analysis(
+excludes = [
+    # Exclude heavy optional deps not needed at runtime
+    'torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
+    'tkinter', 'matplotlib', 'numpy',
+    # CUDA / quantization libraries
+    'bitsandbytes',
+    # HuggingFace ecosystem
+    'huggingface_hub', 'safetensors', 'tokenizers',
+    # MCP/uvicorn/starlette
+    'mcp', 'uvicorn', 'starlette', 'anyio', 'httpx', 'httpx_sse',
+    'httpcore', 'h11', 'h2', 'hpack', 'hyperframe',
+    # Pydantic
+    'pydantic', 'pydantic_core', 'pydantic_settings',
+    # Other heavy packages
+    'scipy', 'pandas', 'tensorflow', 'keras',
+    'IPython', 'notebook', 'jupyterlab',
+    'fsspec', 'rich', 'typer',
+]
+
+# ── Analysis for CLI entry point ─────────────────────────────────────────────
+a_cli = Analysis(
     ['autarch.py'],
     pathex=[str(SRC)],
     binaries=[],
@@ -93,38 +127,40 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        # Exclude heavy optional deps not needed at runtime
-        'torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
-        'tkinter', 'matplotlib', 'numpy',
-        # CUDA / quantization libraries (bitsandbytes ships 169MB of CUDA DLLs)
-        'bitsandbytes',
-        # HuggingFace ecosystem (pulled in by llama_cpp_python)
-        'huggingface_hub', 'safetensors', 'tokenizers',
-        # MCP/uvicorn/starlette (heavy server stack not needed in frozen exe)
-        'mcp', 'uvicorn', 'starlette', 'anyio', 'httpx', 'httpx_sse',
-        'httpcore', 'h11', 'h2', 'hpack', 'hyperframe',
-        # Pydantic (pulled in by MCP/huggingface)
-        'pydantic', 'pydantic_core', 'pydantic_settings',
-        # Other heavy / unnecessary packages
-        'scipy', 'pandas', 'tensorflow', 'keras',
-        'IPython', 'notebook', 'jupyterlab',
-        'fsspec', 'rich', 'typer',
-    ],
+    excludes=excludes,
     noarchive=False,
     optimize=0,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+# ── Analysis for Web entry point ─────────────────────────────────────────────
+a_web = Analysis(
+    ['autarch_web.py'],
+    pathex=[str(SRC)],
+    binaries=[],
+    datas=added_files,
+    hiddenimports=hidden_imports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=excludes,
+    noarchive=False,
+    optimize=0,
+)
 
-# ── Single-file executable ───────────────────────────────────────────────────
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
+# ── Merge analyses (shared libraries only stored once) ───────────────────────
+MERGE(
+    (a_cli, 'autarch', 'autarch'),
+    (a_web, 'autarch_web', 'autarch_web'),
+)
+
+# ── CLI executable (console window) ─────────────────────────────────────────
+pyz_cli = PYZ(a_cli.pure, a_cli.zipped_data, cipher=block_cipher)
+exe_cli = EXE(
+    pyz_cli,
+    a_cli.scripts,
     [],
-    name='autarch_public',
+    exclude_binaries=True,
+    name='autarch',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -136,4 +172,39 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,
+)
+
+# ── Web executable (NO console window — tray icon only) ─────────────────────
+pyz_web = PYZ(a_web.pure, a_web.zipped_data, cipher=block_cipher)
+exe_web = EXE(
+    pyz_web,
+    a_web.scripts,
+    [],
+    exclude_binaries=True,
+    name='autarch_web',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False,       # <-- No console window
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=None,
+)
+
+# ── Collect everything into one directory ────────────────────────────────────
+coll = COLLECT(
+    exe_cli,
+    a_cli.binaries,
+    a_cli.datas,
+    exe_web,
+    a_web.binaries,
+    a_web.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='autarch',
 )

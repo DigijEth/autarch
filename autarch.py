@@ -210,6 +210,11 @@ def create_parser():
         metavar='PORT',
         help='Web dashboard port (default: 8181)'
     )
+    parser.add_argument(
+        '--no-tray',
+        action='store_true',
+        help='Disable system tray icon (run web server in foreground only)'
+    )
 
     # Web service management
     parser.add_argument(
@@ -680,6 +685,20 @@ def main():
             proto = 'http'
 
         print(f"{Colors.GREEN}[+] Starting AUTARCH Web Dashboard on {proto}://{host}:{port}{Colors.RESET}")
+
+        # System tray mode (default on desktop environments)
+        if not args.no_tray:
+            try:
+                from core.tray import TrayManager, TRAY_AVAILABLE
+                if TRAY_AVAILABLE:
+                    print(f"{Colors.DIM}  System tray icon active — right-click to control{Colors.RESET}")
+                    tray = TrayManager(app, host, port, ssl_context=ssl_ctx)
+                    tray.run()  # Blocks until Exit
+                    sys.exit(0)
+            except Exception:
+                pass  # Fall through to normal mode
+
+        # Fallback: run Flask directly (headless / --no-tray)
         app.run(host=host, port=port, debug=False, ssl_context=ssl_ctx)
         sys.exit(0)
 

@@ -100,29 +100,36 @@ class MainMenu:
         print(f"{color}[{symbol}] {message}{Colors.RESET}")
 
     def load_modules(self):
-        """Load all available modules from the modules directory."""
-        modules_path = self._app_dir / self.config.get('autarch', 'modules_path', 'modules')
+        """Load all available modules from the modules directory.
 
-        if not modules_path.exists():
-            self.print_status(f"Modules directory not found: {modules_path}", "warning")
-            return
+        In a frozen (PyInstaller) build, scans both the bundled modules inside
+        _MEIPASS and the user modules directory next to the exe.  User modules
+        override bundled modules with the same name.
+        """
+        from core.paths import get_modules_dir, get_user_modules_dir, is_frozen
 
-        for module_file in modules_path.glob("*.py"):
-            if module_file.name.startswith("_"):
-                continue
+        # Collect module files — bundled first, then user (user overrides)
+        module_files: dict[str, Path] = {}
 
-            module_name = module_file.stem
+        bundled = get_modules_dir()
+        if bundled.exists():
+            for f in bundled.glob("*.py"):
+                if not f.name.startswith("_") and f.stem != "setup":
+                    module_files[f.stem] = f
 
-            # Skip the setup module from regular listing
-            if module_name == "setup":
-                continue
+        if is_frozen():
+            user_dir = get_user_modules_dir()
+            if user_dir.exists():
+                for f in user_dir.glob("*.py"):
+                    if not f.name.startswith("_") and f.stem != "setup":
+                        module_files[f.stem] = f  # Override bundled
 
+        for module_name, module_file in module_files.items():
             try:
                 spec = importlib.util.spec_from_file_location(module_name, module_file)
                 module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(module)
 
-                # Check if module has required 'run' function
                 if hasattr(module, 'run'):
                     self.modules[module_name] = ModuleInfo(module_name, module_file, module)
                 else:

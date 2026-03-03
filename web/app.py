@@ -9,15 +9,20 @@ from pathlib import Path
 from flask import Flask
 
 # Ensure framework is importable
-FRAMEWORK_DIR = Path(__file__).parent.parent
+if getattr(sys, 'frozen', False):
+    FRAMEWORK_DIR = Path(sys._MEIPASS)
+else:
+    FRAMEWORK_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(FRAMEWORK_DIR))
 
 
 def create_app():
+    # In frozen builds, templates/static are inside _MEIPASS, not next to __file__
+    bundle_web = FRAMEWORK_DIR / 'web'
     app = Flask(
         __name__,
-        template_folder=str(Path(__file__).parent / 'templates'),
-        static_folder=str(Path(__file__).parent / 'static')
+        template_folder=str(bundle_web / 'templates'),
+        static_folder=str(bundle_web / 'static')
     )
 
     # Config
