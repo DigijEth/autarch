@@ -26,9 +26,6 @@ _candidate_files = [
     # Modules directory (dynamically loaded at runtime)
     (SRC / 'modules',           'modules'),
 
-    # LLM model
-    (SRC / 'models' / 'Hal_v2.gguf', 'models'),
-
     # Icon
     (SRC / 'autarch.ico',            '.'),
 
