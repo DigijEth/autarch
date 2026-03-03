@@ -2324,3 +2324,35 @@ Full Hash Toolkit added as a sub-page under Analyze (sidebar sub-item like Legen
 - Phase 6 (Docker): NOT STARTED
 - Plan file (quizzical-toasting-mccarthy.md) — Threat Monitor + Hal Module Factory: DONE
 
+---
+
+## Session 18 - 2026-03-02: Chat Fix, Tray Icon, v1.5.1 Release
+
+### Fixes
+- **Hal Chat broken** — All messages went through Agent system, models can't follow structured format → `Error: '"info"'`. Fixed by adding Chat/Agent mode toggle: Chat mode streams tokens directly via `llm.chat(stream=True)`, Agent mode uses tool-using Agent system.
+- **Agent infinite retry** — Models that can't produce `THOUGHT/ACTION/PARAMS` looped 20 times. Fixed: after 2 consecutive parse failures, return the raw response as a direct answer.
+- **LLM missing in exe** — `llama_cpp` was in PyInstaller excludes. Removed from `autarch_public.spec` and `setup_msi.py`.
+- **No exe icon** — Created `autarch.ico` from `icon.svg`, wired into PyInstaller spec, Inno Setup installer, and `core/tray.py`.
+
+### New Features
+- Chat/Agent toggle switch in Hal panel header (CSS slider, defaults to Chat mode)
+- `autarch.ico` multi-resolution icon (16-256px) for exe, tray, installer shortcuts
+- `icon.svg` source artwork (anarchy-A cyberpunk neon)
+
+### Release
+- **v1.5.1** pushed to GitHub: https://github.com/DigijEth/autarch/releases/tag/v1.5.1
+- Assets: `AUTARCH_Setup.exe`, `AUTARCH_v1.5.1_Portable.zip` (51 MB)
+
+### Key files modified
+- `web/routes/chat.py` — Dual-mode: `_handle_direct_chat()` + `_handle_agent_chat()`
+- `core/agent.py` — `parse_failures` counter, graceful fallback after 2 failures
+- `core/tray.py` — `_get_icon_path()`, loads `.ico` with fallback
+- `autarch_public.spec` — Icon paths, removed llama_cpp from excludes
+- `web/templates/base.html` — Hal mode toggle switch
+- `web/static/js/app.js` — `halAgentMode`, `halModeChanged()`, mode in POST body
+- `web/static/css/style.css` — Toggle switch styles
+- `installer.iss` — Icon paths, v1.5.1
+- `autarch.ico`, `icon.svg` (NEW)
+
+**Phase status:** Phases 0–4.28 DONE, Phase 6 (Docker) NOT STARTED
+

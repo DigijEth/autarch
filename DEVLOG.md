@@ -5552,3 +5552,61 @@ Wired Hal chat to the Agent system so it can create new AUTARCH modules on deman
 
 ---
 
+## Session 18 - 2026-03-02
+
+### Phase 4.25 — Hal Chat Fix (Chat/Agent Dual Mode)
+
+**Problem:** All Hal chat messages were routed through the Agent system (`core/agent.py`), which expects structured `THOUGHT:/ACTION:/PARAMS:` responses. Local GGUF models return plain conversational text, causing `_parse_response()` to fail with `ValueError("No ACTION found")` on every message. The agent retried 20 times, exhausted max steps, and returned `Error: '"info"'`.
+
+**Fix — Dual-mode routing:**
+
+**Files Changed:**
+- `web/routes/chat.py` — Split `/api/chat` into `_handle_direct_chat()` (streams tokens via `llm.chat(stream=True)`) and `_handle_agent_chat()` (existing Agent system). Mode selected by `mode` field in POST body (`'chat'` default, `'agent'` for tools).
+- `web/templates/base.html` — Added toggle switch in Hal panel header (Chat ↔ Agent)
+- `web/static/js/app.js` — Added `halAgentMode` flag, `halModeChanged()`, passes `mode` in fetch body
+- `web/static/css/style.css` — Toggle switch CSS (`.hal-mode-switch`, `.hal-mode-slider`, `.hal-mode-label`)
+
+### Phase 4.26 — Agent Graceful Degradation
+
+**Problem:** In Agent mode, models that can't follow the structured format would loop 20 times and error out.
+
+**Fix:**
+
+**Files Changed:**
+- `core/agent.py` — Added `parse_failures` counter. After 2 consecutive `ValueError` from `_parse_response()`, the agent cleans up the raw response (strips ChatML tokens) and returns it as a `task_complete` result instead of continuing to retry. First failure still gets one retry with format correction prompt.
+
+### Phase 4.27 — Frozen Build LLM Fix
+
+**Problem:** Compiled exe reported `llama-cpp-python not installed: No module named 'llama_cpp'` because `llama_cpp` and `llama_cpp_python` were in the PyInstaller excludes list.
+
+**Fix:**
+
+**Files Changed:**
+- `autarch_public.spec` — Removed `llama_cpp`, `llama_cpp_python`, `anthropic` from `excludes` list
+- `setup_msi.py` — Same removal from excludes
+
+### Phase 4.28 — System Tray Icon
+
+**Problem:** No `.ico` file existed — exe had no icon in Explorer/taskbar, and the tray icon relied on Pillow generating one programmatically at runtime.
+
+**Fix:**
+
+**Files Changed:**
+- `autarch.ico` (NEW) — Multi-resolution .ico (16-256px) created from `icon.svg`
+- `icon.svg` (NEW) — SVG source for the AUTARCH icon (anarchy-A in circle, cyberpunk neon style)
+- `core/tray.py` — Added `_get_icon_path()` to find `.ico` in both source and frozen builds. `create_icon_image()` now loads from `.ico` first, falls back to programmatic generation.
+- `autarch_public.spec` — Added `icon=str(SRC / 'autarch.ico')` for both exe targets, added `.ico` to data files
+- `installer.iss` — Added `SetupIconFile=autarch.ico`, `UninstallDisplayIcon`, `IconFilename` on shortcuts
+
+### v1.5.1 Release
+
+**Release:** https://github.com/DigijEth/autarch/releases/tag/v1.5.1
+
+**Assets:**
+- `AUTARCH_Setup.exe` — Inno Setup installer with icon
+- `AUTARCH_v1.5.1_Portable.zip` (51 MB) — Portable build
+
+**Version bumped** in `installer.iss`, `installer.nsi`, `setup_msi.py`.
+
+---
+
