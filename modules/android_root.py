@@ -1,10 +1,18 @@
 """
-Android Root Methods - Root detection, Magisk install, exploit-based rooting
+Android Root Methods v2.0 — Root detection, Magisk, CVE exploits, GrapheneOS support
+
+Privilege escalation paths:
+  CVE-2024-0044  — run-as any app UID (Android 12-13, pre-Oct 2024)
+  CVE-2024-31317 — Zygote injection (Android 12-14, pre-Mar 2024, NOT GrapheneOS)
+  fastboot boot  — temp root via Magisk-patched image (unlocked bootloader)
+  Pixel GPU      — kernel root via Mali driver (CVE-2023-6241, CVE-2025-0072)
+  Magisk         — standard Magisk install + patch workflow
+  adb root       — userdebug/eng builds only
 """
 
-DESCRIPTION = "Android root methods (Magisk, exploits, root detection)"
+DESCRIPTION = "Android root methods (CVE-2024-0044, CVE-2024-31317, Magisk, fastboot, GrapheneOS)"
 AUTHOR = "AUTARCH"
-VERSION = "1.0"
+VERSION = "2.0"
 CATEGORY = "offense"
 
 import sys
@@ -13,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 class AndroidRoot:
-    """Interactive menu for Android rooting operations."""
+    """Interactive menu for Android rooting and privilege escalation."""
 
     def __init__(self):
         from core.android_exploit import get_exploit_manager
@@ -48,16 +56,22 @@ class AndroidRoot:
         return self.serial is not None
 
     def show_menu(self):
-        print(f"\n{'='*50}")
-        print("  Root Methods")
-        print(f"{'='*50}")
+        print(f"\n{'='*55}")
+        print("  Root Methods & Privilege Escalation")
+        print(f"{'='*55}")
         print(f"  Device: {self.serial or '(none)'}")
         print()
         print("  [1] Check Root Status")
-        print("  [2] Install Magisk APK")
-        print("  [3] Pull Patched Boot Image")
-        print("  [4] Root via Exploit")
-        print("  [5] ADB Root Shell (debug builds)")
+        print("  [2] Vulnerability Assessment")
+        print("  [3] Detect OS (Stock / GrapheneOS)")
+        print("  [4] CVE-2024-0044 — run-as any app UID")
+        print("  [5] CVE-2024-31317 — Zygote injection")
+        print("  [6] Install Magisk APK")
+        print("  [7] Pull Patched Boot Image")
+        print("  [8] Fastboot Temp Root (boot patched image)")
+        print("  [9] Root via Exploit Binary")
+        print("  [a] ADB Root Shell (debug builds)")
+        print("  [c] Cleanup CVE-2024-0044 Traces")
         print("  [s] Select Device")
         print("  [0] Back")
         print()
@@ -72,11 +86,76 @@ class AndroidRoot:
             print(f"  Method: {result['method']}")
         if result['version']:
             print(f"  Version: {result['version']}")
-        details = result.get('details', {})
-        if details:
-            print(f"  Details:")
-            for k, v in details.items():
-                print(f"    {k}: {v}")
+        for k, v in result.get('details', {}).items():
+            print(f"    {k}: {v}")
+
+    def vuln_assessment(self):
+        if not self._ensure_device():
+            return
+        print("  Assessing vulnerabilities...")
+        result = self.mgr.assess_vulnerabilities(self.serial)
+        oi = result['os_info']
+        print(f"\n  OS: {'GrapheneOS' if oi.get('is_grapheneos') else 'Stock Android'}")
+        print(f"  Model: {oi.get('model', '?')} ({oi.get('brand', '?')})")
+        print(f"  Android: {oi.get('android_version', '?')} (SDK {oi.get('sdk', '?')})")
+        print(f"  Patch: {oi.get('security_patch', '?')}")
+        print(f"  Bootloader: {'UNLOCKED' if oi.get('bootloader_unlocked') else 'LOCKED'}")
+        print(f"  Kernel: {oi.get('kernel', '?')}")
+        print(f"\n  Exploitable: {result['exploitable_count']}")
+        print(f"  Kernel root: {'YES' if result['has_kernel_root'] else 'NO'}")
+        print(f"  App UID:     {'YES' if result['has_app_uid'] else 'NO'}")
+        for v in result['vulnerabilities']:
+            m = '[!]' if v.get('exploitable') else '[ ]'
+            print(f"\n  {m} {v.get('cve', 'N/A'):20s} {v['name']}")
+            print(f"       Type: {v['type']} | Severity: {v.get('severity', '?')}")
+            if v.get('note'):
+                print(f"       Note: {v['note']}")
+
+    def detect_os(self):
+        if not self._ensure_device():
+            return
+        info = self.mgr.detect_os_type(self.serial)
+        print(f"\n  Brand: {info.get('brand', '?')}")
+        print(f"  Model: {info.get('model', '?')}")
+        print(f"  Android: {info.get('android_version', '?')} (SDK {info.get('sdk', '?')})")
+        print(f"  Patch: {info.get('security_patch', '?')}")
+        print(f"  Pixel: {'YES' if info.get('is_pixel') else 'NO'}")
+        print(f"  GrapheneOS: {'YES' if info.get('is_grapheneos') else 'NO'}")
+        print(f"  Hardened Malloc: {'YES' if info.get('hardened_malloc') else 'NO'}")
+        print(f"  Bootloader: {'UNLOCKED' if info.get('bootloader_unlocked') else 'LOCKED'}")
+
+    def cve_0044(self):
+        if not self._ensure_device():
+            return
+        try:
+            target = input("  Target package [com.google.android.apps.messaging]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if not target:
+            target = 'com.google.android.apps.messaging'
+        print(f"  Exploiting CVE-2024-0044 against {target}...")
+        result = self.mgr.exploit_cve_2024_0044(self.serial, target)
+        if result['success']:
+            print(f"\n  SUCCESS! {result['message']}")
+            print(f"  Victim: {result['victim_name']}  UID: {result['target_uid']}")
+        else:
+            print(f"\n  FAILED: {result.get('error', 'Unknown')}")
+
+    def cve_31317(self):
+        if not self._ensure_device():
+            return
+        try:
+            target = input("  Target package [com.google.android.apps.messaging]: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if not target:
+            target = 'com.google.android.apps.messaging'
+        print(f"  Exploiting CVE-2024-31317 against {target}...")
+        result = self.mgr.exploit_cve_2024_31317(self.serial, target)
+        if result['success']:
+            print(f"\n  SUCCESS! {result['message']}")
+        else:
+            print(f"\n  FAILED: {result.get('error', 'Unknown')}")
 
     def install_magisk(self):
         if not self._ensure_device():
@@ -87,25 +166,36 @@ class AndroidRoot:
             return
         if not apk:
             return
-        print("  Installing Magisk APK...")
         result = self.mgr.install_magisk(self.serial, apk)
         if result['success']:
-            print("  Magisk installed successfully.")
-            print("  Next: Open Magisk app, patch boot image, then flash patched boot.")
+            print("  Magisk installed. Open app → patch boot image → use [8] to temp boot.")
         else:
             print(f"  Error: {result.get('error', result.get('output', 'Failed'))}")
 
     def pull_patched(self):
         if not self._ensure_device():
             return
-        print("  Looking for patched boot image...")
         result = self.mgr.pull_patched_boot(self.serial)
         if result['success']:
-            size_mb = result['size'] / (1024 * 1024)
-            print(f"  Saved: {result['local_path']} ({size_mb:.1f} MB)")
-            print("  Next: Reboot to fastboot, flash this as boot partition.")
+            print(f"  Saved: {result['local_path']} ({result['size'] / (1024*1024):.1f} MB)")
         else:
             print(f"  Error: {result.get('error', 'Failed')}")
+
+    def fastboot_root(self):
+        if not self._ensure_device():
+            return
+        try:
+            img = input("  Patched boot/init_boot image: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if not img:
+            return
+        print("  Booting patched image via fastboot (temp root, no flash)...")
+        result = self.mgr.fastboot_temp_root(self.serial, img)
+        if result['success']:
+            print(f"\n  {result['message']}")
+        else:
+            print(f"\n  FAILED: {result.get('error', '')}")
 
     def root_exploit(self):
         if not self._ensure_device():
@@ -116,23 +206,28 @@ class AndroidRoot:
             return
         if not exploit:
             return
-        print("  Deploying and executing exploit...")
         result = self.mgr.root_via_exploit(self.serial, exploit)
-        if result['success']:
-            print("  ROOT OBTAINED!")
-        else:
-            print("  Root not obtained.")
-        print(f"  Exploit output:\n{result.get('exploit_output', '')}")
+        print("  ROOT OBTAINED!" if result['success'] else "  Root not obtained.")
+        print(f"  Output:\n{result.get('exploit_output', '')}")
 
     def adb_root(self):
         if not self._ensure_device():
             return
-        print("  Attempting adb root (userdebug/eng builds only)...")
         result = self.mgr.adb_root_shell(self.serial)
-        if result['success']:
-            print("  ADB running as root.")
-        else:
-            print(f"  Failed: {result['output']}")
+        print("  ADB running as root." if result['success'] else f"  Failed: {result['output']}")
+
+    def cleanup(self):
+        if not self._ensure_device():
+            return
+        try:
+            victim = input("  Victim name from CVE-2024-0044: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return
+        if not victim:
+            return
+        result = self.mgr.cleanup_cve_2024_0044(self.serial, victim)
+        for line in result.get('cleanup', []):
+            print(f"  {line}")
 
     def run_interactive(self):
         while True:
@@ -144,12 +239,10 @@ class AndroidRoot:
             if choice == '0':
                 break
             actions = {
-                '1': self.check_root,
-                '2': self.install_magisk,
-                '3': self.pull_patched,
-                '4': self.root_exploit,
-                '5': self.adb_root,
-                's': self._select_device,
+                '1': self.check_root, '2': self.vuln_assessment, '3': self.detect_os,
+                '4': self.cve_0044, '5': self.cve_31317, '6': self.install_magisk,
+                '7': self.pull_patched, '8': self.fastboot_root, '9': self.root_exploit,
+                'a': self.adb_root, 'c': self.cleanup, 's': self._select_device,
             }
             action = actions.get(choice)
             if action:
