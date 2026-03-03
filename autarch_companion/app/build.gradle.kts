@@ -58,4 +58,8 @@ dependencies {
     // Local ADB client (wireless debugging pairing + shell)
     implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
     implementation("org.conscrypt:conscrypt-android:2.5.3")
+
+    // Shizuku for elevated access (SMS/RCS operations)
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }

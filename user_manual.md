@@ -35,10 +35,14 @@ No prior hacking experience is needed to use most features. This manual will wal
 14. [Archon Companion App](#14-archon-companion-app)
 15. [AI Chat & Agents](#15-ai-chat--agents)
 16. [MCP Server](#16-mcp-server)
-17. [Configuration & Settings](#17-configuration--settings)
-18. [Troubleshooting](#18-troubleshooting)
-19. [Quick Reference](#19-quick-reference)
-20. [Safety & Legal Notice](#20-safety--legal-notice)
+17. [Advanced Offense Tools](#17-advanced-offense-tools)
+18. [Advanced Defense Tools](#18-advanced-defense-tools)
+19. [Advanced Analysis Tools](#19-advanced-analysis-tools)
+20. [SDR/RF & Starlink Tools](#20-sdrrf--starlink-tools)
+21. [Configuration & Settings](#21-configuration--settings)
+22. [Troubleshooting](#22-troubleshooting)
+23. [Quick Reference](#23-quick-reference)
+24. [Safety & Legal Notice](#24-safety--legal-notice)
 
 ---
 
@@ -165,19 +169,45 @@ The left sidebar has these sections:
 - Module counts
 - LLM and UPnP status
 
-**Categories** — The 6 main tool categories (Defense, Offense, Counter, Analyze, OSINT, Simulate)
+**Autonomy** — AI-driven autonomous security operations
+
+**Categories** — The 6 main tool categories:
+- **Defense** — System hardening, firewall, SSH, services, scan monitor
+  - Linux / Windows / Threat Monitor sub-pages
+  - Threat Intel, Log Correlator, Container Sec, Email Sec, Incident Response
+- **Offense** — Penetration testing & exploitation
+  - Load Test, Gone Fishing, Social Eng, Hack Hijack, Web Scanner
+  - C2 Framework, WiFi Audit, Deauth, API Fuzzer, Cloud Scan
+  - Vuln Scanner, Exploit Dev, AD Audit, MITM Proxy, Pineapple, SMS Forge
+- **Counter** — Threat detection & hunting
+  - Steganography, Anti-Forensics
+- **Analyze** — Forensics & analysis
+  - Hash Toolkit, LLM Trainer, Password Toolkit, Net Mapper, Reports
+  - BLE Scanner, Forensics, RFID/NFC, Malware Sandbox, Reverse Eng
+- **OSINT** — Intelligence gathering
+  - IP Capture
+- **Simulate** — Attack scenarios & Legendary Creator
 
 **Tools** — Specialized tool pages:
+- **Enc Modules** — Encrypted module management
 - **Wireshark** — Packet capture & analysis
 - **Hardware** — Android/iPhone/ESP32 device management
 - **Android Exploit** — Android-specific attack tools
+  - SMS Forge — SMS backup forging
 - **iPhone Exploit** — iPhone forensics tools
 - **Shield** — Anti-stalkerware/spyware scanner
 - **Reverse Shell** — Remote device management
+- **Archon** — Android companion app
+- **SDR/RF Tools** — Software-defined radio & drone detection
+- **Starlink Hack** — Starlink terminal exploitation
+- **RCS Tools** — SMS/RCS message exploitation
 
 **System** — Infrastructure management:
 - **UPnP** — Port forwarding
 - **WireGuard** — VPN management
+- **DNS Server** — Built-in DNS service
+- **MSF Console** — Metasploit terminal
+- **Chat** — AI chat interface
 - **Settings** — All configuration options
 
 ### Running as a Background Service
@@ -765,7 +795,402 @@ Then in Claude Desktop, you can say things like "Use AUTARCH to scan 192.168.1.1
 
 ---
 
-## 17. Configuration & Settings
+## 17. Advanced Offense Tools
+
+AUTARCH v2.3 includes a comprehensive suite of offense modules for authorized penetration testing.
+
+### Vulnerability Scanner
+
+Template-based vulnerability scanning with Nuclei and OpenVAS integration.
+
+- **Scan profiles:** Quick, Standard, Full, or custom template selection
+- **Results:** Severity-rated findings (Critical/High/Medium/Low/Info)
+- **Integration:** Feeds results into the Report Engine
+- **Web UI:** 3 tabs — Scan, Templates, Results
+
+### Exploit Development
+
+Shellcode generation, payload encoding, ROP chain building, and buffer overflow pattern tools.
+
+- **Shellcode:** Reverse shell, bind shell — x86, x64, ARM
+- **Encoder:** XOR, AES, polymorphic stub generation
+- **ROP Builder:** Gadget finder from binary, chain assembly
+- **Patterns:** Cyclic pattern create/offset for buffer overflow development
+- **Web UI:** 4 tabs — Shellcode, Encoder, ROP, Patterns
+
+### Social Engineering
+
+Credential harvesting, pretexting, QR phishing, and campaign tracking.
+
+- **Page Cloner:** Clone login pages for authorized phishing tests
+- **Pretexts:** Library of IT support, HR, vendor, delivery templates
+- **QR Codes:** Embed URLs in QR codes with custom branding
+- **Campaigns:** Track which pretexts and vectors get clicks
+- **Integration:** Works with Gone Fishing mail server and IP Capture
+- **Web UI:** 4 tabs — Harvest, Pretexts, QR Codes, Campaigns
+
+### Active Directory Audit
+
+LDAP enumeration, Kerberoasting, AS-REP roasting, ACL analysis, and BloodHound data collection.
+
+- **Enumerate:** Users, groups, OUs, GPOs, trusts, domain controllers
+- **Kerberoast:** Request TGS tickets, extract hashes for offline cracking
+- **ACL Analysis:** Find dangerous permissions (WriteDACL, GenericAll)
+- **BloodHound:** JSON ingestor for graph-based attack path analysis
+- **Web UI:** 4 tabs — Enumerate, Attack, ACLs, BloodHound
+
+### MITM Proxy
+
+HTTP(S) interception with SSL stripping, request modification, and traffic logging.
+
+- **Proxy:** Intercept and modify HTTP/HTTPS traffic (mitmproxy integration)
+- **SSL Strip:** Test SSL stripping detection
+- **Rules:** Header injection, body replacement, WebSocket interception
+- **Upstream:** Proxy chaining through Tor or SOCKS proxies
+- **Web UI:** 3 tabs — Proxy, Rules, Traffic Log
+
+### WiFi Pineapple / Rogue AP
+
+Rogue access point creation, Evil Twin attacks, captive portals, and Karma attacks. Designed for Raspberry Pi and similar SBCs.
+
+- **Rogue AP:** hostapd-based fake AP with configurable SSID, channel, encryption
+- **Evil Twin:** Clone target AP, deauth original, capture reconnections
+- **Captive Portal:** Hotel WiFi, corporate, social media login pages
+- **Karma Attack:** Respond to all probe requests, auto-associate clients
+- **Tools:** hostapd, dnsmasq, iptables/nftables, airbase-ng
+- **Web UI:** 4 tabs — Rogue AP, Captive Portal, Clients, Traffic
+
+### Deauth Attack
+
+Targeted and broadcast deauthentication attacks. Designed for Raspberry Pi with monitor-mode WiFi adapters.
+
+- **Targeted:** Disconnect specific client from specific AP
+- **Broadcast:** Disconnect all clients from target AP
+- **Continuous:** Persistent deauth with configurable interval and burst count
+- **Channel Hop:** Auto-detect target channel or sweep all channels
+- **Tools:** aireplay-ng, mdk3/mdk4, scapy raw frame injection
+- **Integration:** Pairs with WiFi Audit for handshake capture after deauth
+- **Web UI:** 3 tabs — Targets, Attack, Monitor
+
+### C2 Framework
+
+Multi-agent command and control with task queuing, agent management, and payload generation.
+
+- **Listeners:** Multi-port TCP accept with agent registration
+- **Agents:** Python, Bash, PowerShell templates with configurable beacon interval/jitter
+- **Tasks:** exec, download, upload, sysinfo commands
+- **Payloads:** One-liner generators with copy-to-clipboard
+- **Web UI:** 3 tabs — Dashboard (auto-refresh), Agents (interactive shell), Generate
+
+### Load Test
+
+HTTP load/stress testing with configurable concurrency and duration.
+
+- **Modes:** GET, POST, custom headers, authentication
+- **Metrics:** Requests/sec, latency percentiles, error rate, throughput
+- **Web UI:** Configure target, run test, view live results
+
+### Gone Fishing Mail Server
+
+Built-in SMTP mail server for phishing simulation campaigns.
+
+- **Local Network:** The public release operates on local network only
+- **Templates:** Customizable email templates with variable substitution
+- **Tracking:** Integrates with IP Capture for open/click tracking
+- **Web UI:** Compose, send, and track phishing emails
+
+### Hack & Hijack
+
+Session hijacking, cookie theft, and DNS hijacking tools.
+
+- **Session Hijack:** Capture and replay session tokens
+- **DNS Hijack:** Redirect domain resolution
+- **Web UI:** Configure targets and execute attacks
+
+### Web Application Scanner
+
+Automated web vulnerability scanning with crawling and fuzzing.
+
+- **Crawler:** Discover pages, forms, and API endpoints
+- **Scanners:** XSS, SQLi, CSRF, directory traversal, header injection
+- **Reports:** Severity-rated findings with remediation guidance
+- **Web UI:** Scan configuration, results viewer
+
+### API Fuzzer
+
+REST/GraphQL API endpoint fuzzing and security testing.
+
+- **Discovery:** Endpoint enumeration from OpenAPI specs or crawling
+- **Fuzzing:** Parameter mutation, boundary testing, injection payloads
+- **Auth Testing:** Token manipulation, privilege escalation checks
+- **Web UI:** 3 tabs — Endpoints, Fuzz, Results
+
+### Cloud Security Scanner
+
+AWS, Azure, and GCP misconfiguration scanning.
+
+- **S3/Blob:** Public bucket/container detection
+- **IAM:** Overprivileged role analysis
+- **Network:** Security group and firewall rule audit
+- **Web UI:** Provider selection, scan results with severity
+
+### SMS Forge
+
+Create and modify SMS/MMS backup XML files in SMS Backup & Restore format for Android.
+
+- **Create:** Build fake conversations with realistic timestamps
+- **Modify:** Edit existing backup files — change bodies, senders, timestamps
+- **Templates:** Business meeting, casual chat, delivery notifications, verification codes
+- **Export:** XML (SMS Backup & Restore compatible), CSV, HTML chat view
+- **Web UI:** 3 tabs — Create (chat bubble preview), Editor, Tools
+
+### RCS/SMS Exploitation (v2.0)
+
+Comprehensive RCS/SMS database extraction, forging, modification, backup, and exploitation
+on connected Android devices. Uses content providers (no root), Archon app relay with Shizuku,
+CVE-2024-0044 privilege escalation, and direct bugle_db access. Messages in Google Messages'
+bugle_db are stored as **plaintext** — no decryption needed.
+
+**Exploitation Paths (in order of preference):**
+
+1. Content providers at UID 2000 (shell/Shizuku) — SMS/MMS, no root needed
+2. Archon app relay (READ_SMS + Shizuku) — full bugle_db access including RCS
+3. CVE-2024-0044 exploit (Android 12-13 pre-Oct 2024 patch) — full app-UID access
+4. ADB backup (deprecated Android 12+ but works on some devices)
+5. Root access (if available)
+
+**7 Tabs in Web UI:**
+
+- **Extract** — Read SMS/MMS via content providers, query AOSP RCS provider (`content://rcs/`),
+  enumerate all accessible messaging content providers, filter by address/keyword/thread, export
+  to JSON/CSV/XML (SMS Backup & Restore format)
+- **Database** — Extract Google Messages bugle_db directly (plaintext messages), run arbitrary
+  SQL queries against extracted databases, extract RCS-only messages, conversation exports,
+  message edit history, preset queries for common forensic tasks
+- **Forge** — Insert fake SMS/MMS/RCS messages with arbitrary sender, body, timestamp, and
+  direction. Forge entire conversations, bulk insert, import SMS Backup & Restore XML files.
+  RCS forging via Archon relay for direct bugle_db insertion
+- **Modify** — Change message bodies, senders, timestamps, type (inbox/sent). Shift all
+  timestamps for an address, mark messages read, wipe threads, delete individual messages
+- **Exploit** — CVE-2024-0044 run-as privilege escalation (check vulnerability, execute exploit,
+  cleanup traces). RCS spoofing (typing indicators, read receipts). Clone RCS identity, extract
+  Signal Protocol E2EE session state. Known CVE database (CVE-2023-24033 Exynos baseband,
+  CVE-2024-49415 Samsung zero-click, CVE-2025-48593 Android system RCE). IMS/RCS diagnostics
+  (dumpsys telephony_ims, carrier config, Phenotype verbose logging, RCS log capture, Pixel
+  diagnostics, Google Messages debug menu activation via `*xyzzy*`)
+- **Backup** — Full SMS/MMS/RCS backup to JSON or XML, restore from backup, clone messages to
+  another device. Archon full backup (including RCS and attachments). Set default SMS app
+  (Archon/Google Messages/Samsung). List saved backups and exports
+- **Monitor** — Real-time SMS/RCS interception via logcat, intercepted message feed with
+  auto-refresh
+
+**Key bugle_db Tables:**
+- `conversations` — Thread metadata, snippet, participants
+- `messages` — `message_protocol` field: 0=SMS, 1=MMS, 2+=RCS
+- `parts` — Plaintext message bodies in `text` column, attachment URIs
+- `participants` — Phone numbers and contact names
+- `message_edits` — RCS message edit history
+
+**AOSP RCS Provider URIs (content://rcs/):**
+- `content://rcs/thread`, `content://rcs/p2p_thread`, `content://rcs/group_thread`
+- `content://rcs/participant`, `content://rcs/.../message`, `content://rcs/.../file_transfer`
+
+**Archon Integration:**
+- Set Archon as default SMS app for full message access
+- Extract bugle_db via Shizuku-elevated shell (UID 2000)
+- Forge/modify RCS messages directly in bugle_db via broadcast commands
+- Full backup including RCS messages and attachments
+
+### Starlink Hack
+
+Starlink terminal security analysis and exploitation for authorized testing.
+
+- **Discovery:** Find dish on network (192.168.100.1), gRPC enumeration
+- **gRPC Control:** Stow, unstow, reboot, factory reset via gRPC API
+- **Firmware:** Version check against known vulnerabilities (CVE database)
+- **Network:** Subnet scan, DNS/CGNAT bypass testing, WiFi security audit
+- **RF Analysis:** Ku-band downlink capture with SDR (HackRF/RTL-SDR)
+- **Web UI:** 4 tabs — Terminal, Attack, Signal, Network
+
+---
+
+## 18. Advanced Defense Tools
+
+### Container Security
+
+Docker and Kubernetes security auditing.
+
+- **Docker:** Socket access audit, privileged container detection, capability review, image scanning
+- **Kubernetes:** Pod enumeration, RBAC review, secrets exposure, network policies
+- **Image Scan:** Trivy/Grype integration for CVE scanning
+- **Container Escape:** Check for common breakout vectors
+- **Web UI:** 3 tabs — Docker, Kubernetes, Image Scan
+
+### Email Security
+
+DMARC/SPF/DKIM analysis, email header forensics, and phishing detection.
+
+- **DNS Records:** Validate DMARC, SPF, DKIM for any domain
+- **Header Forensics:** Trace email routing, identify spoofing indicators
+- **Phishing Detection:** URL analysis, attachment scanning, brand impersonation
+- **Mailbox:** IMAP/POP3 connection, keyword search, export
+- **Web UI:** 3 tabs — Analyze, Headers, Mailbox
+
+### Incident Response
+
+IR playbook runner, evidence collection, IOC sweeping, and timeline building.
+
+- **Playbooks:** Step-by-step guided response (ransomware, data breach, insider threat, DDoS)
+- **Evidence:** Automated log gathering, memory dump, disk image
+- **IOC Sweeper:** Scan hosts for indicators from threat intel
+- **Timeline:** Aggregate events from multiple sources into unified timeline
+- **Web UI:** 4 tabs — Playbooks, Evidence, Sweep, Timeline
+
+### Threat Intelligence
+
+Threat feed aggregation, IOC management, and STIX/TAXII integration.
+
+- **Feeds:** Aggregate from multiple threat intel sources
+- **IOCs:** Manage indicators of compromise (IP, domain, hash, URL)
+- **Correlation:** Cross-reference IOCs with local logs and network data
+- **Web UI:** Feed management, IOC search, correlation results
+
+### Log Correlator
+
+Multi-source log aggregation and security event correlation.
+
+- **Sources:** Syslog, Windows Event Log, application logs, network devices
+- **Rules:** Correlation rules for detecting attack patterns
+- **Alerts:** Real-time alerting on suspicious event combinations
+- **Web UI:** Log viewer, rule editor, alert dashboard
+
+---
+
+## 19. Advanced Analysis Tools
+
+### Reverse Engineering
+
+Binary analysis, disassembly, YARA scanning, and hex viewing.
+
+- **Binary Analysis:** File type detection, strings, entropy analysis
+- **PE/ELF Parser:** Headers, sections, imports/exports, resources
+- **Disassembler:** Capstone integration for x86/x64/ARM
+- **Decompiler:** Ghidra headless integration
+- **YARA Scanner:** Match binaries against rule sets
+- **Packer Detection:** UPX, Themida, custom packer signatures
+- **Web UI:** 4 tabs — Analyze, Disasm, YARA, Hex View
+
+### Digital Forensics
+
+Disk forensics, memory analysis, and artifact extraction.
+
+- **Disk:** Image mounting, file system analysis, deleted file recovery
+- **Memory:** Volatility integration for RAM analysis
+- **Artifacts:** Browser history, registry hives, prefetch files
+- **Timeline:** Forensic timeline from multiple evidence sources
+- **Web UI:** Evidence management, analysis tools, reporting
+
+### Steganography
+
+Hide and extract data in images, audio, and other media.
+
+- **Embed:** LSB encoding, DCT domain, spread spectrum
+- **Extract:** Detect and extract hidden data from media files
+- **Analysis:** Statistical steganalysis to detect hidden content
+- **Web UI:** Embed, Extract, and Analyze tabs
+
+### Anti-Forensics
+
+Counter-forensics tools for testing forensic resilience.
+
+- **Timestamp Manipulation:** Modify file timestamps
+- **Log Cleaning:** Selective log entry removal
+- **Secure Delete:** Overwrite and wipe files beyond recovery
+- **Metadata Stripping:** Remove EXIF, document metadata
+- **Web UI:** Tools for each anti-forensic technique
+
+### Malware Sandbox
+
+Safe malware detonation and behavior analysis.
+
+- **Sandbox:** Isolated execution environment for suspicious files
+- **Behavior:** System call monitoring, network activity, file changes
+- **Reports:** Automated analysis reports with IOC extraction
+- **Web UI:** Upload, execute, analyze, report
+
+### BLE Scanner
+
+Bluetooth Low Energy device discovery and security testing.
+
+- **Discovery:** Scan for BLE devices, services, characteristics
+- **Enumeration:** Read GATT services and characteristics
+- **Fuzzing:** Write malformed data to characteristics
+- **Tracking:** Monitor BLE advertisement patterns
+- **Web UI:** Scan, enumerate, and test BLE devices
+
+### RFID/NFC Tools
+
+RFID and NFC card reading, cloning, and emulation.
+
+- **Read:** UID, ATQA, SAK, data blocks from Mifare/NTAG
+- **Clone:** Duplicate cards to writable blanks
+- **Emulate:** NFC tag emulation for testing access systems
+- **Web UI:** Card reader, data viewer, cloning tools
+
+### Net Mapper
+
+Network topology discovery and visualization.
+
+- **Discovery:** Host discovery via nmap or ICMP/TCP ping sweep
+- **Topology:** SVG visualization with force-directed layout
+- **Diff:** Compare scans over time to detect changes
+- **Web UI:** 3 tabs — Discover, Map, Saved Scans
+
+### Report Engine
+
+Professional penetration test report generation.
+
+- **Templates:** Executive summary, methodology, findings, recommendations
+- **Findings:** Pre-built templates with CVSS scores (OWASP Top 10)
+- **Export:** HTML (styled), Markdown, JSON
+- **Web UI:** 3 tabs — Reports, Editor, Templates
+
+### Password Toolkit
+
+Password analysis, generation, and cracking tools.
+
+- **Analysis:** Strength checking, entropy calculation, policy compliance
+- **Generation:** Secure password/passphrase generation
+- **Cracking:** Dictionary, brute-force, rule-based attack simulation
+- **Web UI:** Analyze, generate, and test passwords
+
+---
+
+## 20. SDR/RF & Starlink Tools
+
+### SDR/RF Tools
+
+Software-defined radio spectrum analysis with HackRF and RTL-SDR support.
+
+- **Spectrum Analyzer:** Frequency scanning, signal strength visualization
+- **RF Replay:** Capture and retransmit signals (authorized testing)
+- **ADS-B:** Aircraft tracking via dump1090 integration
+- **GPS Spoofing Detection:** Monitor for GPS signal anomalies
+- **Drone Detection:** Real-time drone RF signature detection and classification
+  - Scans 2.4 GHz, 5.8 GHz, 900 MHz, and 433 MHz bands
+  - Identifies DJI OcuSync, analog/digital FPV, ExpressLRS, TBS Crossfire
+  - FHSS pattern analysis for frequency-hopping protocols
+  - Confidence-scored detections with protocol identification
+  - All 32 standard 5.8 GHz FPV video channels mapped
+- **Web UI:** 4 tabs — Spectrum, Capture/Replay, ADS-B, Drone Detection
+
+### Starlink Hack
+
+See [Section 17: Advanced Offense Tools — Starlink Hack](#starlink-hack) for full details.
+
+---
+
+## 21. Configuration & Settings
 
 ### The Config File
 
@@ -837,7 +1262,7 @@ mappings = 443:TCP,51820:UDP,8080:TCP
 
 ---
 
-## 18. Troubleshooting
+## 22. Troubleshooting
 
 ### "Module not found" error
 - Run `python autarch.py --list` to see available modules
@@ -883,7 +1308,7 @@ mappings = 443:TCP,51820:UDP,8080:TCP
 
 ---
 
-## 19. Quick Reference
+## 23. Quick Reference
 
 ### Most-Used Commands
 
@@ -904,12 +1329,12 @@ python autarch.py --service status   # Check web service
 
 | # | Category | Color | What's In It |
 |---|----------|-------|-------------|
-| 1 | Defense | Blue | System hardening, shield, VPN, scan monitor |
-| 2 | Offense | Red | Metasploit, reverse shell, Android exploits |
-| 3 | Counter | Purple | Threat detection, rootkit scanning |
-| 4 | Analyze | Cyan | File forensics, packet capture |
-| 5 | OSINT | Green | Username/email/domain/IP lookup |
-| 6 | Simulate | Yellow | Port scanning, payload generation |
+| 1 | Defense | Blue | System hardening, shield, VPN, scan monitor, threat intel, container/email sec, incident response |
+| 2 | Offense | Red | Metasploit, reverse shell, C2 framework, WiFi audit, deauth, vuln scanner, exploit dev, AD audit, MITM, pineapple, social eng, SMS forge, RCS tools, Starlink hack |
+| 3 | Counter | Purple | Threat detection, rootkit scanning, steganography, anti-forensics |
+| 4 | Analyze | Cyan | File forensics, packet capture, reverse engineering, BLE/RFID, malware sandbox, SDR/RF, drone detection |
+| 5 | OSINT | Green | Username/email/domain/IP lookup, IP capture |
+| 6 | Simulate | Yellow | Port scanning, payload generation, Legendary Creator |
 
 ### Key Ports
 
@@ -937,7 +1362,7 @@ python autarch.py --service status   # Check web service
 
 ---
 
-## 20. Safety & Legal Notice
+## 24. Safety & Legal Notice
 
 AUTARCH is a powerful security platform. Use it responsibly.
 
@@ -967,5 +1392,5 @@ If you discover your device has been compromised:
 
 ---
 
-*AUTARCH v1.3 — By darkHal Security Group and Setec Security Labs*
-*This manual covers all features through Phase 5 (February 2026)*
+*AUTARCH v2.3 — By darkHal Security Group and Setec Security Labs*
+*This manual covers all features including 59 web modules, 72 CLI modules, SDR drone detection, Starlink hacking, SMS/RCS exploitation, and the Archon companion app (March 2026)*

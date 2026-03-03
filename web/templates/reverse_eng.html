@@ -1,0 +1,734 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Reverse Engineering{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Reverse Engineering</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Binary analysis, disassembly, YARA scanning, hex viewing, and packer detection.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="re" data-tab="analyze" onclick="showTab('re','analyze')">Analyze</button>
+    <button class="tab" data-tab-group="re" data-tab="disasm" onclick="showTab('re','disasm')">Disasm</button>
+    <button class="tab" data-tab-group="re" data-tab="yara" onclick="showTab('re','yara')">YARA</button>
+    <button class="tab" data-tab-group="re" data-tab="hex" onclick="showTab('re','hex')">Hex View</button>
+</div>
+
+<!-- ==================== ANALYZE TAB ==================== -->
+<div class="tab-content active" data-tab-group="re" data-tab="analyze">
+
+<div class="section">
+    <h2>Binary Analysis</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Comprehensive file analysis: type detection, hashes, entropy, strings, imports, exports, and packer detection.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>File Path</label>
+            <input type="text" id="analyze-file" placeholder="/path/to/binary.exe">
+        </div>
+        <div class="form-group" style="max-width:160px;align-self:flex-end">
+            <button id="btn-analyze" class="btn btn-primary" onclick="reAnalyze()">Analyze</button>
+        </div>
+    </div>
+</div>
+
+<!-- Analysis Results (hidden until analysis runs) -->
+<div id="analyze-results" style="display:none">
+
+    <!-- File Info Card -->
+    <div class="section">
+        <h2>File Info</h2>
+        <table class="data-table" id="analyze-info-table">
+            <tbody>
+                <tr><td style="width:140px">Name</td><td id="a-name" style="font-weight:600"></td></tr>
+                <tr><td>Type</td><td id="a-type"></td></tr>
+                <tr><td>Architecture</td><td id="a-arch"></td></tr>
+                <tr><td>Size</td><td id="a-size"></td></tr>
+                <tr><td>Modified</td><td id="a-modified"></td></tr>
+                <tr><td>MD5</td><td id="a-md5" style="font-family:monospace;font-size:0.85rem"></td></tr>
+                <tr><td>SHA1</td><td id="a-sha1" style="font-family:monospace;font-size:0.85rem"></td></tr>
+                <tr><td>SHA256</td><td id="a-sha256" style="font-family:monospace;font-size:0.85rem;word-break:break-all"></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Entropy -->
+    <div class="section">
+        <h2>Entropy</h2>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
+            <span style="font-size:1.2rem;font-weight:600" id="a-entropy-value"></span>
+            <div style="flex:1;height:20px;background:var(--bg-input);border-radius:4px;overflow:hidden">
+                <div id="a-entropy-bar" style="height:100%;border-radius:4px;transition:width 0.4s"></div>
+            </div>
+            <span id="a-entropy-label" style="font-size:0.8rem;font-weight:600;padding:2px 8px;border-radius:4px"></span>
+        </div>
+        <table class="data-table" id="a-sections-table" style="display:none">
+            <thead>
+                <tr><th>Section</th><th>Raw Size</th><th>Entropy</th><th style="width:40%">Bar</th><th>Status</th></tr>
+            </thead>
+            <tbody id="a-sections-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Imports -->
+    <div class="section" id="a-imports-section" style="display:none">
+        <h2>Imports <span id="a-imports-count" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+        <div id="a-imports-container"></div>
+    </div>
+
+    <!-- Exports -->
+    <div class="section" id="a-exports-section" style="display:none">
+        <h2>Exports <span id="a-exports-count" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+        <table class="data-table" id="a-exports-table">
+            <thead><tr><th>Name</th><th>Ordinal</th><th>Address</th></tr></thead>
+            <tbody id="a-exports-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Packer Detection -->
+    <div class="section" id="a-packer-section" style="display:none">
+        <h2>Packer Detection</h2>
+        <div id="a-packer-result"></div>
+    </div>
+
+    <!-- Strings Preview -->
+    <div class="section">
+        <h2>Strings <span id="a-strings-count" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+        <div class="form-row" style="margin-bottom:8px">
+            <input type="text" id="a-strings-filter" placeholder="Filter strings..." style="max-width:300px" oninput="reFilterStrings()">
+        </div>
+        <div id="a-strings-container" style="max-height:300px;overflow-y:auto;font-family:monospace;font-size:0.82rem;background:var(--bg-primary);padding:8px;border-radius:var(--radius);border:1px solid var(--border)"></div>
+    </div>
+
+</div>
+
+<!-- Compare Section -->
+<div class="section" style="margin-top:24px;border-top:1px solid var(--border);padding-top:24px">
+    <h2>Binary Comparison</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>File 1</label>
+            <input type="text" id="cmp-file1" placeholder="/path/to/binary1">
+        </div>
+        <div class="form-group">
+            <label>File 2</label>
+            <input type="text" id="cmp-file2" placeholder="/path/to/binary2">
+        </div>
+        <div class="form-group" style="max-width:120px;align-self:flex-end">
+            <button id="btn-compare" class="btn btn-primary btn-small" onclick="reCompare()">Compare</button>
+        </div>
+    </div>
+    <pre class="output-panel" id="cmp-result" style="display:none"></pre>
+</div>
+
+</div>
+
+<!-- ==================== DISASM TAB ==================== -->
+<div class="tab-content" data-tab-group="re" data-tab="disasm">
+
+<div class="section">
+    <h2>Disassembly</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Disassemble binary data from a file section or raw hex bytes.
+    </p>
+
+    <!-- Input Mode Toggle -->
+    <div style="margin-bottom:12px">
+        <button class="btn btn-small" id="disasm-mode-file" onclick="reDisasmMode('file')" style="opacity:1">From File</button>
+        <button class="btn btn-small" id="disasm-mode-hex" onclick="reDisasmMode('hex')" style="opacity:0.5">From Hex Bytes</button>
+    </div>
+
+    <!-- File Mode -->
+    <div id="disasm-file-inputs">
+        <div class="form-row">
+            <div class="form-group" style="flex:1">
+                <label>File Path</label>
+                <input type="text" id="disasm-file" placeholder="/path/to/binary">
+            </div>
+            <div class="form-group" style="max-width:140px">
+                <label>Section</label>
+                <input type="text" id="disasm-section" placeholder=".text" value=".text">
+            </div>
+            <div class="form-group" style="max-width:120px">
+                <label>Offset</label>
+                <input type="number" id="disasm-offset" value="0" min="0">
+            </div>
+        </div>
+    </div>
+
+    <!-- Hex Mode -->
+    <div id="disasm-hex-inputs" style="display:none">
+        <div class="form-group">
+            <label>Hex Bytes</label>
+            <textarea id="disasm-hex" rows="4" placeholder="48 89 5c 24 08 48 89 6c 24 10 48 89 74 24 18 ..." style="font-family:monospace"></textarea>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group" style="max-width:140px">
+            <label>Architecture</label>
+            <select id="disasm-arch">
+                <option value="x64">x86-64</option>
+                <option value="x86">x86 (32-bit)</option>
+                <option value="arm">ARM</option>
+                <option value="arm64">ARM64</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Count</label>
+            <input type="number" id="disasm-count" value="100" min="1" max="5000">
+        </div>
+        <div class="form-group" style="max-width:160px;align-self:flex-end">
+            <button id="btn-disasm" class="btn btn-primary" onclick="reDisassemble()">Disassemble</button>
+        </div>
+    </div>
+</div>
+
+<!-- Disassembly Output -->
+<div class="section" id="disasm-results" style="display:none">
+    <h2>Disassembly Output <span id="disasm-count-label" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+    <div style="max-height:600px;overflow-y:auto;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)">
+        <table class="data-table" style="margin:0">
+            <thead><tr><th style="width:100px">Address</th><th style="width:180px">Bytes</th><th style="width:100px">Mnemonic</th><th>Operands</th></tr></thead>
+            <tbody id="disasm-body"></tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== YARA TAB ==================== -->
+<div class="tab-content" data-tab-group="re" data-tab="yara">
+
+<div class="section">
+    <h2>YARA Scanner</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Scan files against YARA rules for malware signatures, patterns, and indicators of compromise.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>File Path to Scan</label>
+            <input type="text" id="yara-file" placeholder="/path/to/suspect_binary">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="max-width:250px">
+            <label>Rule Source</label>
+            <select id="yara-source" onchange="reYaraSourceChange()">
+                <option value="all">All Built-in Rules</option>
+                <option value="select">Select Rule File</option>
+                <option value="custom">Custom Rule (inline)</option>
+            </select>
+        </div>
+        <div class="form-group" style="flex:1;display:none" id="yara-select-group">
+            <label>Rule File</label>
+            <select id="yara-rulefile"><option value="">Loading...</option></select>
+        </div>
+    </div>
+    <div class="form-group" id="yara-custom-group" style="display:none">
+        <label>Custom YARA Rule</label>
+        <textarea id="yara-custom" rows="8" placeholder='rule example_rule {
+    strings:
+        $a = "malware"
+        $b = { 6A 40 68 00 30 00 00 }
+    condition:
+        $a or $b
+}' style="font-family:monospace;font-size:0.85rem"></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-yara" class="btn btn-primary" onclick="reYaraScan()">Scan</button>
+        <button class="btn btn-small" onclick="reYaraLoadRules()">Refresh Rules</button>
+    </div>
+</div>
+
+<!-- YARA Results -->
+<div class="section" id="yara-results" style="display:none">
+    <h2>Scan Results <span id="yara-match-count" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+    <div id="yara-results-container"></div>
+</div>
+
+<!-- Available Rules -->
+<div class="section">
+    <h2>Available Rules</h2>
+    <div id="yara-rules-list" style="font-size:0.85rem;color:var(--text-secondary)">
+        <em>Click "Refresh Rules" to load the list of available YARA rule files.</em>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== HEX VIEW TAB ==================== -->
+<div class="tab-content" data-tab-group="re" data-tab="hex">
+
+<div class="section">
+    <h2>Hex Viewer</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        View raw binary content in hex and ASCII format.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>File Path</label>
+            <input type="text" id="hex-file" placeholder="/path/to/binary">
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Offset</label>
+            <input type="number" id="hex-offset" value="0" min="0">
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Length</label>
+            <input type="number" id="hex-length" value="512" min="16" max="65536">
+        </div>
+        <div class="form-group" style="max-width:100px;align-self:flex-end">
+            <button id="btn-hex" class="btn btn-primary" onclick="reHexDump()">Load</button>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-small" onclick="reHexNav(-1)" title="Previous page">Prev</button>
+        <button class="btn btn-small" onclick="reHexNav(1)" title="Next page">Next</button>
+        <span id="hex-info" style="font-size:0.8rem;color:var(--text-muted);align-self:center"></span>
+    </div>
+</div>
+
+<!-- Hex Dump Display -->
+<div class="section" id="hex-dump-section" style="display:none">
+    <pre id="hex-dump-output" style="font-family:'Cascadia Code','Fira Code','Courier New',monospace;font-size:0.82rem;line-height:1.6;background:var(--bg-primary);padding:12px;border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;max-height:600px;overflow-y:auto;white-space:pre;tab-size:8"></pre>
+</div>
+
+<!-- Hex Search -->
+<div class="section">
+    <h2>Hex Search</h2>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>Hex Pattern</label>
+            <input type="text" id="hex-search-pattern" placeholder="4D 5A 90 00  or  4d5a9000" style="font-family:monospace">
+        </div>
+        <div class="form-group" style="max-width:120px;align-self:flex-end">
+            <button id="btn-hex-search" class="btn btn-primary btn-small" onclick="reHexSearch()">Search</button>
+        </div>
+    </div>
+    <div id="hex-search-results" style="display:none">
+        <p style="font-size:0.85rem;margin-bottom:8px"><strong id="hex-search-count"></strong></p>
+        <div id="hex-search-list" style="max-height:200px;overflow-y:auto;font-family:monospace;font-size:0.82rem;background:var(--bg-primary);padding:8px;border-radius:var(--radius);border:1px solid var(--border)"></div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+/* -- globals for hex pagination -- */
+var _reStrings = [];
+var _hexCurrentOffset = 0;
+var _hexCurrentLength = 512;
+var _hexCurrentFile = '';
+
+/* ==================== ANALYZE ==================== */
+function reAnalyze() {
+    var btn = document.getElementById('btn-analyze');
+    var file = document.getElementById('analyze-file').value.trim();
+    if (!file) return;
+    setLoading(btn, true);
+    document.getElementById('analyze-results').style.display = 'none';
+    postJSON('/reverse-eng/analyze', {file: file}).then(function(r) {
+        setLoading(btn, false);
+        if (r.error) { alert(r.error); return; }
+        document.getElementById('analyze-results').style.display = '';
+        /* File info */
+        document.getElementById('a-name').textContent = r.name || '';
+        document.getElementById('a-type').textContent = (r.file_type||{}).type || 'unknown';
+        document.getElementById('a-arch').textContent = r.architecture || 'unknown';
+        document.getElementById('a-size').textContent = (r.size_human||'') + ' (' + (r.size||0).toLocaleString() + ' bytes)';
+        document.getElementById('a-modified').textContent = r.modified || '';
+        document.getElementById('a-md5').textContent = (r.hashes||{}).md5 || '';
+        document.getElementById('a-sha1').textContent = (r.hashes||{}).sha1 || '';
+        document.getElementById('a-sha256').textContent = (r.hashes||{}).sha256 || '';
+        /* Entropy */
+        var ent = r.entropy || 0;
+        document.getElementById('a-entropy-value').textContent = ent.toFixed(4);
+        var pct = (ent / 8) * 100;
+        var bar = document.getElementById('a-entropy-bar');
+        bar.style.width = pct + '%';
+        var lbl = document.getElementById('a-entropy-label');
+        if (ent > 7.0) { bar.style.background = 'var(--danger)'; lbl.textContent = 'HIGH'; lbl.style.background = 'rgba(239,68,68,0.2)'; lbl.style.color = 'var(--danger)'; }
+        else if (ent > 6.0) { bar.style.background = '#f59e0b'; lbl.textContent = 'MEDIUM'; lbl.style.background = 'rgba(245,158,11,0.2)'; lbl.style.color = '#f59e0b'; }
+        else { bar.style.background = '#22c55e'; lbl.textContent = 'LOW'; lbl.style.background = 'rgba(34,197,94,0.2)'; lbl.style.color = '#22c55e'; }
+        /* Section entropy */
+        var se = r.section_entropy || [];
+        var stbl = document.getElementById('a-sections-table');
+        var sbody = document.getElementById('a-sections-body');
+        sbody.innerHTML = '';
+        if (se.length > 0) {
+            stbl.style.display = '';
+            se.forEach(function(s) {
+                var color = s.entropy > 7.0 ? 'var(--danger)' : (s.entropy > 6.0 ? '#f59e0b' : '#22c55e');
+                var w = (s.entropy / 8) * 100;
+                var status = s.packed ? '<span style="color:var(--danger);font-weight:600">PACKED</span>' : '<span style="color:#22c55e">Normal</span>';
+                sbody.innerHTML += '<tr><td style="font-family:monospace">' + escapeHtml(s.name) + '</td><td>' + (s.size||0).toLocaleString() + '</td><td style="font-weight:600;color:' + color + '">' + s.entropy.toFixed(2) + '</td><td><div style="height:14px;background:var(--bg-input);border-radius:3px;overflow:hidden"><div style="height:100%;width:' + w + '%;background:' + color + ';border-radius:3px"></div></div></td><td>' + status + '</td></tr>';
+            });
+        } else {
+            stbl.style.display = 'none';
+        }
+        /* Imports */
+        var imports = r.imports || [];
+        var impSec = document.getElementById('a-imports-section');
+        var impCont = document.getElementById('a-imports-container');
+        impCont.innerHTML = '';
+        if (imports.length > 0) {
+            impSec.style.display = '';
+            var totalFuncs = 0;
+            imports.forEach(function(lib) { totalFuncs += (lib.functions||[]).length; });
+            document.getElementById('a-imports-count').textContent = '(' + imports.length + ' libraries, ' + totalFuncs + ' functions)';
+            imports.forEach(function(lib, idx) {
+                var fns = lib.functions || [];
+                var id = 'imp-lib-' + idx;
+                var html = '<div style="margin-bottom:6px"><button class="btn btn-small" onclick="var e=document.getElementById(\'' + id + '\');e.style.display=e.style.display===\'none\'?\'\':\'none\'" style="font-family:monospace;font-size:0.82rem;text-align:left;width:100%;justify-content:flex-start">' + escapeHtml(lib.library || '?') + ' <span style="color:var(--text-muted)">(' + fns.length + ')</span></button>';
+                html += '<div id="' + id + '" style="display:none;padding:4px 0 4px 20px;font-family:monospace;font-size:0.8rem;color:var(--text-secondary);max-height:200px;overflow-y:auto">';
+                fns.forEach(function(f) {
+                    html += '<div>' + escapeHtml(f.name || '') + '</div>';
+                });
+                html += '</div></div>';
+                impCont.innerHTML += html;
+            });
+        } else {
+            impSec.style.display = 'none';
+        }
+        /* Exports */
+        var exports = r.exports || [];
+        var expSec = document.getElementById('a-exports-section');
+        var expBody = document.getElementById('a-exports-body');
+        expBody.innerHTML = '';
+        if (exports.length > 0) {
+            expSec.style.display = '';
+            document.getElementById('a-exports-count').textContent = '(' + exports.length + ')';
+            exports.forEach(function(e) {
+                expBody.innerHTML += '<tr><td style="font-family:monospace;font-size:0.85rem">' + escapeHtml(e.name||'') + '</td><td>' + (e.ordinal||'') + '</td><td style="font-family:monospace">' + escapeHtml(e.address||'') + '</td></tr>';
+            });
+        } else {
+            expSec.style.display = 'none';
+        }
+        /* Packer */
+        var packer = r.packer || {};
+        var pkSec = document.getElementById('a-packer-section');
+        var pkRes = document.getElementById('a-packer-result');
+        pkSec.style.display = '';
+        if (packer.detected) {
+            var ph = '';
+            (packer.detections||[]).forEach(function(d) {
+                var confColor = d.confidence > 70 ? 'var(--danger)' : (d.confidence > 40 ? '#f59e0b' : 'var(--text-secondary)');
+                ph += '<div style="padding:8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px">';
+                ph += '<div style="font-weight:600;color:var(--danger)">' + escapeHtml(d.packer) + ' <span style="color:' + confColor + ';font-size:0.85rem">(' + d.confidence + '% confidence)</span></div>';
+                ph += '<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:4px">' + escapeHtml(d.description||'') + '</div>';
+                (d.evidence||[]).forEach(function(ev) {
+                    ph += '<div style="font-size:0.8rem;color:var(--text-muted);padding-left:12px;font-family:monospace">' + escapeHtml(ev) + '</div>';
+                });
+                ph += '</div>';
+            });
+            pkRes.innerHTML = ph;
+        } else {
+            pkRes.innerHTML = '<div style="padding:8px;color:#22c55e">No packer detected. Entropy: ' + (packer.overall_entropy||0).toFixed(4) + '</div>';
+        }
+        /* Strings */
+        _reStrings = r.strings_preview || [];
+        document.getElementById('a-strings-count').textContent = '(' + (r.strings_count||0).toLocaleString() + ' total, showing first ' + _reStrings.length + ')';
+        reFilterStrings();
+    }).catch(function(e) {
+        setLoading(btn, false);
+        alert('Analysis failed: ' + e);
+    });
+}
+
+function reFilterStrings() {
+    var filter = (document.getElementById('a-strings-filter').value || '').toLowerCase();
+    var container = document.getElementById('a-strings-container');
+    var html = '';
+    var shown = 0;
+    _reStrings.forEach(function(s) {
+        if (filter && s.string.toLowerCase().indexOf(filter) === -1) return;
+        if (shown >= 500) return;
+        var enc = s.encoding === 'unicode' ? '<span style="color:#f59e0b">U</span>' : '<span style="color:var(--text-muted)">A</span>';
+        html += '<div style="display:flex;gap:12px;border-bottom:1px solid var(--border);padding:2px 4px"><span style="color:var(--text-muted);min-width:80px">0x' + s.offset.toString(16).padStart(8, '0') + '</span>' + enc + ' <span>' + escapeHtml(s.string) + '</span></div>';
+        shown++;
+    });
+    if (!html) html = '<div style="color:var(--text-muted);padding:8px">No strings match filter.</div>';
+    container.innerHTML = html;
+}
+
+/* ==================== COMPARE ==================== */
+function reCompare() {
+    var btn = document.getElementById('btn-compare');
+    var f1 = document.getElementById('cmp-file1').value.trim();
+    var f2 = document.getElementById('cmp-file2').value.trim();
+    if (!f1 || !f2) return;
+    setLoading(btn, true);
+    var out = document.getElementById('cmp-result');
+    out.style.display = 'none';
+    postJSON('/reverse-eng/compare', {file1: f1, file2: f2}).then(function(r) {
+        setLoading(btn, false);
+        out.style.display = '';
+        if (r.error) { out.textContent = 'Error: ' + r.error; return; }
+        var lines = [];
+        lines.push('File 1: ' + r.file1.name + '  (' + r.file1.size.toLocaleString() + ' bytes, entropy ' + r.file1.entropy.toFixed(2) + ')');
+        lines.push('File 2: ' + r.file2.name + '  (' + r.file2.size.toLocaleString() + ' bytes, entropy ' + r.file2.entropy.toFixed(2) + ')');
+        lines.push('');
+        if (r.identical) { lines.push('RESULT: Files are IDENTICAL'); }
+        else {
+            lines.push('Different bytes: ' + r.diff_bytes.toLocaleString() + ' (' + r.diff_percentage + '%)');
+            lines.push('Diff regions: ' + r.diff_regions_total);
+            if (r.section_diffs && r.section_diffs.length > 0) {
+                lines.push('');
+                lines.push('Section Diffs:');
+                r.section_diffs.forEach(function(s) {
+                    var marker = s.status === 'unchanged' ? '  ' : (s.status === 'modified' ? '* ' : (s.status === 'added' ? '+ ' : '- '));
+                    var detail = s.size_file1 !== undefined ? '  (' + s.size_file1 + ' vs ' + s.size_file2 + ')' : '';
+                    lines.push('  ' + marker + s.name + '  [' + s.status + ']' + detail);
+                });
+            }
+        }
+        lines.push('');
+        lines.push('MD5  file1: ' + r.file1.hashes.md5);
+        lines.push('MD5  file2: ' + r.file2.hashes.md5);
+        out.textContent = lines.join('\n');
+    }).catch(function(e) {
+        setLoading(btn, false);
+        out.style.display = '';
+        out.textContent = 'Error: ' + e;
+    });
+}
+
+/* ==================== DISASSEMBLE ==================== */
+var _disasmFileMode = true;
+
+function reDisasmMode(mode) {
+    _disasmFileMode = (mode === 'file');
+    document.getElementById('disasm-file-inputs').style.display = _disasmFileMode ? '' : 'none';
+    document.getElementById('disasm-hex-inputs').style.display = _disasmFileMode ? 'none' : '';
+    document.getElementById('disasm-mode-file').style.opacity = _disasmFileMode ? '1' : '0.5';
+    document.getElementById('disasm-mode-hex').style.opacity = _disasmFileMode ? '0.5' : '1';
+}
+
+function reDisassemble() {
+    var btn = document.getElementById('btn-disasm');
+    var body = {};
+    body.arch = document.getElementById('disasm-arch').value;
+    body.count = parseInt(document.getElementById('disasm-count').value) || 100;
+    if (_disasmFileMode) {
+        body.file = document.getElementById('disasm-file').value.trim();
+        body.section = document.getElementById('disasm-section').value.trim() || '.text';
+        body.offset = parseInt(document.getElementById('disasm-offset').value) || 0;
+        if (!body.file) return;
+    } else {
+        body.hex = document.getElementById('disasm-hex').value.trim();
+        if (!body.hex) return;
+    }
+    setLoading(btn, true);
+    document.getElementById('disasm-results').style.display = 'none';
+    postJSON('/reverse-eng/disassemble', body).then(function(r) {
+        setLoading(btn, false);
+        if (r.error) { alert(r.error); return; }
+        var insts = r.instructions || [];
+        if (insts.length > 0 && insts[0].error) { alert(insts[0].error); return; }
+        document.getElementById('disasm-results').style.display = '';
+        document.getElementById('disasm-count-label').textContent = '(' + insts.length + ' instructions)';
+        var tbody = document.getElementById('disasm-body');
+        tbody.innerHTML = '';
+        insts.forEach(function(inst) {
+            var row = '<tr>';
+            row += '<td style="font-family:monospace;color:var(--text-muted)">' + escapeHtml(inst.address||'') + '</td>';
+            row += '<td style="font-family:monospace;font-size:0.8rem;color:var(--text-muted)">' + escapeHtml(inst.bytes_hex||'') + '</td>';
+            row += '<td style="font-family:monospace;font-weight:600;color:var(--accent)">' + escapeHtml(inst.mnemonic||'') + '</td>';
+            /* Highlight registers and immediates in operands */
+            var ops = escapeHtml(inst.op_str||'');
+            ops = ops.replace(/\b(rax|rbx|rcx|rdx|rsi|rdi|rbp|rsp|r8|r9|r10|r11|r12|r13|r14|r15|eax|ebx|ecx|edx|esi|edi|ebp|esp|ax|bx|cx|dx|al|bl|cl|dl|ah|bh|ch|dh|cs|ds|es|fs|gs|ss|rip|eip|ip)\b/gi, '<span style="color:#22c55e">$1</span>');
+            ops = ops.replace(/\b(0x[0-9a-fA-F]+)\b/g, '<span style="color:#f59e0b">$1</span>');
+            row += '<td style="font-family:monospace;font-size:0.85rem">' + ops + '</td>';
+            row += '</tr>';
+            tbody.innerHTML += row;
+        });
+    }).catch(function(e) {
+        setLoading(btn, false);
+        alert('Disassembly failed: ' + e);
+    });
+}
+
+/* ==================== YARA ==================== */
+function reYaraSourceChange() {
+    var src = document.getElementById('yara-source').value;
+    document.getElementById('yara-select-group').style.display = src === 'select' ? '' : 'none';
+    document.getElementById('yara-custom-group').style.display = src === 'custom' ? '' : 'none';
+    if (src === 'select') reYaraLoadRules();
+}
+
+function reYaraLoadRules() {
+    fetchJSON('/reverse-eng/yara/rules').then(function(r) {
+        var rules = r.rules || [];
+        var sel = document.getElementById('yara-rulefile');
+        sel.innerHTML = '';
+        if (rules.length === 0) {
+            sel.innerHTML = '<option value="">(no rules found)</option>';
+        } else {
+            rules.forEach(function(rule) {
+                sel.innerHTML += '<option value="' + escapeHtml(rule.path) + '">' + escapeHtml(rule.name) + ' (' + rule.size + ' bytes)</option>';
+            });
+        }
+        /* Also update rules list section */
+        var list = document.getElementById('yara-rules-list');
+        if (rules.length === 0) {
+            list.innerHTML = '<em>No YARA rule files found. Place .yar/.yara files in data/reverse_eng/yara_rules/</em>';
+        } else {
+            var html = '<table class="data-table"><thead><tr><th>Name</th><th>Size</th><th>Modified</th></tr></thead><tbody>';
+            rules.forEach(function(rule) {
+                html += '<tr><td style="font-family:monospace">' + escapeHtml(rule.name) + '</td><td>' + rule.size + '</td><td>' + escapeHtml(rule.modified||'') + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            list.innerHTML = html;
+        }
+    });
+}
+
+function reYaraScan() {
+    var btn = document.getElementById('btn-yara');
+    var file = document.getElementById('yara-file').value.trim();
+    if (!file) return;
+    var body = {file: file};
+    var src = document.getElementById('yara-source').value;
+    if (src === 'select') {
+        body.rules_path = document.getElementById('yara-rulefile').value;
+    } else if (src === 'custom') {
+        body.rules_string = document.getElementById('yara-custom').value;
+    }
+    setLoading(btn, true);
+    document.getElementById('yara-results').style.display = 'none';
+    postJSON('/reverse-eng/yara/scan', body).then(function(r) {
+        setLoading(btn, false);
+        var sec = document.getElementById('yara-results');
+        sec.style.display = '';
+        var container = document.getElementById('yara-results-container');
+        if (r.error) {
+            document.getElementById('yara-match-count').textContent = '';
+            container.innerHTML = '<div style="color:var(--danger);padding:8px">' + escapeHtml(r.error) + '</div>';
+            return;
+        }
+        var matches = r.matches || [];
+        document.getElementById('yara-match-count').textContent = '(' + matches.length + ' matches, engine: ' + (r.engine||'') + ')';
+        if (matches.length === 0) {
+            container.innerHTML = '<div style="padding:8px;color:#22c55e">No YARA rules matched this file.</div>';
+            return;
+        }
+        var html = '';
+        matches.forEach(function(m) {
+            html += '<div style="padding:10px;background:var(--bg-primary);border:1px solid var(--danger);border-radius:var(--radius);margin-bottom:8px">';
+            html += '<div style="font-weight:600;color:var(--danger)">' + escapeHtml(m.rule||'') + '</div>';
+            if (m.namespace) html += '<div style="font-size:0.8rem;color:var(--text-muted)">Namespace: ' + escapeHtml(m.namespace) + '</div>';
+            if (m.tags && m.tags.length) html += '<div style="font-size:0.8rem;color:var(--text-muted)">Tags: ' + m.tags.map(escapeHtml).join(', ') + '</div>';
+            if (m.meta && Object.keys(m.meta).length) {
+                html += '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">';
+                Object.keys(m.meta).forEach(function(k) {
+                    html += '<div>' + escapeHtml(k) + ': ' + escapeHtml(String(m.meta[k])) + '</div>';
+                });
+                html += '</div>';
+            }
+            var strs = m.strings || [];
+            if (strs.length > 0) {
+                html += '<div style="margin-top:6px;font-family:monospace;font-size:0.82rem">';
+                strs.forEach(function(s) {
+                    html += '<div style="color:var(--text-secondary)">0x' + (s.offset||0).toString(16).padStart(8, '0') + ' ' + escapeHtml(s.identifier||'') + ' = ' + escapeHtml(s.data||'') + '</div>';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        });
+        container.innerHTML = html;
+    }).catch(function(e) {
+        setLoading(btn, false);
+        alert('YARA scan failed: ' + e);
+    });
+}
+
+/* ==================== HEX VIEW ==================== */
+function reHexDump() {
+    var btn = document.getElementById('btn-hex');
+    _hexCurrentFile = document.getElementById('hex-file').value.trim();
+    _hexCurrentOffset = parseInt(document.getElementById('hex-offset').value) || 0;
+    _hexCurrentLength = parseInt(document.getElementById('hex-length').value) || 512;
+    if (!_hexCurrentFile) return;
+    setLoading(btn, true);
+    postJSON('/reverse-eng/hex', {file: _hexCurrentFile, offset: _hexCurrentOffset, length: _hexCurrentLength}).then(function(r) {
+        setLoading(btn, false);
+        if (r.error) { alert(r.error); return; }
+        document.getElementById('hex-dump-section').style.display = '';
+        var pre = document.getElementById('hex-dump-output');
+        /* Color-coded hex dump */
+        var lines = r.lines || [];
+        var html = '';
+        lines.forEach(function(l) {
+            html += '<span style="color:var(--accent)">' + escapeHtml(l.offset) + '</span>  ';
+            /* Color non-zero bytes differently */
+            var hexParts = l.hex.split(' ');
+            hexParts.forEach(function(h, i) {
+                if (h === '' && i > 0) { html += ' '; return; } /* double-space separator */
+                if (h === '00') html += '<span style="color:var(--text-muted)">' + h + '</span> ';
+                else html += '<span style="color:var(--text-primary)">' + h + '</span> ';
+            });
+            /* Pad to fixed width */
+            var padLen = 49 - l.hex.length;
+            if (padLen > 0) html += ' '.repeat(padLen);
+            html += ' <span style="color:#22c55e">|' + escapeHtml(l.ascii) + '|</span>\n';
+        });
+        pre.innerHTML = html;
+        document.getElementById('hex-info').textContent = 'Offset: 0x' + _hexCurrentOffset.toString(16) + ' | Showing: ' + r.length + ' bytes | File: ' + r.file_size.toLocaleString() + ' bytes total';
+    }).catch(function(e) {
+        setLoading(btn, false);
+        alert('Hex dump failed: ' + e);
+    });
+}
+
+function reHexNav(direction) {
+    if (!_hexCurrentFile) return;
+    _hexCurrentOffset += direction * _hexCurrentLength;
+    if (_hexCurrentOffset < 0) _hexCurrentOffset = 0;
+    document.getElementById('hex-offset').value = _hexCurrentOffset;
+    reHexDump();
+}
+
+function reHexSearch() {
+    var btn = document.getElementById('btn-hex-search');
+    var file = document.getElementById('hex-file').value.trim();
+    var pattern = document.getElementById('hex-search-pattern').value.trim();
+    if (!file || !pattern) return;
+    setLoading(btn, true);
+    document.getElementById('hex-search-results').style.display = 'none';
+    postJSON('/reverse-eng/hex/search', {file: file, pattern: pattern}).then(function(r) {
+        setLoading(btn, false);
+        if (r.error) { alert(r.error); return; }
+        document.getElementById('hex-search-results').style.display = '';
+        document.getElementById('hex-search-count').textContent = r.total + ' matches found (pattern: ' + r.pattern + ')';
+        var list = document.getElementById('hex-search-list');
+        var matches = r.matches || [];
+        if (matches.length === 0) {
+            list.innerHTML = '<div style="color:var(--text-muted)">No matches found.</div>';
+            return;
+        }
+        var html = '';
+        matches.forEach(function(m) {
+            html += '<div style="cursor:pointer;padding:2px 4px;border-bottom:1px solid var(--border)" onclick="document.getElementById(\'hex-offset\').value=' + m.offset + ';reHexDump()" title="Click to jump to offset">';
+            html += '<span style="color:var(--accent)">' + escapeHtml(m.offset_hex) + '</span>';
+            html += ' <span style="color:var(--text-muted)">' + escapeHtml(m.context) + '</span>';
+            html += '</div>';
+        });
+        list.innerHTML = html;
+    }).catch(function(e) {
+        setLoading(btn, false);
+        alert('Hex search failed: ' + e);
+    });
+}
+
+/* ==================== INIT ==================== */
+document.addEventListener('DOMContentLoaded', function() {
+    /* Pre-load YARA rules list on tab switch */
+});
+</script>
+{% endblock %}

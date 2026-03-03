@@ -28,14 +28,26 @@
 AUTARCH runs on Windows with most features fully functional. A few Linux-specific tools (like `tshark` packet capture and WireGuard kernel integration) have limited support, but the web dashboard, AI chat, OSINT tools, hardware management, and Metasploit all work on Windows.
 
 **What works on Windows:**
-- Web dashboard (full UI)
-- AI chat (all LLM backends except GPU quantization)
-- OSINT tools
+- Web dashboard (full UI — 59 blueprints, all tool pages)
+- AI chat (all LLM backends — Claude API, OpenAI, local GGUF, HuggingFace)
+- All 72 CLI modules
+- OSINT tools (7,200+ sites, username/email/domain/IP/phone lookup)
 - Android/iPhone device management via ADB (USB or WebUSB)
 - Hardware ESP32 flashing
 - Metasploit RPC client (MSF must be started separately)
 - Reverse shell management
-- Targets & Settings
+- C2 Framework, Load Test, Gone Fishing Mail Server
+- Vulnerability Scanner, Exploit Development, Social Engineering
+- Active Directory Audit, MITM Proxy, WiFi Audit
+- Password Toolkit, Web Scanner, API Fuzzer, Cloud Scanner
+- Steganography, Anti-Forensics, Forensics, Reverse Engineering
+- BLE Scanner, RFID/NFC Tools, Malware Sandbox
+- Container Security, Email Security, Incident Response
+- Report Engine, Net Mapper, Log Correlator, Threat Intel
+- SDR/RF Tools (with Drone Detection), Starlink Hack
+- SMS Forge, RCS/SMS Exploitation
+- Pineapple/Rogue AP, Deauth (require Linux/Raspberry Pi for full functionality)
+- Targets, Autonomy, Encrypted Modules, LLM Trainer
 - Agent Hal (autonomous AI agent)
 
 **What has reduced functionality on Windows:**
@@ -181,23 +193,15 @@ Default credentials are set during first-run setup. Change them in Settings → 
 |---------|-------------|
 | Dashboard | System overview, tool status |
 | Targets | Pentest scope and target management |
-| Defense | System hardening, firewall checks |
-| Offense | Metasploit modules, port scanning |
-| Counter | Threat hunting, detection |
-| Analyze | File forensics, malware analysis |
-| OSINT | Intelligence gathering |
+| Autonomy | AI-driven autonomous security operations |
+| Defense | System hardening, Linux/Windows/Threat Monitor, Threat Intel, Log Correlator, Container Sec, Email Sec, Incident Response |
+| Offense | Metasploit, Load Test, Gone Fishing, Social Eng, Hack Hijack, Web Scanner, C2 Framework, WiFi Audit, Deauth, API Fuzzer, Cloud Scan, Vuln Scanner, Exploit Dev, AD Audit, MITM Proxy, Pineapple, SMS Forge |
+| Counter | Threat hunting, Steganography, Anti-Forensics |
+| Analyze | File forensics, Hash Toolkit, LLM Trainer, Password Toolkit, Net Mapper, Reports, BLE Scanner, Forensics, RFID/NFC, Malware Sandbox, Reverse Eng |
+| OSINT | Intelligence gathering, IP Capture |
 | Simulate | Attack scenarios, Legendary Creator |
-| Wireshark | Packet analysis (needs Npcap) |
-| Hardware | Android/iPhone/ESP32 management |
-| Android Exploit | Android-specific testing |
-| iPhone Exploit | iPhone forensics |
-| Shield | Anti-stalkerware scanner |
-| Reverse Shell | Remote device management |
-| Archon | Android companion app |
-| UPnP | Port forwarding |
-| WireGuard | VPN management |
-| MSF Console | Metasploit terminal |
-| Settings | All configuration |
+| Tools | Enc Modules, Wireshark, Hardware, Android Exploit (+ SMS Forge), iPhone Exploit, Shield, Reverse Shell, Archon, SDR/RF Tools, Starlink Hack, RCS Tools |
+| System | UPnP, WireGuard, DNS Server, MSF Console, Chat, Settings |
 
 ### HAL Chat Button
 
@@ -405,7 +409,7 @@ AUTARCH's WireGuard page generates and manages config files. On Windows, apply t
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Web dashboard | Full | Works perfectly |
+| Web dashboard (59 blueprints) | Full | Works perfectly |
 | AI chat (cloud APIs) | Full | Claude, OpenAI, HuggingFace all work |
 | AI chat (local GGUF) | Full (CPU) | Slow without GPU |
 | GPU quantization (4-bit/8-bit) | Partial | Needs CUDA + bitsandbytes |
@@ -416,6 +420,13 @@ AUTARCH's WireGuard page generates and manages config files. On Windows, apply t
 | ADB (WebUSB/Direct) | Full | Chrome/Edge only, needs WinUSB driver |
 | ESP32 flashing | Full | COM port instead of /dev/ttyUSB |
 | WireGuard | Partial | Needs Windows WireGuard app |
+| SDR/RF Tools | Full | Needs HackRF or RTL-SDR hardware + drivers |
+| Starlink Hack | Full | Needs network access to Starlink dish |
+| SMS Forge / RCS Tools | Full | Needs ADB connection to Android device |
+| WiFi Audit / Deauth / Pineapple | Partial | Full functionality requires Linux/monitor-mode adapter |
+| C2 Framework | Full | All agent types work |
+| Vulnerability Scanner | Full | Nuclei recommended for template scanning |
+| Container Security | Full | Needs Docker Desktop installed |
 | Background service | Via Task Scheduler | `--service` flag doesn't work |
 | System uptime | N/A | Shows "N/A" (uses /proc/uptime) |
 | mDNS discovery | Partial | May require Bonjour |
@@ -560,4 +571,52 @@ python autarch.py --setup
 
 ---
 
-*AUTARCH is for authorized security testing and research only. Always obtain written permission before testing systems you do not own.*
+---
+
+## 14. New Tools Overview (v2.3)
+
+AUTARCH v2.3 includes 59 web blueprints and 72 CLI modules. Here is a summary of the major tool categories added since v2.0:
+
+### Offense Tools
+| Tool | Description |
+|------|-------------|
+| Vulnerability Scanner | Nuclei/OpenVAS template-based scanning with severity ratings |
+| Exploit Development | Shellcode gen, payload encoding, ROP chains, pattern generator |
+| Social Engineering | Credential harvest, pretexts, QR phishing, campaign tracking |
+| AD Audit | LDAP enumeration, Kerberoasting, AS-REP roast, ACL analysis |
+| MITM Proxy | HTTP(S) interception, SSL strip, request modification |
+| Pineapple | Rogue AP, Evil Twin, captive portal (Raspberry Pi) |
+| Deauth Attack | WiFi deauthentication (Raspberry Pi + monitor-mode adapter) |
+| C2 Framework | Multi-agent command & control with task queuing |
+| WiFi Audit | Wireless network security assessment |
+| SMS Forge | Create/modify SMS Backup & Restore XML backups |
+| RCS/SMS Exploit | Message extraction, forging, and RCS exploitation via ADB |
+| Starlink Hack | Starlink terminal security analysis and gRPC exploitation |
+
+### Defense Tools
+| Tool | Description |
+|------|-------------|
+| Container Security | Docker/K8s audit, image scanning, escape detection |
+| Email Security | DMARC/SPF/DKIM analysis, header forensics, phishing detection |
+| Incident Response | IR playbooks, evidence collection, IOC sweeping, timeline |
+| Threat Intelligence | Feed aggregation, IOC management, STIX/TAXII |
+| Log Correlator | Multi-source log aggregation and event correlation |
+
+### Analysis Tools
+| Tool | Description |
+|------|-------------|
+| Reverse Engineering | Binary analysis, Capstone disassembly, YARA, Ghidra integration |
+| Digital Forensics | Disk/memory forensics, artifact extraction |
+| SDR/RF Tools | Spectrum analysis, RF replay, ADS-B tracking, drone detection |
+| Steganography | Data hiding/extraction in images and audio |
+| BLE Scanner | Bluetooth Low Energy discovery and fuzzing |
+| RFID/NFC Tools | Card reading, cloning, emulation |
+| Malware Sandbox | Safe detonation and behavior analysis |
+| Net Mapper | Network topology discovery with SVG visualization |
+
+All tools are accessible from the web dashboard sidebar and most are also available via CLI (`python autarch.py -m <module_name>`).
+
+---
+
+*AUTARCH v2.3 — By darkHal Security Group and Setec Security Labs*
+*For authorized security testing and research only. Always obtain written permission before testing systems you do not own.*

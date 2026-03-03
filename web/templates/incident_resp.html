@@ -1,0 +1,800 @@
+{% extends "base.html" %}
+{% block title %}Incident Response - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Incident Response</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            IR playbooks, evidence collection, IOC sweeping, and post-incident reporting.
+        </p>
+    </div>
+    <a href="{{ url_for('defense.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Defense</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ir" data-tab="playbooks" onclick="showTab('ir','playbooks')">Playbooks</button>
+    <button class="tab" data-tab-group="ir" data-tab="evidence" onclick="showTab('ir','evidence')">Evidence</button>
+    <button class="tab" data-tab-group="ir" data-tab="sweep" onclick="showTab('ir','sweep')">Sweep</button>
+    <button class="tab" data-tab-group="ir" data-tab="timeline" onclick="showTab('ir','timeline')">Timeline</button>
+</div>
+
+<!-- ==================== PLAYBOOKS TAB ==================== -->
+<div class="tab-content active" data-tab-group="ir" data-tab="playbooks">
+
+<!-- Create Incident -->
+<div class="section">
+    <h2>Create Incident</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:180px">
+            <label class="form-label">Name</label>
+            <input id="ir-name" class="form-input" placeholder="Incident name">
+        </div>
+        <div style="min-width:160px">
+            <label class="form-label">Type</label>
+            <select id="ir-type" class="form-input">
+                <option value="ransomware">Ransomware</option>
+                <option value="data_breach">Data Breach</option>
+                <option value="insider_threat">Insider Threat</option>
+                <option value="ddos">DDoS</option>
+                <option value="account_compromise">Account Compromise</option>
+                <option value="malware">Malware</option>
+                <option value="phishing">Phishing</option>
+                <option value="unauthorized_access">Unauthorized Access</option>
+            </select>
+        </div>
+        <div style="min-width:120px">
+            <label class="form-label">Severity</label>
+            <select id="ir-severity" class="form-input">
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium" selected>Medium</option>
+                <option value="low">Low</option>
+            </select>
+        </div>
+        <div style="flex:2;min-width:200px">
+            <label class="form-label">Description</label>
+            <input id="ir-desc" class="form-input" placeholder="Brief description">
+        </div>
+        <button id="btn-create-ir" class="btn btn-primary" onclick="irCreate()">Create</button>
+    </div>
+</div>
+
+<!-- Active Incidents -->
+<div class="section">
+    <h2>Incidents</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <select id="ir-filter-status" class="form-input" style="width:auto;display:inline-block" onchange="irLoadList()">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="investigating">Investigating</option>
+            <option value="contained">Contained</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+        </select>
+        <button class="btn btn-sm" onclick="irLoadList()">Refresh</button>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="data-table" style="font-size:0.85rem">
+            <thead><tr>
+                <th>ID</th><th>Name</th><th>Type</th><th>Severity</th><th>Status</th><th>Created</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="ir-list-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Incident Detail + Playbook (shown when incident selected) -->
+<div class="section" id="ir-detail-section" style="display:none">
+    <h2 id="ir-detail-title">Incident Detail</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <span class="badge" id="ir-detail-type"></span>
+        <span class="badge" id="ir-detail-severity"></span>
+        <span class="badge" id="ir-detail-status"></span>
+        <span style="font-size:0.8rem;color:var(--text-muted)" id="ir-detail-created"></span>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:16px" id="ir-detail-desc"></p>
+
+    <!-- Status Update -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+        <select id="ir-update-status" class="form-input" style="width:auto">
+            <option value="open">Open</option>
+            <option value="investigating">Investigating</option>
+            <option value="contained">Contained</option>
+            <option value="resolved">Resolved</option>
+        </select>
+        <button class="btn btn-sm" onclick="irUpdateStatus()">Update Status</button>
+        <button class="btn btn-danger btn-sm" onclick="irCloseIncident()">Close Incident</button>
+    </div>
+
+    <!-- Playbook Progress -->
+    <h3>Playbook</h3>
+    <div style="margin-bottom:12px">
+        <div style="background:var(--bg-input);border-radius:8px;height:8px;overflow:hidden;margin-bottom:4px">
+            <div id="ir-pb-bar" style="height:100%;background:var(--accent);transition:width 0.3s;width:0%"></div>
+        </div>
+        <span style="font-size:0.8rem;color:var(--text-muted)" id="ir-pb-progress-text"></span>
+    </div>
+    <div id="ir-pb-steps"></div>
+</div>
+</div>
+
+<!-- ==================== EVIDENCE TAB ==================== -->
+<div class="tab-content" data-tab-group="ir" data-tab="evidence">
+<div class="section">
+    <h2>Evidence Collection</h2>
+
+    <!-- Incident Selector -->
+    <div style="margin-bottom:16px">
+        <label class="form-label">Select Incident</label>
+        <select id="ev-incident-sel" class="form-input" style="max-width:400px" onchange="evOnSelect()">
+            <option value="">-- Select --</option>
+        </select>
+    </div>
+
+    <!-- Collection Buttons -->
+    <div id="ev-collect-area" style="display:none">
+        <h3>Collect System Evidence</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+            <button class="btn btn-sm" onclick="evCollect('system_logs')">System Logs</button>
+            <button class="btn btn-sm" onclick="evCollect('process_list')">Processes</button>
+            <button class="btn btn-sm" onclick="evCollect('network_connections')">Network Connections</button>
+            <button class="btn btn-sm" onclick="evCollect('running_services')">Services</button>
+            <button class="btn btn-sm" onclick="evCollect('user_accounts')">Users</button>
+            <button class="btn btn-sm" onclick="evCollect('scheduled_tasks')">Scheduled Tasks</button>
+            <button class="btn btn-sm" onclick="evCollect('recent_files')">Recent Files</button>
+            <button class="btn btn-sm" onclick="evCollect('memory_info')">Memory Info</button>
+            <button class="btn btn-sm" onclick="evCollect('disk_info')">Disk Info</button>
+            <button class="btn btn-sm" onclick="evCollect('installed_software')">Installed Software</button>
+        </div>
+
+        <div id="ev-collect-status" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px"></div>
+
+        <!-- Manual Evidence -->
+        <h3>Add Manual Evidence</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+            <div style="min-width:180px">
+                <label class="form-label">Name</label>
+                <input id="ev-manual-name" class="form-input" placeholder="Evidence name">
+            </div>
+            <div style="min-width:120px">
+                <label class="form-label">Type</label>
+                <input id="ev-manual-type" class="form-input" value="manual" placeholder="manual">
+            </div>
+            <div style="flex:1;min-width:200px">
+                <label class="form-label">Content</label>
+                <textarea id="ev-manual-content" class="form-input" rows="2" placeholder="Notes, observations, hashes..."></textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="evAddManual()">Add</button>
+        </div>
+
+        <!-- Evidence Table -->
+        <h3>Collected Evidence</h3>
+        <div style="overflow-x:auto">
+            <table class="data-table" style="font-size:0.85rem">
+                <thead><tr><th>Type/Name</th><th>Collected At</th><th>Size</th><th>Actions</th></tr></thead>
+                <tbody id="ev-list-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Evidence Viewer -->
+        <div id="ev-viewer" style="display:none;margin-top:16px">
+            <h3 id="ev-viewer-title">Evidence Viewer</h3>
+            <pre class="output-panel scrollable" id="ev-viewer-content" style="max-height:400px;font-size:0.75rem;white-space:pre-wrap"></pre>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== SWEEP TAB ==================== -->
+<div class="tab-content" data-tab-group="ir" data-tab="sweep">
+<div class="section">
+    <h2>IOC Sweep</h2>
+
+    <!-- Incident Selector -->
+    <div style="margin-bottom:16px">
+        <label class="form-label">Select Incident</label>
+        <select id="sw-incident-sel" class="form-input" style="max-width:400px">
+            <option value="">-- Select --</option>
+        </select>
+    </div>
+
+    <!-- IOC Inputs -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+        <div style="flex:1;min-width:200px">
+            <label class="form-label">IP Addresses (one per line)</label>
+            <textarea id="sw-ips" class="form-input" rows="5" placeholder="1.2.3.4&#10;5.6.7.8"></textarea>
+        </div>
+        <div style="flex:1;min-width:200px">
+            <label class="form-label">Domain Names (one per line)</label>
+            <textarea id="sw-domains" class="form-input" rows="5" placeholder="evil.com&#10;malware.net"></textarea>
+        </div>
+        <div style="flex:1;min-width:200px">
+            <label class="form-label">File Hashes (one per line)</label>
+            <textarea id="sw-hashes" class="form-input" rows="5" placeholder="sha256:abc123...&#10;md5:def456..."></textarea>
+        </div>
+    </div>
+
+    <div class="tool-actions" style="margin-bottom:16px">
+        <button id="btn-sweep" class="btn btn-primary" onclick="swSweep()">Sweep IOCs</button>
+    </div>
+
+    <!-- Results -->
+    <div id="sw-results" style="display:none">
+        <h3>Sweep Results</h3>
+        <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+            <div class="stat-box">
+                <div class="stat-value" id="sw-total-iocs">0</div>
+                <div class="stat-label">Total IOCs</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="sw-matches-found" style="color:var(--danger)">0</div>
+                <div class="stat-label">Matches Found</div>
+            </div>
+        </div>
+        <div style="overflow-x:auto">
+            <table class="data-table" style="font-size:0.85rem">
+                <thead><tr><th>Type</th><th>IOC</th><th>Found In</th><th>Severity</th><th>Details</th></tr></thead>
+                <tbody id="sw-matches-body"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:12px">
+            <button class="btn btn-danger btn-sm" onclick="swAutoContain()">Auto-Contain Matched IPs</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== TIMELINE TAB ==================== -->
+<div class="tab-content" data-tab-group="ir" data-tab="timeline">
+<div class="section">
+    <h2>Incident Timeline</h2>
+
+    <!-- Incident Selector -->
+    <div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div>
+            <label class="form-label">Select Incident</label>
+            <select id="tl-incident-sel" class="form-input" style="max-width:400px" onchange="tlLoad()">
+                <option value="">-- Select --</option>
+            </select>
+        </div>
+        <button class="btn btn-sm" onclick="tlAutoBuild()">Auto-Build Timeline</button>
+        <button class="btn btn-sm" onclick="tlLoad()">Refresh</button>
+        <button class="btn btn-sm" onclick="tlExport()">Export</button>
+        <button class="btn btn-primary btn-sm" onclick="tlGenReport()">Generate Report</button>
+    </div>
+
+    <!-- Add Event Form -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;padding:12px;background:var(--bg-card);border-radius:var(--radius)">
+        <div style="min-width:180px">
+            <label class="form-label">Timestamp</label>
+            <input id="tl-event-ts" class="form-input" type="datetime-local">
+        </div>
+        <div style="flex:1;min-width:200px">
+            <label class="form-label">Event Description</label>
+            <input id="tl-event-desc" class="form-input" placeholder="What happened?">
+        </div>
+        <div style="min-width:120px">
+            <label class="form-label">Source</label>
+            <input id="tl-event-source" class="form-input" placeholder="manual" value="manual">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="tlAddEvent()">Add Event</button>
+    </div>
+
+    <!-- Timeline Visualization -->
+    <div id="tl-container"></div>
+
+    <!-- Report Preview -->
+    <div id="tl-report-section" style="display:none;margin-top:24px">
+        <h2>Incident Report</h2>
+        <div id="tl-report-content" style="background:var(--bg-card);border-radius:var(--radius);padding:20px"></div>
+    </div>
+</div>
+</div>
+
+<style>
+/* Severity badges */
+.sev-critical{background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
+.sev-high{background:#f59e0b;color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
+.sev-medium{background:#3b82f6;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
+.sev-low{background:#22c55e;color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
+.status-badge{padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600;background:var(--bg-input);color:var(--text-primary)}
+.status-open{border:1px solid #ef4444;color:#ef4444}
+.status-investigating{border:1px solid #f59e0b;color:#f59e0b}
+.status-contained{border:1px solid #3b82f6;color:#3b82f6}
+.status-resolved{border:1px solid #22c55e;color:#22c55e}
+.status-closed{border:1px solid var(--text-muted);color:var(--text-muted)}
+.type-badge{padding:2px 8px;border-radius:4px;font-size:0.75rem;background:var(--bg-input);color:var(--accent)}
+.stat-box{background:var(--bg-card);border-radius:var(--radius);padding:16px 24px;text-align:center;border:1px solid var(--border)}
+.stat-value{font-size:1.8rem;font-weight:700;line-height:1}
+.stat-label{font-size:0.75rem;color:var(--text-muted);margin-top:4px}
+
+/* Playbook step accordion */
+.pb-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden}
+.pb-step-header{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;user-select:none}
+.pb-step-header:hover{background:var(--bg-input)}
+.pb-step-body{display:none;padding:0 16px 16px;font-size:0.85rem;color:var(--text-secondary)}
+.pb-step.open .pb-step-body{display:block}
+.pb-step-check{margin:2px 0;display:flex;align-items:center;gap:6px;font-size:0.85rem}
+.pb-step-check input[type=checkbox]{accent-color:var(--accent)}
+.pb-step-mark{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;flex-shrink:0}
+.pb-step-mark.done{background:#22c55e;color:#fff}
+.pb-step-mark.pending{background:var(--bg-input);color:var(--text-muted);border:2px solid var(--border)}
+.pb-step-num{font-size:0.8rem;color:var(--text-muted);min-width:20px}
+.pb-step-auto{font-size:0.65rem;padding:1px 6px;background:var(--accent);color:#fff;border-radius:3px}
+
+/* Timeline */
+.tl-event{display:flex;gap:16px;position:relative;padding-left:24px;margin-bottom:0}
+.tl-event::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:2px;background:var(--border)}
+.tl-event:last-child::before{display:none}
+.tl-dot{width:16px;height:16px;border-radius:50%;flex-shrink:0;position:absolute;left:0;top:6px;border:2px solid var(--bg-primary)}
+.tl-dot.src-system{background:var(--accent)}
+.tl-dot.src-playbook{background:#22c55e}
+.tl-dot.src-evidence{background:#f59e0b}
+.tl-dot.src-sweep{background:#ef4444}
+.tl-dot.src-containment{background:#ef4444}
+.tl-dot.src-manual{background:#8b5cf6}
+.tl-dot.src-default{background:var(--text-muted)}
+.tl-body{padding-bottom:20px}
+.tl-time{font-size:0.75rem;color:var(--text-muted);font-family:monospace}
+.tl-text{font-size:0.85rem;margin-top:2px}
+.tl-details{font-size:0.75rem;color:var(--text-muted);margin-top:2px}
+.tl-source-tag{font-size:0.65rem;padding:1px 5px;border-radius:3px;background:var(--bg-input);color:var(--text-muted);margin-left:6px}
+
+/* Report preview */
+.rpt-section{margin-bottom:20px}
+.rpt-section h3{font-size:1rem;margin-bottom:8px;color:var(--accent)}
+.rpt-kv{display:flex;gap:8px;font-size:0.85rem;margin-bottom:4px}
+.rpt-kv .rpt-k{color:var(--text-muted);min-width:140px}
+.rpt-kv .rpt-v{color:var(--text-primary)}
+.rpt-list{list-style:disc;padding-left:20px;font-size:0.85rem;color:var(--text-secondary)}
+.rpt-list li{margin-bottom:4px}
+</style>
+
+<script>
+var irCurrentId = null;
+var irIncidents = [];
+var swLastMatches = [];
+
+/* ── Helpers ──────────────────────────────────────────────── */
+function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function irBase() { return '/incident-resp'; }
+function sevClass(s) { return 'sev-' + (s || 'medium'); }
+function statusClass(s) { return 'status-badge status-' + (s || 'open'); }
+function fmtTime(iso) {
+    if (!iso) return '';
+    try { var d = new Date(iso); return d.toLocaleString(); } catch(e) { return iso; }
+}
+
+/* ── Populate Incident Selectors ──────────────────────────── */
+function irPopulateSelectors() {
+    var sels = ['ev-incident-sel','sw-incident-sel','tl-incident-sel'];
+    sels.forEach(function(sid) {
+        var sel = document.getElementById(sid);
+        if (!sel) return;
+        var val = sel.value;
+        sel.innerHTML = '<option value="">-- Select --</option>';
+        irIncidents.forEach(function(inc) {
+            if (inc.status === 'closed') return;
+            var o = document.createElement('option');
+            o.value = inc.id;
+            o.textContent = inc.id + ' - ' + inc.name;
+            sel.appendChild(o);
+        });
+        if (val) sel.value = val;
+    });
+}
+
+/* ── PLAYBOOKS TAB ────────────────────────────────────────── */
+function irCreate() {
+    var btn = document.getElementById('btn-create-ir');
+    setLoading(btn, true);
+    postJSON(irBase() + '/incidents', {
+        name: document.getElementById('ir-name').value,
+        type: document.getElementById('ir-type').value,
+        severity: document.getElementById('ir-severity').value,
+        description: document.getElementById('ir-desc').value,
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('ir-name').value = '';
+        document.getElementById('ir-desc').value = '';
+        irLoadList();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function irLoadList() {
+    var status = document.getElementById('ir-filter-status').value;
+    var url = irBase() + '/incidents' + (status ? '?status=' + status : '');
+    fetchJSON(url).then(function(data) {
+        irIncidents = data.incidents || [];
+        var body = document.getElementById('ir-list-body');
+        body.innerHTML = '';
+        irIncidents.forEach(function(inc) {
+            var tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.innerHTML =
+                '<td style="font-family:monospace;font-size:0.8rem">' + esc(inc.id) + '</td>' +
+                '<td>' + esc(inc.name) + '</td>' +
+                '<td><span class="type-badge">' + esc(inc.type) + '</span></td>' +
+                '<td><span class="' + sevClass(inc.severity) + '">' + esc(inc.severity) + '</span></td>' +
+                '<td><span class="' + statusClass(inc.status) + '">' + esc(inc.status) + '</span></td>' +
+                '<td style="font-size:0.8rem">' + fmtTime(inc.created) + '</td>' +
+                '<td>' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();irSelect(\'' + esc(inc.id) + '\')">View</button> ' +
+                    '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();irDelete(\'' + esc(inc.id) + '\')">Del</button>' +
+                '</td>';
+            tr.onclick = function() { irSelect(inc.id); };
+            body.appendChild(tr);
+        });
+        if (!irIncidents.length) {
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No incidents found</td></tr>';
+        }
+        irPopulateSelectors();
+    });
+}
+
+function irSelect(id) {
+    irCurrentId = id;
+    fetchJSON(irBase() + '/incidents/' + id).then(function(inc) {
+        var sec = document.getElementById('ir-detail-section');
+        sec.style.display = '';
+        document.getElementById('ir-detail-title').textContent = inc.name;
+        document.getElementById('ir-detail-type').className = 'type-badge';
+        document.getElementById('ir-detail-type').textContent = inc.type;
+        document.getElementById('ir-detail-severity').className = sevClass(inc.severity);
+        document.getElementById('ir-detail-severity').textContent = inc.severity;
+        document.getElementById('ir-detail-status').className = statusClass(inc.status);
+        document.getElementById('ir-detail-status').textContent = inc.status;
+        document.getElementById('ir-detail-created').textContent = 'Created: ' + fmtTime(inc.created);
+        document.getElementById('ir-detail-desc').textContent = inc.description || '';
+        document.getElementById('ir-update-status').value = inc.status === 'closed' ? 'resolved' : inc.status;
+        irLoadPlaybook(id, inc);
+    });
+}
+
+function irLoadPlaybook(id, inc) {
+    fetchJSON(irBase() + '/incidents/' + id + '/playbook').then(function(pb) {
+        var container = document.getElementById('ir-pb-steps');
+        container.innerHTML = '';
+        var steps = pb.steps || [];
+        var progress = pb.progress || [];
+        var outputs = pb.outputs || [];
+        var done = 0;
+        steps.forEach(function(step, i) {
+            var isDone = progress[i] || false;
+            if (isDone) done++;
+            var div = document.createElement('div');
+            div.className = 'pb-step' + (isDone ? '' : '');
+            var checks = (step.check_items || []).map(function(c) {
+                return '<div class="pb-step-check"><input type="checkbox"' + (isDone ? ' checked disabled' : ' disabled') + '><span>' + esc(c) + '</span></div>';
+            }).join('');
+            var autoTag = step.automated ? '<span class="pb-step-auto">AUTO</span>' : '';
+            var outHtml = outputs[i] ? '<pre class="output-panel" style="max-height:200px;font-size:0.7rem;margin-top:8px;white-space:pre-wrap">' + esc(outputs[i]) + '</pre>' : '';
+            div.innerHTML =
+                '<div class="pb-step-header" onclick="this.parentElement.classList.toggle(\'open\')">' +
+                    '<div class="pb-step-mark ' + (isDone ? 'done' : 'pending') + '">' + (isDone ? '&#x2713;' : (i+1)) + '</div>' +
+                    '<span style="flex:1;font-size:0.9rem">' + esc(step.title) + '</span>' +
+                    autoTag +
+                '</div>' +
+                '<div class="pb-step-body">' +
+                    '<p style="margin-bottom:8px">' + esc(step.description) + '</p>' +
+                    checks +
+                    (isDone ? '' :
+                        '<div style="margin-top:10px;display:flex;gap:8px">' +
+                        (step.automated ? '<button class="btn btn-primary btn-sm" onclick="irRunStep(' + i + ',true)">Run Auto</button>' : '') +
+                        '<button class="btn btn-sm" onclick="irRunStep(' + i + ',false)">Mark Complete</button>' +
+                        '</div>'
+                    ) +
+                    outHtml +
+                '</div>';
+            container.appendChild(div);
+        });
+        var pct = steps.length > 0 ? Math.round(done / steps.length * 100) : 0;
+        document.getElementById('ir-pb-bar').style.width = pct + '%';
+        document.getElementById('ir-pb-progress-text').textContent = done + ' / ' + steps.length + ' steps (' + pct + '%)';
+    });
+}
+
+function irRunStep(stepIdx, auto) {
+    if (!irCurrentId) return;
+    postJSON(irBase() + '/incidents/' + irCurrentId + '/playbook/' + stepIdx, {auto: auto}).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        irSelect(irCurrentId);
+    });
+}
+
+function irUpdateStatus() {
+    if (!irCurrentId) return;
+    var status = document.getElementById('ir-update-status').value;
+    fetchJSON(irBase() + '/incidents/' + irCurrentId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: status}),
+    }).then(function() { irSelect(irCurrentId); irLoadList(); });
+}
+
+function irCloseIncident() {
+    if (!irCurrentId) return;
+    var notes = prompt('Resolution notes:');
+    if (notes === null) return;
+    postJSON(irBase() + '/incidents/' + irCurrentId + '/close', {resolution_notes: notes}).then(function() {
+        document.getElementById('ir-detail-section').style.display = 'none';
+        irCurrentId = null;
+        irLoadList();
+    });
+}
+
+function irDelete(id) {
+    if (!confirm('Delete incident ' + id + '? This cannot be undone.')) return;
+    fetchJSON(irBase() + '/incidents/' + id, {method: 'DELETE'}).then(function() {
+        if (irCurrentId === id) {
+            document.getElementById('ir-detail-section').style.display = 'none';
+            irCurrentId = null;
+        }
+        irLoadList();
+    });
+}
+
+/* ── EVIDENCE TAB ─────────────────────────────────────────── */
+function evOnSelect() {
+    var id = document.getElementById('ev-incident-sel').value;
+    document.getElementById('ev-collect-area').style.display = id ? '' : 'none';
+    if (id) evLoadList(id);
+}
+
+function evCollect(etype) {
+    var id = document.getElementById('ev-incident-sel').value;
+    if (!id) return;
+    var st = document.getElementById('ev-collect-status');
+    st.textContent = 'Collecting ' + etype + '...';
+    postJSON(irBase() + '/incidents/' + id + '/evidence/collect', {type: etype}).then(function(data) {
+        if (data.error) { st.textContent = 'Error: ' + data.error; return; }
+        st.textContent = 'Collected ' + data.name + ' (' + data.size + ' bytes)';
+        evLoadList(id);
+    }).catch(function() { st.textContent = 'Collection failed'; });
+}
+
+function evAddManual() {
+    var id = document.getElementById('ev-incident-sel').value;
+    if (!id) return;
+    postJSON(irBase() + '/incidents/' + id + '/evidence', {
+        name: document.getElementById('ev-manual-name').value || 'manual_note',
+        content: document.getElementById('ev-manual-content').value,
+        evidence_type: document.getElementById('ev-manual-type').value || 'manual',
+    }).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('ev-manual-name').value = '';
+        document.getElementById('ev-manual-content').value = '';
+        evLoadList(id);
+    });
+}
+
+function evLoadList(id) {
+    fetchJSON(irBase() + '/incidents/' + id + '/evidence').then(function(data) {
+        var body = document.getElementById('ev-list-body');
+        body.innerHTML = '';
+        (data.evidence || []).forEach(function(ev) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + esc(ev.name) + '</td>' +
+                '<td style="font-size:0.8rem">' + fmtTime(ev.collected_at) + '</td>' +
+                '<td>' + (ev.size > 1024 ? Math.round(ev.size/1024) + ' KB' : ev.size + ' B') + '</td>' +
+                '<td><button class="btn btn-sm" onclick="evView(\'' + esc(id) + '\',\'' + esc(ev.filename) + '\')">View</button></td>';
+            body.appendChild(tr);
+        });
+        if (!(data.evidence || []).length) {
+            body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No evidence collected</td></tr>';
+        }
+    });
+}
+
+function evView(incId, filename) {
+    /* Fetch evidence content — reuse the export endpoint or read from list */
+    fetchJSON(irBase() + '/incidents/' + incId + '/export').then(function(data) {
+        var found = null;
+        (data.evidence_data || []).forEach(function(e) {
+            if (e.filename === filename) found = e;
+        });
+        if (found) {
+            document.getElementById('ev-viewer').style.display = '';
+            document.getElementById('ev-viewer-title').textContent = found.name || filename;
+            document.getElementById('ev-viewer-content').textContent = found.content || '(empty)';
+        }
+    });
+}
+
+/* ── SWEEP TAB ────────────────────────────────────────────── */
+function swSweep() {
+    var id = document.getElementById('sw-incident-sel').value;
+    if (!id) { alert('Select an incident first'); return; }
+    var btn = document.getElementById('btn-sweep');
+    setLoading(btn, true);
+    var ips = document.getElementById('sw-ips').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+    var domains = document.getElementById('sw-domains').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+    var hashes = document.getElementById('sw-hashes').value.split('\n').map(function(s){return s.trim()}).filter(Boolean);
+    postJSON(irBase() + '/incidents/' + id + '/sweep', {ips: ips, domains: domains, hashes: hashes}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('sw-results').style.display = '';
+        document.getElementById('sw-total-iocs').textContent = data.total_iocs || 0;
+        document.getElementById('sw-matches-found').textContent = data.matches_found || 0;
+        swLastMatches = data.matches || [];
+        var body = document.getElementById('sw-matches-body');
+        body.innerHTML = '';
+        swLastMatches.forEach(function(m) {
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td>' + esc(m.type) + '</td>' +
+                '<td style="font-family:monospace;font-size:0.8rem">' + esc(m.ioc) + '</td>' +
+                '<td>' + esc(m.found_in) + '</td>' +
+                '<td><span class="' + sevClass(m.severity) + '">' + esc(m.severity) + '</span></td>' +
+                '<td style="font-size:0.8rem">' + esc(m.details) + '</td>';
+            body.appendChild(tr);
+        });
+        if (!swLastMatches.length) {
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No matches found - system appears clean</td></tr>';
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function swAutoContain() {
+    var id = document.getElementById('sw-incident-sel').value;
+    if (!id) return;
+    var ipMatches = swLastMatches.filter(function(m) { return m.type === 'ip'; });
+    if (!ipMatches.length) { alert('No IP matches to contain'); return; }
+    ipMatches.forEach(function(m) {
+        postJSON(irBase() + '/incidents/' + id + '/contain', {
+            host: m.ioc,
+            actions: ['block_ip'],
+        });
+    });
+    alert('Containment actions dispatched for ' + ipMatches.length + ' IPs');
+}
+
+/* ── TIMELINE TAB ─────────────────────────────────────────── */
+function tlLoad() {
+    var id = document.getElementById('tl-incident-sel').value;
+    if (!id) { document.getElementById('tl-container').innerHTML = ''; return; }
+    fetchJSON(irBase() + '/incidents/' + id + '/timeline').then(function(data) {
+        var events = data.timeline || [];
+        var container = document.getElementById('tl-container');
+        container.innerHTML = '';
+        if (!events.length) {
+            container.innerHTML = '<p style="color:var(--text-muted)">No timeline events yet.</p>';
+            return;
+        }
+        events.forEach(function(ev) {
+            var src = (ev.source || 'default').toLowerCase();
+            var dotClass = 'tl-dot src-' + (['system','playbook','evidence','sweep','containment','manual'].indexOf(src) >= 0 ? src : 'default');
+            var div = document.createElement('div');
+            div.className = 'tl-event';
+            div.innerHTML =
+                '<div class="' + dotClass + '"></div>' +
+                '<div class="tl-body">' +
+                    '<div class="tl-time">' + fmtTime(ev.timestamp) + '<span class="tl-source-tag">' + esc(ev.source) + '</span></div>' +
+                    '<div class="tl-text">' + esc(ev.event) + '</div>' +
+                    (ev.details ? '<div class="tl-details">' + esc(ev.details) + '</div>' : '') +
+                '</div>';
+            container.appendChild(div);
+        });
+    });
+}
+
+function tlAddEvent() {
+    var id = document.getElementById('tl-incident-sel').value;
+    if (!id) { alert('Select an incident first'); return; }
+    var ts = document.getElementById('tl-event-ts').value;
+    if (ts) ts = new Date(ts).toISOString();
+    postJSON(irBase() + '/incidents/' + id + '/timeline', {
+        timestamp: ts || new Date().toISOString(),
+        event: document.getElementById('tl-event-desc').value,
+        source: document.getElementById('tl-event-source').value || 'manual',
+    }).then(function() {
+        document.getElementById('tl-event-desc').value = '';
+        tlLoad();
+    });
+}
+
+function tlAutoBuild() {
+    var id = document.getElementById('tl-incident-sel').value;
+    if (!id) { alert('Select an incident first'); return; }
+    postJSON(irBase() + '/incidents/' + id + '/timeline/auto', {}).then(function(data) {
+        if (data.error) { alert(data.error); return; }
+        alert('Auto-built timeline: ' + data.events_added + ' events extracted from ' + data.evidence_parsed + ' evidence files');
+        tlLoad();
+    });
+}
+
+function tlExport() {
+    var id = document.getElementById('tl-incident-sel').value;
+    if (!id) { alert('Select an incident first'); return; }
+    fetchJSON(irBase() + '/incidents/' + id + '/export').then(function(data) {
+        var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = id + '_export.json';
+        a.click();
+    });
+}
+
+function tlGenReport() {
+    var id = document.getElementById('tl-incident-sel').value;
+    if (!id) { alert('Select an incident first'); return; }
+    fetchJSON(irBase() + '/incidents/' + id + '/report').then(function(rpt) {
+        if (rpt.error) { alert(rpt.error); return; }
+        var sec = document.getElementById('tl-report-section');
+        sec.style.display = '';
+        var es = rpt.executive_summary || {};
+        var pp = rpt.playbook_progress || {};
+        var html = '';
+
+        /* Executive Summary */
+        html += '<div class="rpt-section"><h3>Executive Summary</h3>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Incident</span><span class="rpt-v">' + esc(es.incident_name) + '</span></div>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Type</span><span class="rpt-v">' + esc(es.incident_type) + '</span></div>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Severity</span><span class="rpt-v"><span class="' + sevClass(es.severity) + '">' + esc(es.severity) + '</span></span></div>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Status</span><span class="rpt-v">' + esc(es.status) + '</span></div>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Duration</span><span class="rpt-v">' + esc(es.duration) + '</span></div>';
+        html += '<div class="rpt-kv"><span class="rpt-k">Description</span><span class="rpt-v">' + esc(es.description) + '</span></div>';
+        html += '</div>';
+
+        /* Playbook */
+        html += '<div class="rpt-section"><h3>Playbook Progress (' + (pp.completion_pct || 0) + '%)</h3>';
+        html += '<ul class="rpt-list">';
+        (pp.steps || []).forEach(function(s) {
+            var mark = s.completed ? '&#x2713;' : '&#x2717;';
+            var c = s.completed ? 'color:#22c55e' : 'color:#ef4444';
+            html += '<li><span style="' + c + '">' + mark + '</span> Step ' + s.step + ': ' + esc(s.title) + '</li>';
+        });
+        html += '</ul></div>';
+
+        /* Evidence */
+        html += '<div class="rpt-section"><h3>Evidence (' + (rpt.evidence_summary || {}).total_evidence + ' items)</h3>';
+        html += '<ul class="rpt-list">';
+        ((rpt.evidence_summary || {}).evidence_list || []).forEach(function(e) {
+            html += '<li>' + esc(e.name) + ' (' + e.size + ' bytes)</li>';
+        });
+        html += '</ul></div>';
+
+        /* Actions */
+        if ((rpt.actions_taken || []).length) {
+            html += '<div class="rpt-section"><h3>Actions Taken</h3><ul class="rpt-list">';
+            (rpt.actions_taken || []).forEach(function(a) {
+                html += '<li><strong>' + fmtTime(a.timestamp) + '</strong> - ' + esc(a.action) + '</li>';
+            });
+            html += '</ul></div>';
+        }
+
+        /* Timeline */
+        html += '<div class="rpt-section"><h3>Timeline (' + rpt.timeline_summary + ')</h3>';
+        html += '<ul class="rpt-list">';
+        (rpt.timeline || []).slice(0, 50).forEach(function(ev) {
+            html += '<li><strong>' + fmtTime(ev.timestamp) + '</strong> [' + esc(ev.source) + '] ' + esc(ev.event) + '</li>';
+        });
+        html += '</ul></div>';
+
+        /* Recommendations */
+        html += '<div class="rpt-section"><h3>Recommendations</h3><ul class="rpt-list">';
+        (rpt.recommendations || []).forEach(function(r) {
+            html += '<li>' + esc(r) + '</li>';
+        });
+        html += '</ul></div>';
+
+        /* Resolution */
+        if (rpt.resolution) {
+            html += '<div class="rpt-section"><h3>Resolution</h3><p style="font-size:0.85rem">' + esc(rpt.resolution) + '</p></div>';
+        }
+
+        document.getElementById('tl-report-content').innerHTML = html;
+        sec.scrollIntoView({behavior: 'smooth'});
+    });
+}
+
+/* ── Init ─────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+    irLoadList();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1173 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — SDR/RF Tools{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>SDR / RF Tools</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Spectrum analysis, signal capture &amp; replay, ADS-B tracking, and GPS spoofing detection.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="sdr" data-tab="spectrum" onclick="showTab('sdr','spectrum')">Spectrum</button>
+    <button class="tab" data-tab-group="sdr" data-tab="capture" onclick="showTab('sdr','capture')">Capture / Replay</button>
+    <button class="tab" data-tab-group="sdr" data-tab="adsb" onclick="showTab('sdr','adsb')">ADS-B</button>
+    <button class="tab" data-tab-group="sdr" data-tab="drone" onclick="showTab('sdr','drone')">Drone Detection</button>
+</div>
+
+<!-- ==================== SPECTRUM TAB ==================== -->
+<div class="tab-content active" data-tab-group="sdr" data-tab="spectrum">
+
+<!-- Device Detection -->
+<div class="section">
+    <h2>SDR Devices</h2>
+    <button id="btn-sdr-detect" class="btn btn-primary" onclick="sdrDetectDevices()">Detect Devices</button>
+    <div id="sdr-device-list" style="margin-top:12px"></div>
+</div>
+
+<!-- Spectrum Scan -->
+<div class="section">
+    <h2>Spectrum Scan</h2>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:800px">
+        <div class="form-group">
+            <label>Device</label>
+            <select id="sdr-scan-device" class="form-control">
+                <option value="rtl">RTL-SDR</option>
+                <option value="hackrf">HackRF</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Start Freq (MHz)</label>
+            <input type="number" id="sdr-scan-start" class="form-control" value="88" step="0.001" min="0.1" max="6000">
+        </div>
+        <div class="form-group">
+            <label>End Freq (MHz)</label>
+            <input type="number" id="sdr-scan-end" class="form-control" value="108" step="0.001" min="0.1" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Gain (dB)</label>
+            <input type="number" id="sdr-scan-gain" class="form-control" placeholder="auto" min="0" max="62">
+        </div>
+        <div class="form-group">
+            <label>Duration (s)</label>
+            <input type="number" id="sdr-scan-duration" class="form-control" value="5" min="1" max="120">
+        </div>
+    </div>
+    <div style="margin-top:12px">
+        <button id="btn-sdr-scan" class="btn btn-primary" onclick="sdrScanSpectrum()">Scan Spectrum</button>
+    </div>
+    <div id="sdr-scan-status" style="margin-top:8px;font-size:0.85rem;color:var(--text-secondary)"></div>
+</div>
+
+<!-- Spectrum Visualization -->
+<div class="section" id="sdr-spectrum-section" style="display:none">
+    <h2>Spectrum View</h2>
+    <div style="position:relative;width:100%;overflow-x:auto">
+        <canvas id="sdr-spectrum-canvas" width="900" height="320" style="width:100%;max-width:900px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)"></canvas>
+    </div>
+    <div id="sdr-scan-info" style="margin-top:6px;font-size:0.8rem;color:var(--text-muted)"></div>
+</div>
+
+<!-- Common Frequencies Reference -->
+<div class="section">
+    <h2 style="cursor:pointer" onclick="sdrToggleFreqs()">
+        Common Frequencies Reference
+        <span id="sdr-freq-arrow" style="font-size:0.75rem;margin-left:6px">&#x25B6;</span>
+    </h2>
+    <div id="sdr-freq-table" style="display:none">
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">Click a row to set the spectrum scan range.</p>
+        <div id="sdr-freq-content"></div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== CAPTURE / REPLAY TAB ==================== -->
+<div class="tab-content" data-tab-group="sdr" data-tab="capture">
+
+<!-- Capture Section -->
+<div class="section">
+    <h2>Capture Signal</h2>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:900px">
+        <div class="form-group">
+            <label>Device</label>
+            <select id="sdr-cap-device" class="form-control">
+                <option value="rtl">RTL-SDR</option>
+                <option value="hackrf">HackRF</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Frequency (MHz)</label>
+            <input type="number" id="sdr-cap-freq" class="form-control" value="100.0" step="0.001" min="0.1" max="6000">
+        </div>
+        <div class="form-group">
+            <label>Sample Rate</label>
+            <select id="sdr-cap-rate" class="form-control">
+                <option value="250000">250 kS/s</option>
+                <option value="1024000">1.024 MS/s</option>
+                <option value="1800000">1.8 MS/s</option>
+                <option value="2048000" selected>2.048 MS/s</option>
+                <option value="2400000">2.4 MS/s</option>
+                <option value="3200000">3.2 MS/s</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Gain</label>
+            <input type="text" id="sdr-cap-gain" class="form-control" value="auto" placeholder="auto or 0-62">
+        </div>
+        <div class="form-group">
+            <label>Duration (s)</label>
+            <input type="number" id="sdr-cap-duration" class="form-control" value="10" min="1" max="300">
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button id="btn-sdr-capture-start" class="btn btn-primary" onclick="sdrStartCapture()">Start Capture</button>
+        <button id="btn-sdr-capture-stop" class="btn btn-danger" onclick="sdrStopCapture()" style="display:none">Stop Capture</button>
+        <span id="sdr-capture-indicator" style="display:none;color:var(--danger);font-size:0.85rem">
+            <span class="status-dot active" style="animation:pulse 1s infinite"></span>
+            Recording...
+        </span>
+    </div>
+    <pre class="output-panel" id="sdr-capture-output" style="margin-top:10px;max-height:120px;font-size:0.8rem"></pre>
+</div>
+
+<!-- Recordings Table -->
+<div class="section">
+    <h2>Recordings</h2>
+    <button id="btn-sdr-refresh-rec" class="btn btn-small" onclick="sdrLoadRecordings()" style="margin-bottom:10px">Refresh</button>
+    <div id="sdr-recordings-container" style="overflow-x:auto">
+        <div class="empty-state">No recordings yet. Capture a signal to get started.</div>
+    </div>
+</div>
+
+<!-- Replay Section -->
+<div class="section">
+    <h2>Replay Signal <span style="font-size:0.75rem;color:var(--text-muted)">(HackRF TX only)</span></h2>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:700px">
+        <div class="form-group">
+            <label>Recording</label>
+            <select id="sdr-replay-file" class="form-control">
+                <option value="">-- Load recordings first --</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>TX Freq (MHz)</label>
+            <input type="number" id="sdr-replay-freq" class="form-control" value="100.0" step="0.001" min="0.1" max="6000">
+        </div>
+        <div class="form-group">
+            <label>TX Gain (0-47)</label>
+            <input type="number" id="sdr-replay-gain" class="form-control" value="47" min="0" max="47">
+        </div>
+    </div>
+    <button id="btn-sdr-replay" class="btn btn-danger" onclick="sdrReplay()" style="margin-top:10px">Transmit Replay</button>
+    <pre class="output-panel" id="sdr-replay-output" style="margin-top:10px;max-height:100px;font-size:0.8rem"></pre>
+</div>
+
+<!-- Demodulation Section -->
+<div class="section">
+    <h2>Demodulate</h2>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:500px">
+        <div class="form-group">
+            <label>Recording</label>
+            <select id="sdr-demod-file" class="form-control">
+                <option value="">-- Load recordings first --</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Mode</label>
+            <select id="sdr-demod-mode" class="form-control">
+                <option value="fm">FM</option>
+                <option value="am">AM</option>
+            </select>
+        </div>
+    </div>
+    <button id="btn-sdr-demod" class="btn btn-primary" onclick="sdrDemodulate()" style="margin-top:10px">Demodulate</button>
+    <pre class="output-panel" id="sdr-demod-output" style="margin-top:10px;max-height:100px;font-size:0.8rem"></pre>
+</div>
+
+<!-- Signal Analysis -->
+<div class="section">
+    <h2>Signal Analysis</h2>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;max-width:400px">
+        <div class="form-group">
+            <label>Recording</label>
+            <select id="sdr-analyze-file" class="form-control">
+                <option value="">-- Load recordings first --</option>
+            </select>
+        </div>
+    </div>
+    <button id="btn-sdr-analyze" class="btn btn-primary" onclick="sdrAnalyze()" style="margin-top:10px">Analyze Signal</button>
+    <div id="sdr-analysis-results" style="margin-top:10px"></div>
+</div>
+
+</div>
+
+<!-- ==================== ADS-B TAB ==================== -->
+<div class="tab-content" data-tab-group="sdr" data-tab="adsb">
+
+<!-- ADS-B Tracking -->
+<div class="section">
+    <h2>ADS-B Aircraft Tracking</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Receive and decode ADS-B transponder signals at 1090 MHz to track aircraft in range.
+    </p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <button id="btn-adsb-start" class="btn btn-primary" onclick="sdrAdsbStart()">Start Tracking</button>
+        <button id="btn-adsb-stop" class="btn btn-danger" onclick="sdrAdsbStop()" style="display:none">Stop Tracking</button>
+        <span id="sdr-adsb-status" style="font-size:0.85rem;color:var(--text-secondary)">Idle</span>
+    </div>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">
+        <div class="stat-card">
+            <div class="stat-label">Aircraft Tracked</div>
+            <div class="stat-value" id="sdr-adsb-count">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value small" id="sdr-adsb-tool">--</div>
+        </div>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="data-table" id="sdr-adsb-table">
+            <thead>
+                <tr>
+                    <th>ICAO</th>
+                    <th>Callsign</th>
+                    <th>Altitude (ft)</th>
+                    <th>Speed (kn)</th>
+                    <th>Heading</th>
+                    <th>Lat</th>
+                    <th>Lon</th>
+                    <th>Msgs</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+            <tbody id="sdr-adsb-tbody">
+                <tr><td colspan="9" class="empty-state">Start tracking to see aircraft.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- GPS Spoofing Detection -->
+<div class="section">
+    <h2>GPS Spoofing Detection</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Monitor GPS L1 frequency (1575.42 MHz) for anomalies indicating spoofing: unusual power levels,
+        multiple strong carriers, or flat power distribution.
+    </p>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:400px">
+        <div class="form-group">
+            <label>Duration (s)</label>
+            <input type="number" id="sdr-gps-duration" class="form-control" value="30" min="5" max="120">
+        </div>
+    </div>
+    <button id="btn-sdr-gps" class="btn btn-primary" onclick="sdrGpsDetect()" style="margin-top:10px">Run Detection</button>
+    <div id="sdr-gps-results" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<!-- ==================== DRONE DETECTION TAB ==================== -->
+<div class="tab-content" data-tab-group="sdr" data-tab="drone">
+
+<!-- Drone Detection Controls -->
+<div class="section">
+    <h2>Drone RF Detection</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Monitor RF bands for drone control links and video transmitters. Detects DJI OcuSync,
+        analog FPV, Crossfire, ExpressLRS, and other common drone protocols on 2.4 GHz, 5.8 GHz,
+        900 MHz, and 433 MHz bands.
+    </p>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;max-width:500px">
+        <div class="form-group">
+            <label>Device</label>
+            <select id="sdr-drone-device" class="form-control">
+                <option value="rtl">RTL-SDR</option>
+                <option value="hackrf" selected>HackRF</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Duration (s, 0=continuous)</label>
+            <input type="number" id="sdr-drone-duration" class="form-control" value="0" min="0" max="3600">
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <button id="btn-drone-start" class="btn btn-primary" onclick="sdrDroneStart()">Start Detection</button>
+        <button id="btn-drone-stop" class="btn btn-danger" onclick="sdrDroneStop()" style="display:none">Stop Detection</button>
+        <span id="sdr-drone-indicator" style="display:none;color:var(--accent);font-size:0.85rem">
+            <span class="status-dot active" style="animation:dronePulse 1.5s infinite"></span>
+            Scanning for drones...
+        </span>
+    </div>
+</div>
+
+<!-- Drone Detection Status -->
+<div class="section">
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">
+        <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value small" id="sdr-drone-status">Idle</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Detections</div>
+            <div class="stat-value" id="sdr-drone-count">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Bands Monitored</div>
+            <div class="stat-value small" id="sdr-drone-bands">--</div>
+        </div>
+    </div>
+</div>
+
+<!-- Detections Table -->
+<div class="section">
+    <h2>Detections
+        <span id="sdr-drone-count-badge" style="display:none;margin-left:8px;background:var(--danger);color:#fff;border-radius:12px;padding:2px 8px;font-size:0.7rem;vertical-align:middle">0</span>
+    </h2>
+    <div style="margin-bottom:10px;display:flex;gap:8px">
+        <button class="btn btn-small" onclick="sdrDroneRefresh()">Refresh</button>
+        <button class="btn btn-small btn-danger" onclick="sdrDroneClear()">Clear All</button>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="data-table" id="sdr-drone-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Frequency</th>
+                    <th>Protocol</th>
+                    <th>Signal (dB)</th>
+                    <th>SNR</th>
+                    <th>Confidence</th>
+                    <th>Drone Type</th>
+                    <th>Duration</th>
+                    <th>FHSS</th>
+                </tr>
+            </thead>
+            <tbody id="sdr-drone-tbody">
+                <tr><td colspan="9" class="empty-state">Start detection to scan for drones.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Known Drone Frequencies Reference -->
+<div class="section">
+    <h2 style="cursor:pointer" onclick="sdrToggleDroneFreqs()">
+        Known Drone Frequencies Reference
+        <span id="sdr-drone-freq-arrow" style="font-size:0.75rem;margin-left:6px">&#x25B6;</span>
+    </h2>
+    <div id="sdr-drone-freq-table" style="display:none">
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">Common drone control and video frequencies.</p>
+        <table class="data-table" style="font-size:0.8rem;max-width:700px">
+            <thead>
+                <tr><th>Band</th><th>Center Freq</th><th>Bandwidth</th><th>Usage</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>2.4 GHz</td><td style="font-family:monospace">2437 MHz</td><td>40 MHz</td><td>DJI OcuSync 2.4 GHz Control</td></tr>
+                <tr><td>5.8 GHz</td><td style="font-family:monospace">5787 MHz</td><td>80 MHz</td><td>DJI OcuSync 5.8 GHz Control</td></tr>
+                <tr><td>5.8 GHz</td><td style="font-family:monospace">5800 MHz</td><td>200 MHz</td><td>Analog FPV 5.8 GHz Video</td></tr>
+                <tr><td>900 MHz</td><td style="font-family:monospace">915 MHz</td><td>26 MHz</td><td>TBS Crossfire 900 MHz</td></tr>
+                <tr><td>2.4 GHz</td><td style="font-family:monospace">2440 MHz</td><td>80 MHz</td><td>ExpressLRS 2.4 GHz</td></tr>
+                <tr><td>900 MHz</td><td style="font-family:monospace">915 MHz</td><td>26 MHz</td><td>ExpressLRS 900 MHz</td></tr>
+                <tr><td>1.2 GHz</td><td style="font-family:monospace">1280 MHz</td><td>100 MHz</td><td>1.2 GHz Analog Video</td></tr>
+                <tr><td>433 MHz</td><td style="font-family:monospace">433 MHz</td><td>2 MHz</td><td>433 MHz Telemetry</td></tr>
+            </tbody>
+        </table>
+
+        <h4 style="margin-top:16px;color:var(--accent)">5.8 GHz FPV Video Channels</h4>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:8px">
+            <table class="data-table" style="font-size:0.75rem;margin-bottom:0">
+                <thead><tr><th colspan="8">Raceband (R)</th></tr></thead>
+                <tbody><tr>
+                    <td>R1: 5658</td><td>R2: 5695</td><td>R3: 5732</td><td>R4: 5769</td>
+                </tr><tr>
+                    <td>R5: 5806</td><td>R6: 5843</td><td>R7: 5880</td><td>R8: 5917</td>
+                </tr></tbody>
+            </table>
+            <table class="data-table" style="font-size:0.75rem;margin-bottom:0">
+                <thead><tr><th colspan="8">Fatshark (F)</th></tr></thead>
+                <tbody><tr>
+                    <td>F1: 5740</td><td>F2: 5760</td><td>F3: 5780</td><td>F4: 5800</td>
+                </tr><tr>
+                    <td>F5: 5820</td><td>F6: 5840</td><td>F7: 5860</td><td>F8: 5880</td>
+                </tr></tbody>
+            </table>
+            <table class="data-table" style="font-size:0.75rem;margin-bottom:0">
+                <thead><tr><th colspan="8">Boscam E (E)</th></tr></thead>
+                <tbody><tr>
+                    <td>E1: 5705</td><td>E2: 5685</td><td>E3: 5665</td><td>E4: 5645</td>
+                </tr><tr>
+                    <td>E5: 5885</td><td>E6: 5905</td><td>E7: 5925</td><td>E8: 5945</td>
+                </tr></tbody>
+            </table>
+            <table class="data-table" style="font-size:0.75rem;margin-bottom:0">
+                <thead><tr><th colspan="8">Boscam A (A)</th></tr></thead>
+                <tbody><tr>
+                    <td>A1: 5865</td><td>A2: 5845</td><td>A3: 5825</td><td>A4: 5805</td>
+                </tr><tr>
+                    <td>A5: 5785</td><td>A6: 5765</td><td>A7: 5745</td><td>A8: 5725</td>
+                </tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+var sdrAdsbInterval = null;
+var sdrSpectrumData = null;
+var sdrDroneInterval = null;
+
+/* ── Device Detection ───────────────────────────────────────────── */
+
+function sdrDetectDevices() {
+    var btn = document.getElementById('btn-sdr-detect');
+    setLoading(btn, true);
+    fetchJSON('/sdr-tools/devices').then(function(data) {
+        setLoading(btn, false);
+        var container = document.getElementById('sdr-device-list');
+        var devices = data.devices || [];
+        if (!devices.length) {
+            container.innerHTML = '<div class="empty-state">No SDR devices detected.</div>';
+            return;
+        }
+        var html = '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">';
+        devices.forEach(function(d) {
+            var dot = d.status === 'available' ? 'active' : 'inactive';
+            var caps = (d.capabilities || []).join(', ') || 'none';
+            html += '<div class="stat-card">'
+                + '<div class="stat-label">' + escapeHtml(d.type.toUpperCase()) + '</div>'
+                + '<div class="stat-value small"><span class="status-dot ' + dot + '"></span> '
+                + escapeHtml(d.name || d.type) + '</div>'
+                + '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">'
+                + 'SN: ' + escapeHtml(d.serial || 'N/A')
+                + '<br>Capabilities: ' + escapeHtml(caps)
+                + (d.firmware ? '<br>FW: ' + escapeHtml(d.firmware) : '')
+                + (d.note ? '<br><span style="color:var(--danger)">' + escapeHtml(d.note) + '</span>' : '')
+                + '</div></div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Spectrum Scan ──────────────────────────────────────────────── */
+
+function sdrScanSpectrum() {
+    var btn = document.getElementById('btn-sdr-scan');
+    var startMhz = parseFloat(document.getElementById('sdr-scan-start').value) || 88;
+    var endMhz = parseFloat(document.getElementById('sdr-scan-end').value) || 108;
+    var gainVal = document.getElementById('sdr-scan-gain').value.trim();
+    var dur = parseInt(document.getElementById('sdr-scan-duration').value) || 5;
+    var dev = document.getElementById('sdr-scan-device').value;
+
+    if (startMhz >= endMhz) {
+        document.getElementById('sdr-scan-status').textContent = 'Error: start frequency must be less than end frequency.';
+        return;
+    }
+
+    setLoading(btn, true);
+    document.getElementById('sdr-scan-status').textContent = 'Scanning ' + startMhz + ' - ' + endMhz + ' MHz...';
+
+    var body = {
+        device: dev,
+        freq_start: Math.round(startMhz * 1000000),
+        freq_end: Math.round(endMhz * 1000000),
+        duration: dur
+    };
+    if (gainVal && gainVal !== '') body.gain = parseInt(gainVal);
+
+    postJSON('/sdr-tools/spectrum', body).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-scan-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        sdrSpectrumData = data.data || [];
+        document.getElementById('sdr-scan-status').textContent = 'Scan complete: ' + sdrSpectrumData.length + ' data points.';
+        document.getElementById('sdr-scan-info').textContent = startMhz + ' - ' + endMhz + ' MHz | ' + sdrSpectrumData.length + ' pts | ' + dev;
+        sdrDrawSpectrum(sdrSpectrumData, startMhz, endMhz);
+        document.getElementById('sdr-spectrum-section').style.display = '';
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('sdr-scan-status').textContent = 'Scan request failed.';
+    });
+}
+
+function sdrDrawSpectrum(data, startMhz, endMhz) {
+    var canvas = document.getElementById('sdr-spectrum-canvas');
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    var pad = {top: 20, right: 20, bottom: 40, left: 55};
+    var pw = W - pad.left - pad.right;
+    var ph = H - pad.top - pad.bottom;
+
+    ctx.clearRect(0, 0, W, H);
+
+    if (!data || !data.length) {
+        ctx.fillStyle = '#8b8fa8';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No spectrum data', W / 2, H / 2);
+        return;
+    }
+
+    // Find power range
+    var minDb = data[0].power_db, maxDb = data[0].power_db;
+    data.forEach(function(d) {
+        if (d.power_db < minDb) minDb = d.power_db;
+        if (d.power_db > maxDb) maxDb = d.power_db;
+    });
+    var dbRange = maxDb - minDb || 1;
+    // Add 5% padding
+    minDb -= dbRange * 0.05;
+    maxDb += dbRange * 0.05;
+    dbRange = maxDb - minDb;
+
+    var freqMin = data[0].freq, freqMax = data[data.length - 1].freq;
+    var freqRange = freqMax - freqMin || 1;
+
+    // Grid
+    ctx.strokeStyle = '#333650';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#5c6078';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+
+    // Y-axis grid (power)
+    var ySteps = 5;
+    for (var i = 0; i <= ySteps; i++) {
+        var yVal = minDb + (dbRange * i / ySteps);
+        var y = pad.top + ph - (ph * i / ySteps);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + pw, y);
+        ctx.stroke();
+        ctx.fillText(yVal.toFixed(1) + ' dB', pad.left - 4, y + 3);
+    }
+
+    // X-axis grid (frequency)
+    ctx.textAlign = 'center';
+    var xSteps = Math.min(data.length, 8);
+    for (var i = 0; i <= xSteps; i++) {
+        var xVal = freqMin + (freqRange * i / xSteps);
+        var x = pad.left + (pw * i / xSteps);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + ph);
+        ctx.stroke();
+        ctx.fillText((xVal / 1e6).toFixed(2), x, pad.top + ph + 14);
+    }
+    ctx.fillText('MHz', pad.left + pw / 2, pad.top + ph + 30);
+
+    // Draw spectrum line
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    data.forEach(function(d, idx) {
+        var x = pad.left + ((d.freq - freqMin) / freqRange) * pw;
+        var y = pad.top + ph - ((d.power_db - minDb) / dbRange) * ph;
+        if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#6366f1';
+    ctx.lineTo(pad.left + pw, pad.top + ph);
+    ctx.lineTo(pad.left, pad.top + ph);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+}
+
+/* ── Common Frequencies ─────────────────────────────────────────── */
+
+var sdrFreqsLoaded = false;
+
+function sdrToggleFreqs() {
+    var el = document.getElementById('sdr-freq-table');
+    var arrow = document.getElementById('sdr-freq-arrow');
+    if (el.style.display === 'none') {
+        el.style.display = '';
+        arrow.innerHTML = '&#x25BC;';
+        if (!sdrFreqsLoaded) sdrLoadFreqs();
+    } else {
+        el.style.display = 'none';
+        arrow.innerHTML = '&#x25B6;';
+    }
+}
+
+function sdrLoadFreqs() {
+    fetchJSON('/sdr-tools/frequencies').then(function(data) {
+        sdrFreqsLoaded = true;
+        var container = document.getElementById('sdr-freq-content');
+        var html = '';
+        for (var band in data) {
+            var info = data[band];
+            html += '<div style="margin-bottom:12px">'
+                + '<h4 style="color:var(--accent);margin-bottom:4px">' + escapeHtml(band)
+                + ' <span style="font-weight:normal;font-size:0.8rem;color:var(--text-muted)">(' + escapeHtml(info.range || '') + ')</span></h4>';
+            if (info.notes) html += '<p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">' + escapeHtml(info.notes) + '</p>';
+            if (info.entries && info.entries.length) {
+                html += '<table class="data-table" style="font-size:0.8rem;margin-bottom:0"><thead><tr><th>Frequency</th><th>Name</th></tr></thead><tbody>';
+                info.entries.forEach(function(e) {
+                    var mhz = (e.freq / 1e6).toFixed(3);
+                    html += '<tr style="cursor:pointer" onclick="sdrSetScanFreq(' + e.freq + ')">'
+                        + '<td style="font-family:monospace">' + mhz + ' MHz</td>'
+                        + '<td>' + escapeHtml(e.name) + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    });
+}
+
+function sdrSetScanFreq(centerHz) {
+    // Set scan range to center +/- 1 MHz
+    var startMhz = ((centerHz - 1000000) / 1e6).toFixed(3);
+    var endMhz = ((centerHz + 1000000) / 1e6).toFixed(3);
+    document.getElementById('sdr-scan-start').value = startMhz;
+    document.getElementById('sdr-scan-end').value = endMhz;
+    showTab('sdr', 'spectrum');
+    window.scrollTo(0, 0);
+}
+
+/* ── Capture ────────────────────────────────────────────────────── */
+
+function sdrStartCapture() {
+    var btn = document.getElementById('btn-sdr-capture-start');
+    var freq = parseFloat(document.getElementById('sdr-cap-freq').value) || 100;
+    var body = {
+        device: document.getElementById('sdr-cap-device').value,
+        frequency: Math.round(freq * 1000000),
+        sample_rate: parseInt(document.getElementById('sdr-cap-rate').value),
+        gain: document.getElementById('sdr-cap-gain').value.trim() || 'auto',
+        duration: parseInt(document.getElementById('sdr-cap-duration').value) || 10
+    };
+
+    setLoading(btn, true);
+    postJSON('/sdr-tools/capture/start', body).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-capture-output').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('sdr-capture-output').textContent = 'Capturing to: ' + (data.file || '...') + '\nFreq: ' + freq + ' MHz | Duration: ' + body.duration + 's';
+        document.getElementById('btn-sdr-capture-stop').style.display = '';
+        document.getElementById('sdr-capture-indicator').style.display = '';
+        btn.style.display = 'none';
+        // Auto-refresh after duration
+        setTimeout(function() {
+            sdrCaptureFinished();
+        }, (body.duration + 2) * 1000);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrStopCapture() {
+    var btn = document.getElementById('btn-sdr-capture-stop');
+    setLoading(btn, true);
+    postJSON('/sdr-tools/capture/stop', {}).then(function(data) {
+        setLoading(btn, false);
+        sdrCaptureFinished();
+        document.getElementById('sdr-capture-output').textContent += '\n' + (data.message || 'Stopped.');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrCaptureFinished() {
+    document.getElementById('btn-sdr-capture-start').style.display = '';
+    document.getElementById('btn-sdr-capture-stop').style.display = 'none';
+    document.getElementById('sdr-capture-indicator').style.display = 'none';
+    sdrLoadRecordings();
+}
+
+/* ── Recordings ─────────────────────────────────────────────────── */
+
+function sdrLoadRecordings() {
+    fetchJSON('/sdr-tools/recordings').then(function(data) {
+        var recs = data.recordings || [];
+        var replaySelect = document.getElementById('sdr-replay-file');
+        var demodSelect = document.getElementById('sdr-demod-file');
+        var analyzeSelect = document.getElementById('sdr-analyze-file');
+
+        // Update dropdowns
+        var opts = '<option value="">-- Select recording --</option>';
+        recs.forEach(function(r) {
+            var name = r.filename || r.file || 'unknown';
+            opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+        });
+        replaySelect.innerHTML = opts;
+        demodSelect.innerHTML = opts;
+        analyzeSelect.innerHTML = opts;
+
+        // Render table
+        var container = document.getElementById('sdr-recordings-container');
+        if (!recs.length) {
+            container.innerHTML = '<div class="empty-state">No recordings yet.</div>';
+            return;
+        }
+
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>'
+            + '<th>Filename</th><th>Frequency</th><th>Duration</th><th>Device</th><th>Size</th><th>Date</th><th>Actions</th>'
+            + '</tr></thead><tbody>';
+        recs.forEach(function(r) {
+            var name = r.filename || r.file || '?';
+            var freq = r.frequency ? ((r.frequency / 1e6).toFixed(3) + ' MHz') : 'N/A';
+            var dur = r.actual_duration ? (r.actual_duration + 's') : (r.duration ? (r.duration + 's') : 'N/A');
+            var device = r.device || '?';
+            var size = r.size_human || '?';
+            var date = (r.completed || '').replace('T', ' ').substring(0, 19) || 'N/A';
+            html += '<tr>'
+                + '<td style="font-family:monospace">' + escapeHtml(name) + '</td>'
+                + '<td>' + escapeHtml(freq) + '</td>'
+                + '<td>' + escapeHtml(dur) + '</td>'
+                + '<td>' + escapeHtml(device) + '</td>'
+                + '<td>' + escapeHtml(size) + '</td>'
+                + '<td>' + escapeHtml(date) + '</td>'
+                + '<td style="white-space:nowrap">'
+                + '<button class="btn btn-small" onclick="sdrSelectForReplay(\'' + escapeHtml(name) + '\')">Replay</button> '
+                + '<button class="btn btn-small" onclick="sdrSelectForAnalyze(\'' + escapeHtml(name) + '\')">Analyze</button> '
+                + '<button class="btn btn-small" onclick="sdrSelectForDemod(\'' + escapeHtml(name) + '\')">Demod</button> '
+                + '<button class="btn btn-small btn-danger" onclick="sdrDeleteRecording(\'' + escapeHtml(name) + '\')">Delete</button>'
+                + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    });
+}
+
+function sdrSelectForReplay(name) {
+    document.getElementById('sdr-replay-file').value = name;
+    document.getElementById('sdr-replay-file').scrollIntoView({behavior:'smooth'});
+}
+function sdrSelectForAnalyze(name) {
+    document.getElementById('sdr-analyze-file').value = name;
+    document.getElementById('sdr-analyze-file').scrollIntoView({behavior:'smooth'});
+}
+function sdrSelectForDemod(name) {
+    document.getElementById('sdr-demod-file').value = name;
+    document.getElementById('sdr-demod-file').scrollIntoView({behavior:'smooth'});
+}
+
+function sdrDeleteRecording(name) {
+    if (!confirm('Delete recording: ' + name + '?')) return;
+    fetch('/sdr-tools/recordings/' + encodeURIComponent(name), {method:'DELETE'}).then(function(r){return r.json();}).then(function(data) {
+        if (data.error) alert(data.error);
+        sdrLoadRecordings();
+    });
+}
+
+/* ── Replay ─────────────────────────────────────────────────────── */
+
+function sdrReplay() {
+    var btn = document.getElementById('btn-sdr-replay');
+    var file = document.getElementById('sdr-replay-file').value;
+    if (!file) { document.getElementById('sdr-replay-output').textContent = 'Select a recording first.'; return; }
+    var freq = parseFloat(document.getElementById('sdr-replay-freq').value) || 100;
+    var gain = parseInt(document.getElementById('sdr-replay-gain').value) || 47;
+
+    setLoading(btn, true);
+    document.getElementById('sdr-replay-output').textContent = 'Transmitting...';
+    postJSON('/sdr-tools/replay', {
+        file: file,
+        frequency: Math.round(freq * 1000000),
+        gain: gain
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-replay-output').textContent = 'Error: ' + data.error;
+        } else {
+            document.getElementById('sdr-replay-output').textContent = data.message || 'Replay complete.';
+        }
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('sdr-replay-output').textContent = 'Replay request failed.';
+    });
+}
+
+/* ── Demodulation ───────────────────────────────────────────────── */
+
+function sdrDemodulate() {
+    var btn = document.getElementById('btn-sdr-demod');
+    var file = document.getElementById('sdr-demod-file').value;
+    if (!file) { document.getElementById('sdr-demod-output').textContent = 'Select a recording first.'; return; }
+    var mode = document.getElementById('sdr-demod-mode').value;
+
+    setLoading(btn, true);
+    document.getElementById('sdr-demod-output').textContent = 'Demodulating (' + mode.toUpperCase() + ')...';
+    postJSON('/sdr-tools/demod/' + mode, {file: file}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-demod-output').textContent = 'Error: ' + data.error;
+        } else {
+            document.getElementById('sdr-demod-output').textContent =
+                'Output: ' + (data.filename || data.output || '?')
+                + '\nDuration: ' + (data.duration || 0) + 's'
+                + '\nSamples: ' + (data.samples || 0)
+                + '\nMode: ' + (data.mode || mode.toUpperCase());
+        }
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('sdr-demod-output').textContent = 'Demod request failed.';
+    });
+}
+
+/* ── Signal Analysis ────────────────────────────────────────────── */
+
+function sdrAnalyze() {
+    var btn = document.getElementById('btn-sdr-analyze');
+    var file = document.getElementById('sdr-analyze-file').value;
+    if (!file) { document.getElementById('sdr-analysis-results').innerHTML = '<div class="empty-state">Select a recording first.</div>'; return; }
+
+    setLoading(btn, true);
+    postJSON('/sdr-tools/analyze', {file: file}).then(function(data) {
+        setLoading(btn, false);
+        var container = document.getElementById('sdr-analysis-results');
+        if (data.error) {
+            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">' + escapeHtml(data.error) + '</div>';
+            return;
+        }
+        var pwr = data.power || {};
+        var mag = data.magnitude || {};
+        var html = '<table class="data-table" style="max-width:500px;font-size:0.85rem"><tbody>'
+            + '<tr><td>File</td><td>' + escapeHtml(data.file || '?') + '</td></tr>'
+            + '<tr><td>Size</td><td>' + escapeHtml(data.file_size_human || '?') + '</td></tr>'
+            + '<tr><td>Total Samples</td><td>' + (data.total_samples || 0).toLocaleString() + '</td></tr>'
+            + '<tr><td>Avg Power</td><td>' + (pwr.average_db || '?') + ' dB</td></tr>'
+            + '<tr><td>Peak Power</td><td>' + (pwr.peak_db || '?') + ' dB</td></tr>'
+            + '<tr><td>Dynamic Range</td><td>' + (pwr.dynamic_range_db || '?') + ' dB</td></tr>'
+            + '<tr><td>Duty Cycle</td><td>' + (data.duty_cycle_pct || '?') + '%</td></tr>'
+            + '<tr><td>Modulation (est.)</td><td><strong>' + escapeHtml(data.modulation_guess || '?') + '</strong></td></tr>'
+            + '<tr><td>Frequency</td><td>' + (data.frequency ? ((data.frequency / 1e6).toFixed(3) + ' MHz') : 'Unknown') + '</td></tr>'
+            + '<tr><td>Sample Rate</td><td>' + (data.sample_rate ? ((data.sample_rate / 1e6).toFixed(3) + ' MS/s') : 'Unknown') + '</td></tr>'
+            + '<tr><td>Device</td><td>' + escapeHtml(data.device || 'Unknown') + '</td></tr>'
+            + '</tbody></table>';
+        container.innerHTML = html;
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('sdr-analysis-results').innerHTML = '<div class="empty-state">Analysis request failed.</div>';
+    });
+}
+
+/* ── ADS-B ──────────────────────────────────────────────────────── */
+
+function sdrAdsbStart() {
+    var btn = document.getElementById('btn-adsb-start');
+    setLoading(btn, true);
+    postJSON('/sdr-tools/adsb/start', {}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-adsb-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('sdr-adsb-status').innerHTML = '<span class="status-dot active"></span> Tracking (' + escapeHtml(data.tool || 'unknown') + ')';
+        document.getElementById('sdr-adsb-tool').textContent = data.tool || '--';
+        btn.style.display = 'none';
+        document.getElementById('btn-adsb-stop').style.display = '';
+        // Start polling
+        sdrAdsbInterval = setInterval(sdrAdsbRefresh, 3000);
+        sdrAdsbRefresh();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrAdsbStop() {
+    var btn = document.getElementById('btn-adsb-stop');
+    setLoading(btn, true);
+    if (sdrAdsbInterval) { clearInterval(sdrAdsbInterval); sdrAdsbInterval = null; }
+    postJSON('/sdr-tools/adsb/stop', {}).then(function(data) {
+        setLoading(btn, false);
+        document.getElementById('sdr-adsb-status').textContent = 'Idle';
+        btn.style.display = 'none';
+        document.getElementById('btn-adsb-start').style.display = '';
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrAdsbRefresh() {
+    fetchJSON('/sdr-tools/adsb/aircraft').then(function(data) {
+        var aircraft = data.aircraft || [];
+        document.getElementById('sdr-adsb-count').textContent = aircraft.length;
+        var tbody = document.getElementById('sdr-adsb-tbody');
+        if (!aircraft.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No aircraft detected yet. Waiting for signals...</td></tr>';
+            return;
+        }
+        var html = '';
+        aircraft.forEach(function(ac) {
+            var alt = ac.altitude !== null ? ac.altitude.toLocaleString() : '--';
+            var spd = ac.speed !== null ? ac.speed : '--';
+            var hdg = ac.heading !== null ? (ac.heading + '\u00B0') : '--';
+            var lat = ac.lat !== null ? ac.lat.toFixed(4) : '--';
+            var lon = ac.lon !== null ? ac.lon.toFixed(4) : '--';
+            var seen = (ac.last_seen || '').replace('T', ' ').substring(11, 19) || '--';
+            html += '<tr>'
+                + '<td style="font-family:monospace;font-weight:700">' + escapeHtml(ac.icao) + '</td>'
+                + '<td>' + escapeHtml(ac.callsign || '--') + '</td>'
+                + '<td style="text-align:right">' + alt + '</td>'
+                + '<td style="text-align:right">' + spd + '</td>'
+                + '<td style="text-align:right">' + hdg + '</td>'
+                + '<td style="text-align:right">' + lat + '</td>'
+                + '<td style="text-align:right">' + lon + '</td>'
+                + '<td style="text-align:right">' + (ac.messages || 0) + '</td>'
+                + '<td>' + seen + '</td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = html;
+    });
+}
+
+/* ── GPS Spoofing Detection ─────────────────────────────────────── */
+
+function sdrGpsDetect() {
+    var btn = document.getElementById('btn-sdr-gps');
+    var dur = parseInt(document.getElementById('sdr-gps-duration').value) || 30;
+    setLoading(btn, true);
+    document.getElementById('sdr-gps-results').innerHTML = '<div style="color:var(--text-secondary)">Monitoring GPS L1 frequency for ' + dur + ' seconds...</div>';
+
+    postJSON('/sdr-tools/gps/detect', {duration: dur}).then(function(data) {
+        setLoading(btn, false);
+        var container = document.getElementById('sdr-gps-results');
+        if (data.error) {
+            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">' + escapeHtml(data.error) + '</div>';
+            return;
+        }
+
+        var riskColors = {none:'var(--success,#22c55e)', low:'#eab308', medium:'var(--danger)', high:'#dc2626', unknown:'var(--text-muted)'};
+        var risk = data.risk_level || 'unknown';
+        var analysis = data.analysis || {};
+        var indicators = data.spoofing_indicators || [];
+
+        var html = '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:12px">'
+            + '<div class="stat-card"><div class="stat-label">Risk Level</div>'
+            + '<div class="stat-value" style="color:' + riskColors[risk] + '">' + risk.toUpperCase() + '</div></div>'
+            + '<div class="stat-card"><div class="stat-label">Avg Power</div>'
+            + '<div class="stat-value small">' + (analysis.avg_power_db !== undefined ? analysis.avg_power_db + ' dB' : '--') + '</div></div>'
+            + '<div class="stat-card"><div class="stat-label">Max Power</div>'
+            + '<div class="stat-value small">' + (analysis.max_power_db !== undefined ? analysis.max_power_db + ' dB' : '--') + '</div></div>'
+            + '<div class="stat-card"><div class="stat-label">Strong Signals</div>'
+            + '<div class="stat-value small">' + (analysis.strong_signals !== undefined ? analysis.strong_signals : '--') + '</div></div>'
+            + '</div>';
+
+        if (indicators.length) {
+            html += '<h4 style="margin-bottom:6px;color:var(--danger)">Spoofing Indicators</h4>'
+                + '<table class="data-table" style="font-size:0.85rem"><thead><tr><th>Indicator</th><th>Detail</th><th>Severity</th></tr></thead><tbody>';
+            indicators.forEach(function(ind) {
+                var sevColor = ind.severity === 'high' ? 'var(--danger)' : '#eab308';
+                html += '<tr><td><strong>' + escapeHtml(ind.indicator) + '</strong></td>'
+                    + '<td>' + escapeHtml(ind.detail) + '</td>'
+                    + '<td style="color:' + sevColor + ';font-weight:700">' + escapeHtml(ind.severity.toUpperCase()) + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        } else if (risk === 'none') {
+            html += '<div style="color:var(--success,#22c55e);margin-top:8px">No spoofing indicators detected. GPS signal appears normal.</div>';
+        } else if (analysis.note) {
+            html += '<div style="color:var(--text-muted);margin-top:8px">' + escapeHtml(analysis.note) + '</div>';
+        }
+
+        container.innerHTML = html;
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('sdr-gps-results').innerHTML = '<div class="empty-state">GPS detection request failed.</div>';
+    });
+}
+
+/* ── Drone Detection ────────────────────────────────────────────── */
+
+var sdrDroneFreqsOpen = false;
+
+function sdrDroneStart() {
+    var btn = document.getElementById('btn-drone-start');
+    var dev = document.getElementById('sdr-drone-device').value;
+    var dur = parseInt(document.getElementById('sdr-drone-duration').value) || 0;
+
+    setLoading(btn, true);
+    postJSON('/sdr-tools/drone/start', {device: dev, duration: dur}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('sdr-drone-status').textContent = 'Error: ' + data.error;
+            document.getElementById('sdr-drone-status').style.color = 'var(--danger)';
+            return;
+        }
+        document.getElementById('sdr-drone-status').innerHTML = '<span class="status-dot active" style="animation:dronePulse 1.5s infinite"></span> Scanning';
+        document.getElementById('sdr-drone-status').style.color = 'var(--accent)';
+        document.getElementById('sdr-drone-bands').textContent = '4 bands';
+        btn.style.display = 'none';
+        document.getElementById('btn-drone-stop').style.display = '';
+        document.getElementById('sdr-drone-indicator').style.display = '';
+
+        // Start auto-refresh polling every 3 seconds
+        sdrDroneInterval = setInterval(sdrDroneRefresh, 3000);
+        sdrDroneRefresh();
+
+        // If finite duration, auto-stop UI after duration + buffer
+        if (dur > 0) {
+            setTimeout(function() {
+                sdrDroneCheckStatus();
+            }, (dur + 5) * 1000);
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrDroneStop() {
+    var btn = document.getElementById('btn-drone-stop');
+    setLoading(btn, true);
+    if (sdrDroneInterval) { clearInterval(sdrDroneInterval); sdrDroneInterval = null; }
+
+    postJSON('/sdr-tools/drone/stop', {}).then(function(data) {
+        setLoading(btn, false);
+        document.getElementById('sdr-drone-status').textContent = 'Idle';
+        document.getElementById('sdr-drone-status').style.color = '';
+        btn.style.display = 'none';
+        document.getElementById('btn-drone-start').style.display = '';
+        document.getElementById('sdr-drone-indicator').style.display = 'none';
+        // Final refresh to get last detections
+        sdrDroneRefresh();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function sdrDroneCheckStatus() {
+    fetchJSON('/sdr-tools/drone/status').then(function(data) {
+        if (!data.detecting) {
+            // Detection finished (finite duration ended)
+            if (sdrDroneInterval) { clearInterval(sdrDroneInterval); sdrDroneInterval = null; }
+            document.getElementById('sdr-drone-status').textContent = 'Idle';
+            document.getElementById('sdr-drone-status').style.color = '';
+            document.getElementById('btn-drone-stop').style.display = 'none';
+            document.getElementById('btn-drone-start').style.display = '';
+            document.getElementById('sdr-drone-indicator').style.display = 'none';
+            sdrDroneRefresh();
+        }
+    });
+}
+
+function sdrDroneRefresh() {
+    fetchJSON('/sdr-tools/drone/detections').then(function(data) {
+        var dets = data.detections || [];
+        document.getElementById('sdr-drone-count').textContent = dets.length;
+
+        var badge = document.getElementById('sdr-drone-count-badge');
+        if (dets.length > 0) {
+            badge.style.display = '';
+            badge.textContent = dets.length;
+        } else {
+            badge.style.display = 'none';
+        }
+
+        var tbody = document.getElementById('sdr-drone-tbody');
+        if (!dets.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No drones detected yet. Waiting for signals...</td></tr>';
+            return;
+        }
+
+        var html = '';
+        dets.forEach(function(det) {
+            var ts = (det.time || '').replace('T', ' ').substring(11, 19) || '--';
+            var freq = det.frequency_mhz ? (det.frequency_mhz + ' MHz') : '--';
+            var proto = det.protocol || 'Unknown';
+            var sig = det.signal_strength_db !== undefined ? (det.signal_strength_db + ' dB') : '--';
+            var snr = det.snr_db !== undefined ? (det.snr_db + ' dB') : '--';
+            var conf = det.confidence || 0;
+            var drone = det.drone_type || 'Unknown';
+            var dur = det.duration_s ? (det.duration_s + 's') : '--';
+            var fhss = det.fhss_detected ? 'Yes' : '--';
+
+            // Confidence color
+            var confColor = conf >= 70 ? 'var(--danger)' : conf >= 40 ? '#eab308' : 'var(--text-muted)';
+            // High confidence row styling
+            var rowClass = conf >= 70 ? ' style="border-left:3px solid var(--danger)"' : '';
+
+            html += '<tr' + rowClass + '>'
+                + '<td>' + escapeHtml(ts) + '</td>'
+                + '<td style="font-family:monospace">' + escapeHtml(freq) + '</td>'
+                + '<td><strong>' + escapeHtml(proto) + '</strong>'
+                + (det.protocol_detail ? '<br><span style="font-size:0.7rem;color:var(--text-muted)">' + escapeHtml(det.protocol_detail) + '</span>' : '')
+                + '</td>'
+                + '<td style="text-align:right">' + escapeHtml(sig) + '</td>'
+                + '<td style="text-align:right">' + escapeHtml(snr) + '</td>'
+                + '<td style="text-align:right;color:' + confColor + ';font-weight:700">' + conf + '%</td>'
+                + '<td>' + escapeHtml(drone) + '</td>'
+                + '<td style="text-align:right">' + escapeHtml(dur) + '</td>'
+                + '<td>' + (det.fhss_detected ? '<span style="color:var(--danger);font-weight:700">FHSS</span>' : '--') + '</td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = html;
+
+        // Flash effect for new high-confidence detections
+        if (dets.length > 0 && dets[0].confidence >= 70) {
+            var table = document.getElementById('sdr-drone-table');
+            table.classList.add('drone-alert-flash');
+            setTimeout(function() { table.classList.remove('drone-alert-flash'); }, 1500);
+        }
+    });
+}
+
+function sdrDroneClear() {
+    if (!confirm('Clear all drone detections?')) return;
+    fetch('/sdr-tools/drone/clear', {method:'DELETE'}).then(function(r){return r.json();}).then(function() {
+        sdrDroneRefresh();
+    });
+}
+
+function sdrToggleDroneFreqs() {
+    var el = document.getElementById('sdr-drone-freq-table');
+    var arrow = document.getElementById('sdr-drone-freq-arrow');
+    sdrDroneFreqsOpen = !sdrDroneFreqsOpen;
+    if (sdrDroneFreqsOpen) {
+        el.style.display = '';
+        arrow.innerHTML = '&#x25BC;';
+    } else {
+        el.style.display = 'none';
+        arrow.innerHTML = '&#x25B6;';
+    }
+}
+
+/* ── Init ────────────────────────────────────────────────────────── */
+
+document.addEventListener('DOMContentLoaded', function() {
+    sdrDetectDevices();
+    sdrLoadRecordings();
+
+    // Check if drone detection is already running (page reload)
+    fetchJSON('/sdr-tools/drone/status').then(function(data) {
+        if (data.detecting) {
+            document.getElementById('sdr-drone-status').innerHTML = '<span class="status-dot active" style="animation:dronePulse 1.5s infinite"></span> Scanning';
+            document.getElementById('sdr-drone-status').style.color = 'var(--accent)';
+            document.getElementById('sdr-drone-bands').textContent = '4 bands';
+            document.getElementById('btn-drone-start').style.display = 'none';
+            document.getElementById('btn-drone-stop').style.display = '';
+            document.getElementById('sdr-drone-indicator').style.display = '';
+            sdrDroneInterval = setInterval(sdrDroneRefresh, 3000);
+            sdrDroneRefresh();
+        } else if (data.count > 0) {
+            document.getElementById('sdr-drone-count').textContent = data.count;
+            sdrDroneRefresh();
+        }
+    }).catch(function() {});
+});
+</script>
+
+<style>
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+@keyframes dronePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+}
+@keyframes droneAlertFlash {
+    0% { border-color: var(--border); }
+    25% { border-color: var(--danger); box-shadow: 0 0 12px rgba(220,38,38,0.3); }
+    75% { border-color: var(--danger); box-shadow: 0 0 12px rgba(220,38,38,0.3); }
+    100% { border-color: var(--border); }
+}
+.drone-alert-flash {
+    animation: droneAlertFlash 1.5s ease-in-out;
+}
+</style>
+{% endblock %}

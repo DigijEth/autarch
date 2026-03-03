@@ -1,0 +1,750 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — AD Audit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Active Directory Audit</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        LDAP enumeration, Kerberoasting, AS-REP roasting, ACL analysis, BloodHound collection, and password spray.
+    </p>
+</div>
+
+<!-- Connection Panel (always visible) -->
+<div class="section" id="ad-conn-panel">
+    <h2>Connection
+        <span id="ad-conn-badge" class="badge" style="margin-left:8px;font-size:0.75rem;vertical-align:middle">Disconnected</span>
+    </h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>DC Host / IP</label>
+            <input type="text" id="ad-host" placeholder="192.168.1.10 or dc01.corp.local">
+        </div>
+        <div class="form-group">
+            <label>Domain</label>
+            <input type="text" id="ad-domain" placeholder="corp.local">
+        </div>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="ad-user" placeholder="admin (blank = anonymous)">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="ad-pass" placeholder="Password">
+        </div>
+        <div class="form-group" style="max-width:80px;display:flex;flex-direction:column;justify-content:flex-end">
+            <label><input type="checkbox" id="ad-ssl"> SSL</label>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-ad-connect" class="btn btn-primary btn-small" onclick="adConnect()">Connect</button>
+        <button id="btn-ad-disconnect" class="btn btn-danger btn-small" onclick="adDisconnect()" disabled>Disconnect</button>
+    </div>
+    <div id="ad-conn-info" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)"></div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ad" data-tab="enumerate" onclick="showTab('ad','enumerate')">Enumerate</button>
+    <button class="tab" data-tab-group="ad" data-tab="attack" onclick="showTab('ad','attack')">Attack</button>
+    <button class="tab" data-tab-group="ad" data-tab="acls" onclick="showTab('ad','acls')">ACLs</button>
+    <button class="tab" data-tab-group="ad" data-tab="bloodhound" onclick="showTab('ad','bloodhound')">BloodHound</button>
+</div>
+
+<!-- ==================== ENUMERATE TAB ==================== -->
+<div class="tab-content active" data-tab-group="ad" data-tab="enumerate">
+
+<div class="section">
+    <h2>Enumeration</h2>
+    <div class="tool-actions" style="flex-wrap:wrap;gap:6px">
+        <button id="btn-ad-users" class="btn btn-primary btn-small" onclick="adEnumUsers()">Users</button>
+        <button id="btn-ad-groups" class="btn btn-primary btn-small" onclick="adEnumGroups()">Groups</button>
+        <button id="btn-ad-computers" class="btn btn-primary btn-small" onclick="adEnumComputers()">Computers</button>
+        <button id="btn-ad-ous" class="btn btn-small" onclick="adEnumOUs()">OUs</button>
+        <button id="btn-ad-gpos" class="btn btn-small" onclick="adEnumGPOs()">GPOs</button>
+        <button id="btn-ad-trusts" class="btn btn-small" onclick="adEnumTrusts()">Trusts</button>
+        <button id="btn-ad-dcs" class="btn btn-small" onclick="adEnumDCs()">Domain Controllers</button>
+    </div>
+</div>
+
+<!-- Enum results area -->
+<div class="section" id="ad-enum-section" style="display:none">
+    <h2 id="ad-enum-title">Results</h2>
+    <p id="ad-enum-count" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px"></p>
+    <div style="overflow-x:auto">
+        <table class="data-table">
+            <thead id="ad-enum-thead"><tr><th>Loading...</th></tr></thead>
+            <tbody id="ad-enum-tbody">
+                <tr><td class="empty-state">Run an enumeration above.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== ATTACK TAB ==================== -->
+<div class="tab-content" data-tab-group="ad" data-tab="attack">
+
+<!-- Kerberoast -->
+<div class="section">
+    <h2>Kerberoast</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Request TGS tickets for accounts with SPNs and extract hashes in hashcat format.
+    </p>
+    <div class="tool-actions">
+        <button id="btn-ad-spn" class="btn btn-small" onclick="adFindSPN()">Find SPN Accounts</button>
+        <button id="btn-ad-kerberoast" class="btn btn-danger btn-small" onclick="adKerberoast()">Kerberoast</button>
+    </div>
+    <div id="ad-spn-info" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)"></div>
+    <pre class="output-panel" id="ad-kerb-output" style="display:none;max-height:300px;overflow:auto;margin-top:8px;user-select:all"></pre>
+</div>
+
+<!-- AS-REP Roast -->
+<div class="section">
+    <h2>AS-REP Roast</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Find accounts that do not require Kerberos pre-authentication and extract AS-REP hashes.
+    </p>
+    <div class="form-group" style="max-width:500px">
+        <label>User list (one per line, blank = auto-detect)</label>
+        <textarea id="ad-asrep-users" rows="3" placeholder="user1&#10;user2&#10;user3"></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-ad-asrep-find" class="btn btn-small" onclick="adFindASREP()">Find Vulnerable Accounts</button>
+        <button id="btn-ad-asrep" class="btn btn-danger btn-small" onclick="adASREPRoast()">AS-REP Roast</button>
+    </div>
+    <div id="ad-asrep-info" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)"></div>
+    <pre class="output-panel" id="ad-asrep-output" style="display:none;max-height:300px;overflow:auto;margin-top:8px;user-select:all"></pre>
+</div>
+
+<!-- Password Spray -->
+<div class="section">
+    <h2>Password Spray</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Spray a single password against a list of users. Includes delay/jitter to reduce lockout risk.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="flex:2">
+            <label>User list (one per line)</label>
+            <textarea id="ad-spray-users" rows="5" placeholder="administrator&#10;svc_sql&#10;backup_admin&#10;jsmith"></textarea>
+        </div>
+        <div class="form-group" style="flex:1">
+            <label>Password</label>
+            <input type="text" id="ad-spray-pass" placeholder="Winter2026!">
+            <label style="margin-top:8px">Protocol</label>
+            <select id="ad-spray-proto">
+                <option value="ldap">LDAP</option>
+                <option value="smb">SMB</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-ad-spray" class="btn btn-danger btn-small" onclick="adSpray()">Spray</button>
+    </div>
+    <div id="ad-spray-info" style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)"></div>
+    <table class="data-table" id="ad-spray-table" style="display:none;margin-top:8px">
+        <thead>
+            <tr><th>Username</th><th>Status</th><th>Message</th></tr>
+        </thead>
+        <tbody id="ad-spray-tbody"></tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== ACLS TAB ==================== -->
+<div class="tab-content" data-tab-group="ad" data-tab="acls">
+
+<div class="section">
+    <h2>ACL Analysis</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Identify dangerous permissions: GenericAll, WriteDACL, WriteOwner, DCSync rights, and more.
+    </p>
+    <div class="tool-actions">
+        <button id="btn-ad-acls" class="btn btn-primary btn-small" onclick="adAnalyzeACLs()">Analyze ACLs</button>
+        <button id="btn-ad-admins" class="btn btn-small" onclick="adFindAdmins()">Find Admin Accounts</button>
+        <button id="btn-ad-unconstrained" class="btn btn-small" onclick="adFindUnconstrained()">Unconstrained Delegation</button>
+        <button id="btn-ad-constrained" class="btn btn-small" onclick="adFindConstrained()">Constrained Delegation</button>
+    </div>
+    <div class="form-group" style="max-width:200px;margin-top:12px">
+        <label>Filter by risk</label>
+        <select id="ad-acl-filter" onchange="adFilterACLs()">
+            <option value="all">All</option>
+            <option value="Critical">Critical</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+        </select>
+    </div>
+</div>
+
+<!-- ACL Findings -->
+<div class="section" id="ad-acl-section" style="display:none">
+    <h2 id="ad-acl-title">Dangerous Permissions</h2>
+    <p id="ad-acl-count" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px"></p>
+    <table class="data-table">
+        <thead>
+            <tr><th>Principal</th><th>Target</th><th>Permission</th><th>Risk</th></tr>
+        </thead>
+        <tbody id="ad-acl-tbody">
+            <tr><td colspan="4" class="empty-state">Click Analyze ACLs to start.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Admin Accounts -->
+<div class="section" id="ad-admin-section" style="display:none">
+    <h2>Admin Accounts</h2>
+    <div id="ad-admin-list"></div>
+</div>
+
+<!-- Delegation -->
+<div class="section" id="ad-deleg-section" style="display:none">
+    <h2 id="ad-deleg-title">Delegation Findings</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th>Server</th><th>DNS Name</th><th>OS</th><th>Risk</th><th>Details</th></tr>
+        </thead>
+        <tbody id="ad-deleg-tbody">
+            <tr><td colspan="5" class="empty-state">Click a delegation button above.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== BLOODHOUND TAB ==================== -->
+<div class="tab-content" data-tab-group="ad" data-tab="bloodhound">
+
+<div class="section">
+    <h2>BloodHound Collection</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Collect users, groups, computers, sessions, and ACLs for BloodHound import.
+        Uses bloodhound-python if available, otherwise falls back to manual LDAP collection.
+    </p>
+    <div class="tool-actions">
+        <button id="btn-ad-bh" class="btn btn-primary btn-small" onclick="adBloodhound()">Collect Data</button>
+        <button class="btn btn-small" onclick="adExport('json')">Export All (JSON)</button>
+        <button class="btn btn-small" onclick="adExport('csv')">Export All (CSV)</button>
+    </div>
+</div>
+
+<div class="section" id="ad-bh-section" style="display:none">
+    <h2>Collection Results</h2>
+    <div id="ad-bh-progress" style="margin-bottom:12px">
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+            <div class="stat-card">
+                <div class="stat-value" id="ad-bh-users">0</div>
+                <div class="stat-label">Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="ad-bh-groups">0</div>
+                <div class="stat-label">Groups</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="ad-bh-computers">0</div>
+                <div class="stat-label">Computers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="ad-bh-sessions">0</div>
+                <div class="stat-label">Sessions</div>
+            </div>
+        </div>
+    </div>
+    <div id="ad-bh-message" style="margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary)"></div>
+    <div id="ad-bh-method" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px"></div>
+    <h3 style="margin-top:16px;font-size:0.9rem">Output Files</h3>
+    <ul id="ad-bh-files" class="module-list" style="font-size:0.85rem"></ul>
+</div>
+
+</div>
+
+<style>
+.stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:16px 24px; text-align:center; min-width:100px; }
+.stat-value { font-size:1.6rem; font-weight:700; color:var(--accent); }
+.stat-label { font-size:0.75rem; color:var(--text-muted); margin-top:4px; }
+.badge-pass { background:rgba(34,197,94,0.15); color:#22c55e; }
+.badge-fail { background:rgba(239,68,68,0.15); color:#ef4444; }
+.badge-warn { background:rgba(234,179,8,0.15); color:#eab308; }
+.badge-info { background:rgba(99,102,241,0.15); color:#6366f1; }
+.risk-Critical { color:#ef4444; font-weight:700; }
+.risk-High { color:#f97316; font-weight:600; }
+.risk-Medium { color:#eab308; }
+.risk-Low { color:var(--text-muted); }
+.spray-success { background:rgba(34,197,94,0.08); }
+.spray-lockout { background:rgba(239,68,68,0.12); }
+.spray-disabled { background:rgba(234,179,8,0.08); }
+#ad-kerb-output, #ad-asrep-output { background:var(--bg-input); border:1px solid var(--border); border-radius:var(--radius); padding:12px; font-family:monospace; font-size:0.8rem; word-break:break-all; }
+</style>
+
+<script>
+/* ==================== AD AUDIT JS ==================== */
+
+var adACLData = [];  /* cached for filtering */
+
+function adConnect() {
+    var btn = document.getElementById('btn-ad-connect');
+    setLoading(btn, true);
+    postJSON('/ad-audit/connect', {
+        host: document.getElementById('ad-host').value,
+        domain: document.getElementById('ad-domain').value,
+        username: document.getElementById('ad-user').value,
+        password: document.getElementById('ad-pass').value,
+        ssl: document.getElementById('ad-ssl').checked
+    }).then(function(d) {
+        setLoading(btn, false);
+        adUpdateStatus(d);
+    }).catch(function(e) {
+        setLoading(btn, false);
+        document.getElementById('ad-conn-info').textContent = 'Connection error: ' + e.message;
+    });
+}
+
+function adDisconnect() {
+    postJSON('/ad-audit/disconnect', {}).then(function(d) {
+        adUpdateStatus({success: false, connected: false, message: 'Disconnected'});
+    });
+}
+
+function adUpdateStatus(d) {
+    var badge = document.getElementById('ad-conn-badge');
+    var info = document.getElementById('ad-conn-info');
+    var disconnBtn = document.getElementById('btn-ad-disconnect');
+    if (d.success || d.connected) {
+        badge.textContent = 'Connected';
+        badge.className = 'badge badge-pass';
+        info.textContent = d.message || ('Connected to ' + (d.dc_host || '') + ' (' + (d.domain || '') + ')');
+        disconnBtn.disabled = false;
+    } else {
+        badge.textContent = 'Disconnected';
+        badge.className = 'badge badge-fail';
+        info.textContent = d.message || 'Not connected';
+        disconnBtn.disabled = true;
+    }
+}
+
+function adCheckStatus() {
+    fetchJSON('/ad-audit/status').then(function(d) { adUpdateStatus(d); });
+}
+
+/* ==================== ENUMERATION ==================== */
+
+function adShowEnum(title, count, headers, rows) {
+    document.getElementById('ad-enum-section').style.display = '';
+    document.getElementById('ad-enum-title').textContent = title;
+    document.getElementById('ad-enum-count').textContent = count + ' result(s)';
+    var thead = document.getElementById('ad-enum-thead');
+    thead.innerHTML = '<tr>' + headers.map(function(h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr>';
+    var tbody = document.getElementById('ad-enum-tbody');
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="' + headers.length + '" class="empty-state">No results found.</td></tr>';
+    } else {
+        tbody.innerHTML = rows.join('');
+    }
+}
+
+function adEnumUsers() {
+    var btn = document.getElementById('btn-ad-users');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/users').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.users || []).map(function(u) {
+            var flags = (u.uac_flags || []).slice(0, 3).join(', ');
+            var status = u.enabled ? '<span class="badge badge-pass">Enabled</span>' : '<span class="badge badge-fail">Disabled</span>';
+            return '<tr><td>' + escapeHtml(u.username) + '</td><td>' + escapeHtml(u.display_name || '') +
+                '</td><td>' + status + '</td><td>' + escapeHtml(u.last_logon || '') +
+                '</td><td>' + escapeHtml(u.pwd_last_set || '') +
+                '</td><td style="font-size:0.75rem">' + escapeHtml(flags) + '</td></tr>';
+        });
+        adShowEnum('Users', d.count || 0, ['Username', 'Display Name', 'Status', 'Last Logon', 'Password Set', 'Flags'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumGroups() {
+    var btn = document.getElementById('btn-ad-groups');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/groups').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.groups || []).map(function(g) {
+            return '<tr><td>' + escapeHtml(g.name) + '</td><td>' + escapeHtml(g.description || '') +
+                '</td><td>' + g.member_count + '</td><td>' + escapeHtml(g.scope || '') + '</td></tr>';
+        });
+        adShowEnum('Groups', d.count || 0, ['Name', 'Description', 'Members', 'Scope'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumComputers() {
+    var btn = document.getElementById('btn-ad-computers');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/computers').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.computers || []).map(function(c) {
+            var deleg = c.trusted_for_delegation ? '<span class="badge badge-warn">UNCONSTRAINED</span>' : '';
+            return '<tr><td>' + escapeHtml(c.name) + '</td><td>' + escapeHtml(c.dns_name || '') +
+                '</td><td>' + escapeHtml(c.os || '') + '</td><td>' + escapeHtml(c.last_logon || '') +
+                '</td><td>' + deleg + '</td></tr>';
+        });
+        adShowEnum('Computers', d.count || 0, ['Name', 'DNS', 'OS', 'Last Logon', 'Delegation'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumOUs() {
+    var btn = document.getElementById('btn-ad-ous');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/ous').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.ous || []).map(function(o) {
+            var gpos = (o.linked_gpos || []).length;
+            return '<tr><td>' + escapeHtml(o.name) + '</td><td style="font-size:0.75rem">' + escapeHtml(o.dn || '') +
+                '</td><td>' + escapeHtml(o.description || '') + '</td><td>' + gpos + '</td></tr>';
+        });
+        adShowEnum('Organizational Units', d.count || 0, ['Name', 'DN', 'Description', 'Linked GPOs'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumGPOs() {
+    var btn = document.getElementById('btn-ad-gpos');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/gpos').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.gpos || []).map(function(g) {
+            return '<tr><td>' + escapeHtml(g.name) + '</td><td>' + escapeHtml(g.status || '') +
+                '</td><td style="font-size:0.75rem">' + escapeHtml(g.path || '') + '</td><td>' + escapeHtml(g.when_created || '') + '</td></tr>';
+        });
+        adShowEnum('Group Policy Objects', d.count || 0, ['Name', 'Status', 'Path', 'Created'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumTrusts() {
+    var btn = document.getElementById('btn-ad-trusts');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/trusts').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.trusts || []).map(function(t) {
+            var attrs = (t.attributes || []).join(', ');
+            return '<tr><td>' + escapeHtml(t.name) + '</td><td>' + escapeHtml(t.partner || '') +
+                '</td><td>' + escapeHtml(t.direction || '') + '</td><td>' + escapeHtml(t.type || '') +
+                '</td><td style="font-size:0.75rem">' + escapeHtml(attrs) + '</td></tr>';
+        });
+        adShowEnum('Domain Trusts', d.count || 0, ['Name', 'Partner', 'Direction', 'Type', 'Attributes'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adEnumDCs() {
+    var btn = document.getElementById('btn-ad-dcs');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/dcs').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var rows = (d.dcs || []).map(function(dc) {
+            return '<tr><td>' + escapeHtml(dc.name) + '</td><td>' + escapeHtml(dc.dns_name || '') +
+                '</td><td>' + escapeHtml(dc.os || '') + '</td><td>' + escapeHtml(dc.os_version || '') + '</td></tr>';
+        });
+        /* Append FSMO info if present */
+        var fsmo = d.fsmo_roles || {};
+        var fsmoKeys = Object.keys(fsmo);
+        if (fsmoKeys.length > 0) {
+            rows.push('<tr><td colspan="4" style="border-top:2px solid var(--border);font-weight:600;padding-top:12px">FSMO Role Holders</td></tr>');
+            fsmoKeys.forEach(function(role) {
+                rows.push('<tr><td colspan="2">' + escapeHtml(role) + '</td><td colspan="2" style="font-size:0.75rem">' + escapeHtml(String(fsmo[role])) + '</td></tr>');
+            });
+        }
+        adShowEnum('Domain Controllers', d.count || 0, ['Name', 'DNS', 'OS', 'Version'], rows);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ==================== ATTACK ==================== */
+
+function adFindSPN() {
+    var btn = document.getElementById('btn-ad-spn');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/spn-accounts').then(function(d) {
+        setLoading(btn, false);
+        var info = document.getElementById('ad-spn-info');
+        if (d.error) { info.textContent = d.error; return; }
+        var accts = d.accounts || [];
+        if (accts.length === 0) {
+            info.innerHTML = 'No SPN accounts found.';
+        } else {
+            var html = '<strong>' + accts.length + '</strong> Kerberoastable account(s): ';
+            html += accts.map(function(a) {
+                return '<span class="badge badge-warn">' + escapeHtml(a.username) + '</span>';
+            }).join(' ');
+            info.innerHTML = html;
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adKerberoast() {
+    var btn = document.getElementById('btn-ad-kerberoast');
+    setLoading(btn, true);
+    var host = document.getElementById('ad-host').value;
+    var domain = document.getElementById('ad-domain').value;
+    var user = document.getElementById('ad-user').value;
+    var pass = document.getElementById('ad-pass').value;
+    postJSON('/ad-audit/kerberoast', { host: host, domain: domain, username: user, password: pass }).then(function(d) {
+        setLoading(btn, false);
+        var output = document.getElementById('ad-kerb-output');
+        var info = document.getElementById('ad-spn-info');
+        info.textContent = d.message || '';
+        if (d.hashes && d.hashes.length > 0) {
+            output.style.display = '';
+            output.textContent = d.hashes.join('\n');
+        } else {
+            output.style.display = 'none';
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adFindASREP() {
+    var btn = document.getElementById('btn-ad-asrep-find');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/asrep-accounts').then(function(d) {
+        setLoading(btn, false);
+        var info = document.getElementById('ad-asrep-info');
+        if (d.error) { info.textContent = d.error; return; }
+        var accts = d.accounts || [];
+        if (accts.length === 0) {
+            info.innerHTML = 'No accounts without pre-authentication found.';
+        } else {
+            var html = '<strong>' + accts.length + '</strong> AS-REP vulnerable account(s): ';
+            html += accts.map(function(a) {
+                return '<span class="badge badge-warn">' + escapeHtml(a.username) + '</span>';
+            }).join(' ');
+            info.innerHTML = html;
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adASREPRoast() {
+    var btn = document.getElementById('btn-ad-asrep');
+    setLoading(btn, true);
+    var host = document.getElementById('ad-host').value;
+    var domain = document.getElementById('ad-domain').value;
+    var usersRaw = document.getElementById('ad-asrep-users').value.trim();
+    var userlist = usersRaw ? usersRaw : null;
+    postJSON('/ad-audit/asrep', { host: host, domain: domain, userlist: userlist }).then(function(d) {
+        setLoading(btn, false);
+        var output = document.getElementById('ad-asrep-output');
+        var info = document.getElementById('ad-asrep-info');
+        info.textContent = d.message || '';
+        if (d.hashes && d.hashes.length > 0) {
+            output.style.display = '';
+            output.textContent = d.hashes.join('\n');
+        } else {
+            output.style.display = 'none';
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adSpray() {
+    var btn = document.getElementById('btn-ad-spray');
+    var usersRaw = document.getElementById('ad-spray-users').value.trim();
+    var password = document.getElementById('ad-spray-pass').value;
+    var protocol = document.getElementById('ad-spray-proto').value;
+    if (!usersRaw || !password) { alert('User list and password are required.'); return; }
+    setLoading(btn, true);
+    document.getElementById('ad-spray-info').textContent = 'Spraying... this may take a while.';
+    postJSON('/ad-audit/spray', {
+        host: document.getElementById('ad-host').value,
+        domain: document.getElementById('ad-domain').value,
+        userlist: usersRaw,
+        password: password,
+        protocol: protocol
+    }).then(function(d) {
+        setLoading(btn, false);
+        var info = document.getElementById('ad-spray-info');
+        if (d.error) { info.textContent = d.error; return; }
+        info.innerHTML = '<strong>' + (d.success_count || 0) + '</strong> success, <strong>' +
+            (d.failure_count || 0) + '</strong> failed, <strong>' + (d.lockout_count || 0) + '</strong> lockouts';
+        var table = document.getElementById('ad-spray-table');
+        var tbody = document.getElementById('ad-spray-tbody');
+        table.style.display = '';
+        var rows = (d.results || []).map(function(r) {
+            var cls = '';
+            if (r.status === 'success') cls = 'spray-success';
+            else if (r.status === 'lockout') cls = 'spray-lockout';
+            else if (r.status === 'disabled') cls = 'spray-disabled';
+            var badge = 'badge-fail';
+            if (r.status === 'success') badge = 'badge-pass';
+            else if (r.status === 'lockout') badge = 'badge-warn';
+            return '<tr class="' + cls + '"><td>' + escapeHtml(r.username) +
+                '</td><td><span class="badge ' + badge + '">' + escapeHtml(r.status) +
+                '</span></td><td>' + escapeHtml(r.message || '') + '</td></tr>';
+        });
+        tbody.innerHTML = rows.join('');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ==================== ACLs ==================== */
+
+function adAnalyzeACLs() {
+    var btn = document.getElementById('btn-ad-acls');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/acls').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        adACLData = d.findings || [];
+        document.getElementById('ad-acl-section').style.display = '';
+        document.getElementById('ad-acl-count').textContent = (d.count || 0) + ' finding(s)';
+        adRenderACLs(adACLData);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adRenderACLs(data) {
+    var tbody = document.getElementById('ad-acl-tbody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No findings.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(function(f) {
+        return '<tr><td>' + escapeHtml(f.principal || 'N/A') + '</td><td>' + escapeHtml(f.target || '') +
+            '</td><td style="font-size:0.8rem">' + escapeHtml(f.permission || '') +
+            '</td><td><span class="risk-' + escapeHtml(f.risk || 'Low') + '">' + escapeHtml(f.risk || 'Low') + '</span></td></tr>';
+    }).join('');
+}
+
+function adFilterACLs() {
+    var filter = document.getElementById('ad-acl-filter').value;
+    if (filter === 'all') {
+        adRenderACLs(adACLData);
+    } else {
+        adRenderACLs(adACLData.filter(function(f) { return f.risk === filter; }));
+    }
+}
+
+function adFindAdmins() {
+    var btn = document.getElementById('btn-ad-admins');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/admins').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        var section = document.getElementById('ad-admin-section');
+        section.style.display = '';
+        var html = '';
+        (d.admins || []).forEach(function(grp) {
+            html += '<h3 style="margin-top:12px;font-size:0.9rem;color:var(--accent)">' + escapeHtml(grp.group) +
+                ' <span style="color:var(--text-muted);font-weight:400">(' + grp.count + ' members)</span></h3>';
+            if (grp.members.length === 0) {
+                html += '<p style="font-size:0.8rem;color:var(--text-muted)">No members</p>';
+            } else {
+                html += '<table class="data-table"><thead><tr><th>Username</th><th>Display Name</th><th>Status</th><th>Last Logon</th></tr></thead><tbody>';
+                grp.members.forEach(function(m) {
+                    var status = m.enabled ? '<span class="badge badge-pass">Enabled</span>' : '<span class="badge badge-fail">Disabled</span>';
+                    html += '<tr><td>' + escapeHtml(m.username) + '</td><td>' + escapeHtml(m.display_name || '') +
+                        '</td><td>' + status + '</td><td>' + escapeHtml(m.last_logon || '') + '</td></tr>';
+                });
+                html += '</tbody></table>';
+            }
+        });
+        document.getElementById('ad-admin-list').innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adFindUnconstrained() {
+    var btn = document.getElementById('btn-ad-unconstrained');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/unconstrained').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        document.getElementById('ad-deleg-section').style.display = '';
+        document.getElementById('ad-deleg-title').textContent = 'Unconstrained Delegation (' + (d.count || 0) + ')';
+        var tbody = document.getElementById('ad-deleg-tbody');
+        if ((d.servers || []).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No unconstrained delegation found.</td></tr>';
+        } else {
+            tbody.innerHTML = d.servers.map(function(s) {
+                return '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.dns_name || '') +
+                    '</td><td>' + escapeHtml(s.os || '') +
+                    '</td><td><span class="risk-' + escapeHtml(s.risk || 'High') + '">' + escapeHtml(s.risk || 'High') +
+                    '</span></td><td>Trusted for delegation to any service</td></tr>';
+            }).join('');
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function adFindConstrained() {
+    var btn = document.getElementById('btn-ad-constrained');
+    setLoading(btn, true);
+    fetchJSON('/ad-audit/constrained').then(function(d) {
+        setLoading(btn, false);
+        if (d.error) { alert(d.error); return; }
+        document.getElementById('ad-deleg-section').style.display = '';
+        document.getElementById('ad-deleg-title').textContent = 'Constrained Delegation (' + (d.count || 0) + ')';
+        var tbody = document.getElementById('ad-deleg-tbody');
+        if ((d.servers || []).length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No constrained delegation found.</td></tr>';
+        } else {
+            tbody.innerHTML = d.servers.map(function(s) {
+                var targets = (s.allowed_to_delegate_to || []).join(', ');
+                var pt = s.protocol_transition ? ' + Protocol Transition' : '';
+                return '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.dns_name || '') +
+                    '</td><td>' + escapeHtml(s.os || '') +
+                    '</td><td><span class="risk-' + escapeHtml(s.risk || 'Medium') + '">' + escapeHtml(s.risk || 'Medium') +
+                    '</span></td><td style="font-size:0.75rem">' + escapeHtml(targets + pt) + '</td></tr>';
+            }).join('');
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ==================== BLOODHOUND ==================== */
+
+function adBloodhound() {
+    var btn = document.getElementById('btn-ad-bh');
+    setLoading(btn, true);
+    document.getElementById('ad-bh-section').style.display = '';
+    document.getElementById('ad-bh-message').textContent = 'Collecting data... this may take several minutes.';
+    var host = document.getElementById('ad-host').value;
+    var domain = document.getElementById('ad-domain').value;
+    var user = document.getElementById('ad-user').value;
+    var pass = document.getElementById('ad-pass').value;
+    postJSON('/ad-audit/bloodhound', { host: host, domain: domain, username: user, password: pass }).then(function(d) {
+        setLoading(btn, false);
+        if (d.error) {
+            document.getElementById('ad-bh-message').textContent = d.error;
+            return;
+        }
+        document.getElementById('ad-bh-message').textContent = d.message || 'Collection complete.';
+        var stats = d.stats || {};
+        document.getElementById('ad-bh-users').textContent = stats.users || 0;
+        document.getElementById('ad-bh-groups').textContent = stats.groups || 0;
+        document.getElementById('ad-bh-computers').textContent = stats.computers || 0;
+        document.getElementById('ad-bh-sessions').textContent = stats.sessions || 0;
+        document.getElementById('ad-bh-method').textContent = 'Collection method: ' + (stats.method || 'unknown');
+        var filesEl = document.getElementById('ad-bh-files');
+        var files = stats.files || [];
+        if (files.length === 0) {
+            filesEl.innerHTML = '<li style="padding:8px;color:var(--text-muted)">No output files</li>';
+        } else {
+            filesEl.innerHTML = files.map(function(f) {
+                return '<li class="module-item" style="padding:6px 12px"><span style="font-family:monospace;font-size:0.8rem">' + escapeHtml(f) + '</span></li>';
+            }).join('');
+        }
+    }).catch(function(e) {
+        setLoading(btn, false);
+        document.getElementById('ad-bh-message').textContent = 'Error: ' + e.message;
+    });
+}
+
+function adExport(fmt) {
+    fetchJSON('/ad-audit/export?format=' + fmt).then(function(d) {
+        if (d.success) {
+            var path = d.path || (d.files || []).join(', ');
+            alert('Exported to: ' + path);
+        } else {
+            alert(d.message || 'Export failed');
+        }
+    });
+}
+
+/* Check connection on page load */
+document.addEventListener('DOMContentLoaded', adCheckStatus);
+</script>
+
+{% endblock %}

@@ -1,0 +1,940 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — RCS/SMS Exploit{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>RCS/SMS Exploitation</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Extract, forge, modify, backup, and exploit SMS/RCS messages on connected Android devices.
+        Uses content providers (no root), Archon relay, CVE-2024-0044, and bugle_db direct access.
+    </p>
+</div>
+
+<!-- Device Status Banner -->
+<div id="rcs-device-banner" class="section" style="padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span id="rcs-dev-indicator" style="width:10px;height:10px;border-radius:50%;background:#555;display:inline-block"></span>
+    <span id="rcs-dev-label" style="font-size:0.85rem;color:var(--text-secondary)">Checking device...</span>
+    <span id="rcs-shizuku-badge" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;background:#333;color:#888">Shizuku: --</span>
+    <span id="rcs-archon-badge" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;background:#333;color:#888">Archon: --</span>
+    <span id="rcs-cve-badge" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;background:#333;color:#888">CVE: --</span>
+    <span id="rcs-sms-app" style="font-size:0.75rem;color:var(--text-muted)">SMS App: --</span>
+    <button class="btn btn-small" onclick="rcsRefreshStatus()" style="margin-left:auto">Refresh</button>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="rcs" data-tab="extract" onclick="showTab('rcs','extract')">Extract</button>
+    <button class="tab" data-tab-group="rcs" data-tab="database" onclick="showTab('rcs','database')">Database</button>
+    <button class="tab" data-tab-group="rcs" data-tab="forge" onclick="showTab('rcs','forge')">Forge</button>
+    <button class="tab" data-tab-group="rcs" data-tab="modify" onclick="showTab('rcs','modify')">Modify</button>
+    <button class="tab" data-tab-group="rcs" data-tab="exploit" onclick="showTab('rcs','exploit')">Exploit</button>
+    <button class="tab" data-tab-group="rcs" data-tab="backup" onclick="showTab('rcs','backup')">Backup</button>
+    <button class="tab" data-tab-group="rcs" data-tab="monitor" onclick="showTab('rcs','monitor')">Monitor</button>
+</div>
+
+<!-- ========================== EXTRACT TAB ========================== -->
+<div class="tab-content active" data-tab-group="rcs" data-tab="extract">
+
+<div class="section">
+    <h3>SMS Messages</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <input id="rcs-search-addr" type="text" placeholder="Filter by address" style="flex:1;min-width:150px">
+        <input id="rcs-search-kw" type="text" placeholder="Search keyword" style="flex:1;min-width:150px">
+        <input id="rcs-search-thread" type="text" placeholder="Thread ID" style="width:90px">
+        <select id="rcs-msg-filter" style="width:120px">
+            <option value="all">All</option>
+            <option value="inbox">Inbox</option>
+            <option value="sent">Sent</option>
+            <option value="drafts">Drafts</option>
+            <option value="undelivered">Undelivered</option>
+        </select>
+        <button class="btn" onclick="rcsExtractMessages()">Extract</button>
+        <button class="btn btn-secondary" onclick="rcsExportMessages('json')">Export JSON</button>
+        <button class="btn btn-secondary" onclick="rcsExportMessages('csv')">Export CSV</button>
+        <button class="btn btn-secondary" onclick="rcsExportMessages('xml')">Export XML</button>
+    </div>
+    <div id="rcs-msg-count" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px"></div>
+    <div id="rcs-messages-list" style="max-height:500px;overflow-y:auto"></div>
+</div>
+
+<div class="section">
+    <h3>MMS Messages</h3>
+    <button class="btn" onclick="rcsExtractMMS()">Extract MMS</button>
+    <div id="rcs-mms-list" style="max-height:300px;overflow-y:auto;margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>RCS Provider (AOSP content://rcs/)</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn" onclick="rcsExtractRCSProvider()">Query RCS Provider</button>
+        <button class="btn btn-secondary" onclick="rcsExtractRCSMessages()">RCS Messages</button>
+        <button class="btn btn-secondary" onclick="rcsExtractRCSParticipants()">RCS Participants</button>
+    </div>
+    <div id="rcs-provider-result" style="max-height:400px;overflow-y:auto"></div>
+</div>
+
+<div class="section">
+    <h3>Content Provider Enumeration</h3>
+    <p style="font-size:0.8rem;color:var(--text-muted)">Scan all known messaging content providers to see which are accessible at UID 2000.</p>
+    <button class="btn" onclick="rcsEnumerateProviders()">Enumerate All Providers</button>
+    <div id="rcs-providers-result" style="margin-top:8px"></div>
+</div>
+
+</div>
+
+<!-- ========================== DATABASE TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="database">
+
+<div class="section">
+    <h3>bugle_db Extraction</h3>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px">
+        Extract the Google Messages database directly. Messages are stored as <strong>plaintext</strong> &mdash;
+        no decryption needed. Tries: Archon relay &rarr; CVE-2024-0044 &rarr; root &rarr; ADB backup.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-danger" onclick="rcsExtractBugle()">Extract bugle_db</button>
+        <button class="btn" onclick="rcsExtractRCSFromBugle()">Extract RCS Only</button>
+        <button class="btn" onclick="rcsExtractConvosFromBugle()">Extract Conversations</button>
+        <button class="btn" onclick="rcsExtractEdits()">Extract Message Edits</button>
+        <button class="btn btn-secondary" onclick="rcsExtractAllBugle()">Full Export (all tables)</button>
+    </div>
+    <div id="rcs-bugle-result" style="max-height:400px;overflow-y:auto"></div>
+</div>
+
+<div class="section">
+    <h3>SQL Query (extracted bugle_db)</h3>
+    <p style="font-size:0.8rem;color:var(--text-muted)">Run arbitrary SQL against a previously extracted bugle_db.</p>
+    <textarea id="rcs-sql-query" rows="4" style="width:100%;font-family:monospace;font-size:0.85rem"
+        placeholder="SELECT m.*, p.text FROM messages m JOIN parts p ON m._id=p.message_id WHERE m.message_protocol>=2 ORDER BY m.sent_timestamp DESC LIMIT 50"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" onclick="rcsQueryBugle()">Run Query</button>
+        <select id="rcs-sql-preset" onchange="rcsSQLPreset(this.value)" style="font-size:0.85rem">
+            <option value="">-- Preset Queries --</option>
+            <option value="rcs">RCS Messages Only</option>
+            <option value="all_msgs">All Messages with Contacts</option>
+            <option value="edits">Message Edit History</option>
+            <option value="conversations">Conversations with Participants</option>
+            <option value="attachments">Attachments</option>
+            <option value="stats">Message Statistics</option>
+        </select>
+    </div>
+    <div id="rcs-sql-result" style="max-height:400px;overflow-y:auto;margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>Extracted Database Snapshots</h3>
+    <button class="btn btn-secondary" onclick="rcsListExtracted()">List Snapshots</button>
+    <div id="rcs-extracted-list" style="margin-top:8px"></div>
+</div>
+
+</div>
+
+<!-- ========================== FORGE TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="forge">
+
+<div class="section">
+    <h3>Forge SMS Message</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input id="forge-address" type="text" placeholder="Phone number (+1234567890)">
+        <input id="forge-contact" type="text" placeholder="Contact name (optional)">
+    </div>
+    <textarea id="forge-body" rows="3" style="width:100%" placeholder="Message body"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+        <select id="forge-type">
+            <option value="1">Incoming (Inbox)</option>
+            <option value="2">Outgoing (Sent)</option>
+            <option value="3">Draft</option>
+        </select>
+        <input id="forge-timestamp" type="datetime-local" style="width:200px">
+        <label style="font-size:0.85rem"><input type="checkbox" id="forge-read" checked> Mark as read</label>
+        <button class="btn" onclick="rcsForgeSMS()">Forge SMS</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Forge RCS Message (via Archon)</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input id="forge-rcs-address" type="text" placeholder="Phone number">
+        <select id="forge-rcs-direction">
+            <option value="incoming">Incoming</option>
+            <option value="outgoing">Outgoing</option>
+        </select>
+    </div>
+    <textarea id="forge-rcs-body" rows="3" style="width:100%" placeholder="RCS message body"></textarea>
+    <button class="btn" onclick="rcsForgeRCS()" style="margin-top:8px">Forge RCS</button>
+</div>
+
+<div class="section">
+    <h3>Forge Conversation</h3>
+    <input id="forge-conv-address" type="text" placeholder="Phone number" style="width:100%;margin-bottom:8px">
+    <textarea id="forge-conv-msgs" rows="6" style="width:100%;font-family:monospace;font-size:0.85rem"
+        placeholder='[{"body":"Hey!","type":1},{"body":"Hi there","type":2},{"body":"How are you?","type":1}]'></textarea>
+    <button class="btn" onclick="rcsForgeConversation()" style="margin-top:8px">Forge Conversation</button>
+</div>
+
+<div class="section">
+    <h3>Import SMS Backup XML</h3>
+    <p style="font-size:0.8rem;color:var(--text-muted)">Import from SMS Backup & Restore XML format.</p>
+    <textarea id="forge-import-xml" rows="4" style="width:100%;font-family:monospace;font-size:0.85rem"
+        placeholder='Paste XML content here or load from file'></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" onclick="rcsImportXML()">Import XML</button>
+        <input type="file" id="forge-xml-file" accept=".xml" onchange="rcsLoadXMLFile(this)" style="font-size:0.85rem">
+    </div>
+    <div id="forge-import-result" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>Forge Log</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-secondary" onclick="rcsRefreshForgeLog()">Refresh</button>
+        <button class="btn btn-secondary" onclick="rcsClearForgeLog()">Clear Log</button>
+    </div>
+    <div id="forge-log-list" style="max-height:300px;overflow-y:auto"></div>
+</div>
+
+</div>
+
+<!-- ========================== MODIFY TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="modify">
+
+<div class="section">
+    <h3>Modify Message</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <input id="mod-msg-id" type="number" placeholder="Message ID">
+        <select id="mod-type">
+            <option value="">-- Change type --</option>
+            <option value="1">Incoming</option>
+            <option value="2">Outgoing</option>
+            <option value="3">Draft</option>
+        </select>
+        <input id="mod-timestamp" type="datetime-local">
+    </div>
+    <textarea id="mod-body" rows="2" style="width:100%" placeholder="New body (leave empty to keep)"></textarea>
+    <button class="btn" onclick="rcsModifyMessage()" style="margin-top:8px">Modify</button>
+</div>
+
+<div class="section">
+    <h3>Change Sender</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+        <input id="mod-sender-id" type="number" placeholder="Message ID" style="width:120px">
+        <input id="mod-new-address" type="text" placeholder="New sender address" style="flex:1">
+        <button class="btn" onclick="rcsChangeSender()">Change</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Shift Timestamps</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+        <input id="mod-shift-addr" type="text" placeholder="Address" style="flex:1">
+        <input id="mod-shift-mins" type="number" placeholder="Offset (minutes)" style="width:140px">
+        <button class="btn" onclick="rcsShiftTimestamps()">Shift</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Bulk Actions</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="mod-thread-id" type="number" placeholder="Thread ID" style="width:120px">
+        <button class="btn" onclick="rcsMarkAllRead()">Mark All Read</button>
+        <button class="btn btn-danger" onclick="rcsWipeThread()">Wipe Thread</button>
+        <button class="btn btn-danger" onclick="rcsDeleteConversation()">Delete Conversation</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Delete Single Message</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+        <input id="mod-del-id" type="number" placeholder="Message ID" style="width:150px">
+        <button class="btn btn-danger" onclick="rcsDeleteMessage()">Delete</button>
+    </div>
+</div>
+
+</div>
+
+<!-- ========================== EXPLOIT TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="exploit">
+
+<div class="section">
+    <h3>CVE-2024-0044 — run-as Privilege Escalation</h3>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px">
+        Newline injection in PackageInstallerService allows run-as access to any app's private data.
+        Works on Android 12-13 with security patch before October 2024.
+    </p>
+    <div id="rcs-cve-status" style="margin-bottom:8px;padding:8px;border-radius:4px;background:var(--bg-secondary)"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="rcsCVECheck()">Check Vulnerability</button>
+        <button class="btn btn-danger" onclick="rcsCVEExploit()">Execute Exploit</button>
+        <button class="btn btn-secondary" onclick="rcsCVECleanup()">Cleanup Traces</button>
+    </div>
+    <div id="rcs-cve-result" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>RCS Spoofing</h3>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px">
+        <input id="exploit-spoof-addr" type="text" placeholder="Target phone number">
+        <button class="btn" onclick="rcsSpoofTyping()">Spoof Typing</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+        <input id="exploit-spoof-msgid" type="text" placeholder="Message ID for read receipt">
+        <button class="btn" onclick="rcsSpoofReadReceipt()">Spoof Read Receipt</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>RCS Identity & Signal Protocol</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn" onclick="rcsCloneIdentity()">Clone RCS Identity</button>
+        <button class="btn" onclick="rcsExtractSignalState()">Extract Signal Protocol State</button>
+        <button class="btn btn-secondary" onclick="rcsInterceptArchival()">Register Archival Listener</button>
+    </div>
+    <div id="rcs-identity-result" style="max-height:300px;overflow-y:auto"></div>
+</div>
+
+<div class="section">
+    <h3>Known RCS CVEs</h3>
+    <button class="btn btn-secondary" onclick="rcsShowCVEs()">Show CVE Database</button>
+    <div id="rcs-cves-list" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>IMS/RCS Diagnostics</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn" onclick="rcsGetIMSStatus()">IMS Status</button>
+        <button class="btn" onclick="rcsGetCarrierConfig()">Carrier RCS Config</button>
+        <button class="btn" onclick="rcsGetRCSState()">RCS State</button>
+        <button class="btn btn-secondary" onclick="rcsEnableLogging()">Enable Verbose Logging</button>
+        <button class="btn btn-secondary" onclick="rcsCaptureLogs()">Capture RCS Logs</button>
+        <button class="btn btn-secondary" onclick="rcsPixelDiag()">Pixel Diagnostics</button>
+    </div>
+    <div id="rcs-diag-result" style="max-height:400px;overflow-y:auto;font-family:monospace;font-size:0.8rem;white-space:pre-wrap"></div>
+</div>
+
+</div>
+
+<!-- ========================== BACKUP TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="backup">
+
+<div class="section">
+    <h3>Full Backup</h3>
+    <p style="font-size:0.85rem;color:var(--text-secondary)">
+        Back up all SMS/MMS/RCS messages from the device. Content providers capture SMS/MMS;
+        Archon relay or bugle_db extraction captures RCS.
+    </p>
+    <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" onclick="rcsFullBackup('json')">Backup (JSON)</button>
+        <button class="btn" onclick="rcsFullBackup('xml')">Backup (XML — SMS Backup & Restore format)</button>
+        <button class="btn btn-secondary" onclick="rcsArchonBackup()">Archon Full Backup (incl. RCS)</button>
+    </div>
+    <div id="rcs-backup-result" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>Restore / Clone</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input id="backup-restore-path" type="text" placeholder="Backup filename or full path" style="flex:1">
+        <button class="btn" onclick="rcsRestore()">Restore</button>
+    </div>
+    <button class="btn btn-secondary" onclick="rcsCloneDevice()">Clone to Another Device</button>
+    <div id="rcs-restore-result" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>Set Default SMS App</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+        <select id="backup-sms-app" style="flex:1">
+            <option value="com.darkhal.archon">Archon (enables full RCS access)</option>
+            <option value="com.google.android.apps.messaging">Google Messages</option>
+            <option value="com.android.messaging">AOSP Messages</option>
+            <option value="com.samsung.android.messaging">Samsung Messages</option>
+        </select>
+        <button class="btn" onclick="rcsSetDefaultApp()">Set Default</button>
+    </div>
+</div>
+
+<div class="section">
+    <h3>Saved Backups</h3>
+    <button class="btn btn-secondary" onclick="rcsListBackups()">Refresh</button>
+    <div id="rcs-backups-list" style="margin-top:8px"></div>
+</div>
+
+<div class="section">
+    <h3>Exported Files</h3>
+    <button class="btn btn-secondary" onclick="rcsListExports()">Refresh</button>
+    <div id="rcs-exports-list" style="margin-top:8px"></div>
+</div>
+
+</div>
+
+<!-- ========================== MONITOR TAB ========================== -->
+<div class="tab-content" data-tab-group="rcs" data-tab="monitor">
+
+<div class="section">
+    <h3>SMS/RCS Monitor</h3>
+    <p style="font-size:0.85rem;color:var(--text-secondary)">
+        Monitor incoming SMS/RCS messages in real-time via logcat interception.
+    </p>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn" id="rcs-monitor-btn" onclick="rcsToggleMonitor()">Start Monitor</button>
+        <button class="btn btn-secondary" onclick="rcsRefreshMonitor()">Refresh</button>
+        <button class="btn btn-secondary" onclick="rcsClearMonitor()">Clear</button>
+        <span id="rcs-monitor-count" style="font-size:0.85rem;color:var(--text-muted);align-self:center"></span>
+    </div>
+    <div id="rcs-monitor-feed" style="max-height:500px;overflow-y:auto;font-family:monospace;font-size:0.8rem"></div>
+</div>
+
+</div>
+
+<!-- ========================== INLINE JS ========================== -->
+<script>
+const RCS_BASE = '/rcs-tools';
+let rcsMonitorRunning = false;
+let rcsMonitorInterval = null;
+
+// ── Helpers ─────────────────────────────────────────────────────────
+function rcsPost(path, data) {
+    return postJSON(RCS_BASE + path, data || {});
+}
+function rcsGet(path) {
+    return fetchJSON(RCS_BASE + path);
+}
+
+function renderTable(rows, columns) {
+    if (!rows || !rows.length) return '<p style="color:var(--text-muted)">No data</p>';
+    let cols = columns || Object.keys(rows[0]);
+    let h = '<table class="data-table" style="width:100%;font-size:0.8rem"><thead><tr>';
+    cols.forEach(c => h += '<th>' + esc(c) + '</th>');
+    h += '</tr></thead><tbody>';
+    rows.forEach(r => {
+        h += '<tr>';
+        cols.forEach(c => {
+            let v = r[c];
+            if (v === null || v === undefined) v = '';
+            let s = String(v);
+            if (s.length > 120) s = s.substring(0, 120) + '...';
+            h += '<td>' + esc(s) + '</td>';
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+}
+
+function renderJSON(obj) {
+    return '<pre style="max-height:300px;overflow:auto;font-size:0.8rem;padding:8px;background:var(--bg-secondary);border-radius:4px">'
+        + esc(JSON.stringify(obj, null, 2)) + '</pre>';
+}
+
+function renderMsgRow(m) {
+    let dir = parseInt(m.type) === 2 ? 'outgoing' : 'incoming';
+    let color = dir === 'outgoing' ? '#2196f3' : '#4caf50';
+    let arrow = dir === 'outgoing' ? '&#x2192;' : '&#x2190;';
+    return '<div style="padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start">'
+        + '<span style="color:' + color + ';font-weight:bold;min-width:20px">' + arrow + '</span>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:0.8rem;color:var(--text-muted)">'
+        + '<strong>' + esc(m.address || '') + '</strong>'
+        + ' &middot; ID:' + esc(m._id || '')
+        + ' &middot; Thread:' + esc(m.thread_id || '')
+        + (m.date_formatted ? ' &middot; ' + esc(m.date_formatted) : '')
+        + '</div>'
+        + '<div style="font-size:0.85rem;margin-top:2px;word-break:break-word">' + esc(m.body || '') + '</div>'
+        + '</div></div>';
+}
+
+// ── Status ──────────────────────────────────────────────────────────
+async function rcsRefreshStatus() {
+    try {
+        const r = await rcsGet('/status');
+        const ind = document.getElementById('rcs-dev-indicator');
+        const lbl = document.getElementById('rcs-dev-label');
+        const shBadge = document.getElementById('rcs-shizuku-badge');
+        const arBadge = document.getElementById('rcs-archon-badge');
+        const cvBadge = document.getElementById('rcs-cve-badge');
+        const smsApp = document.getElementById('rcs-sms-app');
+        if (r.connected) {
+            const d = r.device || {};
+            ind.style.background = '#4caf50';
+            lbl.textContent = (d.model || 'Device') + ' (' + (d.serial || '?') + ') — Android ' + (d.android_version || '?');
+            smsApp.textContent = 'SMS App: ' + (d.default_sms_app || '?');
+        } else {
+            ind.style.background = '#f44336';
+            lbl.textContent = r.error || 'Not connected';
+        }
+        // Shizuku
+        const sh = r.shizuku || {};
+        if (sh.running) { shBadge.textContent = 'Shizuku: Running'; shBadge.style.background = '#1b5e20'; shBadge.style.color = '#4caf50'; }
+        else if (sh.installed) { shBadge.textContent = 'Shizuku: Installed'; shBadge.style.background = '#33691e'; shBadge.style.color = '#8bc34a'; }
+        else { shBadge.textContent = 'Shizuku: N/A'; shBadge.style.background = '#333'; shBadge.style.color = '#888'; }
+        // Archon
+        const ar = r.archon || {};
+        if (ar.installed) { arBadge.textContent = 'Archon: ' + (ar.version || 'OK'); arBadge.style.background = '#0d47a1'; arBadge.style.color = '#42a5f5'; }
+        else { arBadge.textContent = 'Archon: N/A'; arBadge.style.background = '#333'; arBadge.style.color = '#888'; }
+        // CVE
+        const cv = r.cve_2024_0044 || {};
+        if (cv.vulnerable) { cvBadge.textContent = 'CVE-0044: VULN'; cvBadge.style.background = '#b71c1c'; cvBadge.style.color = '#ef5350'; }
+        else { cvBadge.textContent = 'CVE-0044: Patched'; cvBadge.style.background = '#1b5e20'; cvBadge.style.color = '#4caf50'; }
+    } catch(e) {
+        document.getElementById('rcs-dev-label').textContent = 'Error: ' + e.message;
+    }
+}
+
+// ── Extract ─────────────────────────────────────────────────────────
+async function rcsExtractMessages() {
+    const addr = document.getElementById('rcs-search-addr').value;
+    const kw = document.getElementById('rcs-search-kw').value;
+    const tid = document.getElementById('rcs-search-thread').value;
+    const filter = document.getElementById('rcs-msg-filter').value;
+    let url = '/messages?limit=200';
+    if (tid) url += '&thread_id=' + tid;
+    else if (addr) url += '&address=' + encodeURIComponent(addr);
+    else if (kw) url += '&keyword=' + encodeURIComponent(kw);
+
+    if (filter === 'inbox') url = '/sms-inbox';
+    else if (filter === 'sent') url = '/sms-sent';
+    else if (filter === 'drafts') url = '/drafts';
+    else if (filter === 'undelivered') url = '/undelivered';
+
+    const r = await rcsGet(url);
+    const list = document.getElementById('rcs-messages-list');
+    const count = document.getElementById('rcs-msg-count');
+    const msgs = r.messages || [];
+    count.textContent = msgs.length + ' messages';
+    list.innerHTML = msgs.map(renderMsgRow).join('');
+}
+
+async function rcsExtractMMS() {
+    const r = await rcsGet('/mms');
+    const list = document.getElementById('rcs-mms-list');
+    const msgs = r.messages || [];
+    list.innerHTML = msgs.length ? renderTable(msgs, ['_id','thread_id','date_formatted','msg_box','body','sub']) : '<p style="color:var(--text-muted)">No MMS messages</p>';
+}
+
+async function rcsExtractRCSProvider() {
+    const r = await rcsGet('/rcs-provider');
+    document.getElementById('rcs-provider-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractRCSMessages() {
+    const r = await rcsGet('/rcs-messages');
+    document.getElementById('rcs-provider-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractRCSParticipants() {
+    const r = await rcsGet('/rcs-participants');
+    document.getElementById('rcs-provider-result').innerHTML = renderJSON(r);
+}
+
+async function rcsEnumerateProviders() {
+    const r = await rcsPost('/enumerate-providers');
+    let h = '';
+    if (r.accessible && r.accessible.length) {
+        h += '<h4 style="color:#4caf50">Accessible (' + r.total_accessible + ')</h4>';
+        h += renderTable(r.accessible, ['uri','status','rows','name']);
+    }
+    if (r.blocked && r.blocked.length) {
+        h += '<h4 style="color:#f44336">Blocked (' + r.total_blocked + ')</h4>';
+        h += renderTable(r.blocked, ['uri','error']);
+    }
+    document.getElementById('rcs-providers-result').innerHTML = h;
+}
+
+async function rcsExportMessages(fmt) {
+    const addr = document.getElementById('rcs-search-addr').value;
+    const r = await rcsPost('/export', {address: addr || null, format: fmt});
+    if (r.ok) alert('Exported ' + r.count + ' messages to ' + r.path);
+    else alert('Export failed: ' + (r.error || 'unknown'));
+}
+
+// ── Database ────────────────────────────────────────────────────────
+async function rcsExtractBugle() {
+    document.getElementById('rcs-bugle-result').innerHTML = '<p>Extracting bugle_db...</p>';
+    const r = await rcsPost('/extract-bugle');
+    document.getElementById('rcs-bugle-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractRCSFromBugle() {
+    const r = await rcsPost('/extract-rcs-bugle');
+    document.getElementById('rcs-bugle-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractConvosFromBugle() {
+    const r = await rcsPost('/extract-conversations-bugle');
+    document.getElementById('rcs-bugle-result').innerHTML = r.ok && r.rows
+        ? renderTable(r.rows) : renderJSON(r);
+}
+
+async function rcsExtractEdits() {
+    const r = await rcsPost('/extract-edits');
+    document.getElementById('rcs-bugle-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractAllBugle() {
+    document.getElementById('rcs-bugle-result').innerHTML = '<p>Exporting all tables...</p>';
+    const r = await rcsPost('/extract-all-bugle');
+    document.getElementById('rcs-bugle-result').innerHTML = renderJSON(r);
+}
+
+async function rcsQueryBugle() {
+    const sql = document.getElementById('rcs-sql-query').value;
+    if (!sql) return;
+    const r = await rcsPost('/query-bugle', {sql});
+    const el = document.getElementById('rcs-sql-result');
+    if (r.ok && r.rows && r.rows.length) {
+        el.innerHTML = '<p style="color:var(--text-muted)">' + r.count + ' rows</p>' + renderTable(r.rows);
+    } else {
+        el.innerHTML = renderJSON(r);
+    }
+}
+
+function rcsSQLPreset(val) {
+    const presets = {
+        rcs: "SELECT m.*, p.text, p.content_type FROM messages m LEFT JOIN parts p ON m._id=p.message_id WHERE m.message_protocol>=2 ORDER BY m.sent_timestamp DESC LIMIT 100",
+        all_msgs: "SELECT m._id, m.conversation_id, m.message_protocol, m.sent_timestamp, p.text, ppl.normalized_destination, ppl.full_name, CASE WHEN ppl.sub_id=-2 THEN 'IN' ELSE 'OUT' END AS dir FROM messages m LEFT JOIN parts p ON m._id=p.message_id LEFT JOIN conversation_participants cp ON m.conversation_id=cp.conversation_id LEFT JOIN participants ppl ON cp.participant_id=ppl._id ORDER BY m.sent_timestamp DESC LIMIT 100",
+        edits: "SELECT me.*, p.text AS current_text FROM message_edits me LEFT JOIN messages m ON me.latest_message_id=m._id LEFT JOIN parts p ON m._id=p.message_id ORDER BY me.edited_at_timestamp_ms DESC",
+        conversations: "SELECT c._id, c.name, c.snippet_text, c.sort_timestamp, c.participant_count, GROUP_CONCAT(ppl.normalized_destination,'; ') AS numbers FROM conversations c LEFT JOIN conversation_participants cp ON c._id=cp.conversation_id LEFT JOIN participants ppl ON cp.participant_id=ppl._id GROUP BY c._id ORDER BY c.sort_timestamp DESC",
+        attachments: "SELECT p._id, p.message_id, p.content_type, p.uri, p.text, m.message_protocol FROM parts p JOIN messages m ON p.message_id=m._id WHERE p.content_type!='text/plain' AND p.uri IS NOT NULL ORDER BY p._id DESC LIMIT 50",
+        stats: "SELECT message_protocol, COUNT(*) as count, MIN(sent_timestamp) as earliest, MAX(sent_timestamp) as latest FROM messages GROUP BY message_protocol",
+    };
+    if (presets[val]) document.getElementById('rcs-sql-query').value = presets[val];
+}
+
+async function rcsListExtracted() {
+    const r = await rcsGet('/extracted-dbs');
+    const el = document.getElementById('rcs-extracted-list');
+    if (r.extractions && r.extractions.length) {
+        el.innerHTML = renderTable(r.extractions, ['name','files','total_size']);
+    } else {
+        el.innerHTML = '<p style="color:var(--text-muted)">No extracted databases yet</p>';
+    }
+}
+
+// ── Forge ────────────────────────────────────────────────────────────
+async function rcsForgeSMS() {
+    const tsInput = document.getElementById('forge-timestamp').value;
+    let ts = null;
+    if (tsInput) ts = new Date(tsInput).getTime();
+    const r = await rcsPost('/forge', {
+        address: document.getElementById('forge-address').value,
+        body: document.getElementById('forge-body').value,
+        type: document.getElementById('forge-type').value,
+        timestamp: ts,
+        contact_name: document.getElementById('forge-contact').value || null,
+        read: document.getElementById('forge-read').checked ? 1 : 0,
+    });
+    alert(r.ok ? 'SMS forged!' : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsForgeRCS() {
+    const r = await rcsPost('/archon/forge-rcs', {
+        address: document.getElementById('forge-rcs-address').value,
+        body: document.getElementById('forge-rcs-body').value,
+        direction: document.getElementById('forge-rcs-direction').value,
+    });
+    alert(r.ok ? 'RCS message forged via Archon!' : 'Failed: ' + (r.error || r.result || ''));
+}
+
+async function rcsForgeConversation() {
+    let msgs;
+    try { msgs = JSON.parse(document.getElementById('forge-conv-msgs').value); }
+    catch(e) { alert('Invalid JSON'); return; }
+    const r = await rcsPost('/forge-conversation', {
+        address: document.getElementById('forge-conv-address').value,
+        messages: msgs,
+    });
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsImportXML() {
+    const xml = document.getElementById('forge-import-xml').value;
+    if (!xml) { alert('Paste XML first'); return; }
+    const r = await rcsPost('/import-xml', {xml});
+    document.getElementById('forge-import-result').innerHTML = renderJSON(r);
+}
+
+function rcsLoadXMLFile(input) {
+    if (!input.files.length) return;
+    const reader = new FileReader();
+    reader.onload = e => document.getElementById('forge-import-xml').value = e.target.result;
+    reader.readAsText(input.files[0]);
+}
+
+async function rcsRefreshForgeLog() {
+    const r = await rcsGet('/forged-log');
+    const list = document.getElementById('forge-log-list');
+    const log = r.log || [];
+    if (log.length) {
+        list.innerHTML = renderTable(log, ['time','action','address','body']);
+    } else {
+        list.innerHTML = '<p style="color:var(--text-muted)">No forged messages yet</p>';
+    }
+}
+
+async function rcsClearForgeLog() {
+    await rcsPost('/forged-log/clear');
+    rcsRefreshForgeLog();
+}
+
+// ── Modify ──────────────────────────────────────────────────────────
+async function rcsModifyMessage() {
+    const id = parseInt(document.getElementById('mod-msg-id').value);
+    if (!id) { alert('Enter message ID'); return; }
+    const tsInput = document.getElementById('mod-timestamp').value;
+    const data = {};
+    const body = document.getElementById('mod-body').value;
+    if (body) data.body = body;
+    const type = document.getElementById('mod-type').value;
+    if (type) data.type = type;
+    if (tsInput) data.timestamp = new Date(tsInput).getTime();
+    const r = await fetch(RCS_BASE + '/message/' + id, {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+    }).then(r => r.json());
+    alert(r.ok ? 'Modified!' : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsChangeSender() {
+    const r = await rcsPost('/change-sender', {
+        msg_id: document.getElementById('mod-sender-id').value,
+        new_address: document.getElementById('mod-new-address').value,
+    });
+    alert(r.ok ? 'Sender changed!' : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsShiftTimestamps() {
+    const r = await rcsPost('/shift-timestamps', {
+        address: document.getElementById('mod-shift-addr').value,
+        offset_minutes: parseInt(document.getElementById('mod-shift-mins').value) || 0,
+    });
+    alert(r.ok ? 'Modified ' + r.modified + ' messages' : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsMarkAllRead() {
+    const tid = document.getElementById('mod-thread-id').value;
+    const r = await rcsPost('/mark-read', {thread_id: tid || null});
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsWipeThread() {
+    const tid = parseInt(document.getElementById('mod-thread-id').value);
+    if (!tid) { alert('Enter thread ID'); return; }
+    if (!confirm('Wipe all messages in thread ' + tid + '?')) return;
+    const r = await rcsPost('/wipe-thread', {thread_id: tid});
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsDeleteConversation() {
+    const tid = parseInt(document.getElementById('mod-thread-id').value);
+    if (!tid) { alert('Enter thread ID'); return; }
+    if (!confirm('Delete conversation ' + tid + '?')) return;
+    const r = await fetch(RCS_BASE + '/conversation/' + tid, {method:'DELETE'}).then(r => r.json());
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+}
+
+async function rcsDeleteMessage() {
+    const id = parseInt(document.getElementById('mod-del-id').value);
+    if (!id) { alert('Enter message ID'); return; }
+    if (!confirm('Delete message ' + id + '?')) return;
+    const r = await fetch(RCS_BASE + '/message/' + id, {method:'DELETE'}).then(r => r.json());
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+}
+
+// ── Exploit ─────────────────────────────────────────────────────────
+async function rcsCVECheck() {
+    const r = await rcsGet('/cve-check');
+    const el = document.getElementById('rcs-cve-status');
+    if (r.vulnerable) {
+        el.style.border = '1px solid #f44336';
+        el.innerHTML = '<strong style="color:#f44336">VULNERABLE</strong> — ' + esc(r.message);
+    } else {
+        el.style.border = '1px solid #4caf50';
+        el.innerHTML = '<strong style="color:#4caf50">NOT VULNERABLE</strong> — ' + esc(r.message);
+    }
+}
+
+async function rcsCVEExploit() {
+    if (!confirm('Execute CVE-2024-0044 exploit? This will forge a package entry to gain app-level access.')) return;
+    document.getElementById('rcs-cve-result').innerHTML = '<p>Exploiting...</p>';
+    const r = await rcsPost('/cve-exploit', {target_package: 'com.google.android.apps.messaging'});
+    document.getElementById('rcs-cve-result').innerHTML = renderJSON(r);
+    rcsRefreshStatus();
+}
+
+async function rcsCVECleanup() {
+    const r = await rcsPost('/cve-cleanup');
+    document.getElementById('rcs-cve-result').innerHTML = renderJSON(r);
+    rcsRefreshStatus();
+}
+
+async function rcsSpoofTyping() {
+    const addr = document.getElementById('exploit-spoof-addr').value;
+    if (!addr) return;
+    const r = await rcsPost('/rcs-spoof-typing', {address: addr});
+    alert(r.ok ? r.message : 'Failed');
+}
+
+async function rcsSpoofReadReceipt() {
+    const mid = document.getElementById('exploit-spoof-msgid').value;
+    if (!mid) return;
+    const r = await rcsPost('/rcs-spoof-read', {msg_id: mid});
+    alert(r.ok ? r.message : 'Failed');
+}
+
+async function rcsCloneIdentity() {
+    const r = await rcsPost('/clone-identity');
+    document.getElementById('rcs-identity-result').innerHTML = renderJSON(r);
+}
+
+async function rcsExtractSignalState() {
+    const r = await rcsPost('/signal-state');
+    document.getElementById('rcs-identity-result').innerHTML = renderJSON(r);
+}
+
+async function rcsInterceptArchival() {
+    const r = await rcsPost('/intercept-archival');
+    document.getElementById('rcs-identity-result').innerHTML = renderJSON(r);
+}
+
+async function rcsShowCVEs() {
+    const r = await rcsGet('/cve-database');
+    const el = document.getElementById('rcs-cves-list');
+    if (r.cves) {
+        let h = '';
+        for (const [id, cve] of Object.entries(r.cves)) {
+            let sColor = cve.severity === 'critical' ? '#f44336' : cve.severity === 'high' ? '#ff9800' : '#ffeb3b';
+            h += '<div style="padding:8px;margin-bottom:6px;border:1px solid var(--border);border-radius:4px;border-left:3px solid ' + sColor + '">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center">'
+                + '<strong>' + esc(id) + '</strong>'
+                + '<span style="font-size:0.75rem;padding:2px 6px;border-radius:3px;background:' + sColor + ';color:#000">'
+                + esc(cve.severity.toUpperCase()) + ' ' + cve.cvss + '</span></div>'
+                + '<div style="font-size:0.85rem;margin-top:4px">' + esc(cve.desc) + '</div>'
+                + '<div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">Affected: ' + esc(cve.affected) + ' | Type: ' + esc(cve.type) + '</div>'
+                + '</div>';
+        }
+        el.innerHTML = h;
+    }
+}
+
+async function rcsGetIMSStatus() {
+    const r = await rcsGet('/ims-status');
+    document.getElementById('rcs-diag-result').textContent = r.raw || JSON.stringify(r, null, 2);
+}
+
+async function rcsGetCarrierConfig() {
+    const r = await rcsGet('/carrier-config');
+    document.getElementById('rcs-diag-result').textContent = JSON.stringify(r.rcs_config || r, null, 2);
+}
+
+async function rcsGetRCSState() {
+    const r = await rcsGet('/rcs-state');
+    document.getElementById('rcs-diag-result').textContent = JSON.stringify(r, null, 2);
+}
+
+async function rcsEnableLogging() {
+    const r = await rcsPost('/enable-logging');
+    document.getElementById('rcs-diag-result').textContent = JSON.stringify(r, null, 2);
+}
+
+async function rcsCaptureLogs() {
+    document.getElementById('rcs-diag-result').textContent = 'Capturing logs (10s)...';
+    const r = await rcsPost('/capture-logs', {duration: 10});
+    document.getElementById('rcs-diag-result').textContent = (r.lines || []).join('\n');
+}
+
+async function rcsPixelDiag() {
+    const r = await rcsGet('/pixel-diagnostics');
+    document.getElementById('rcs-diag-result').textContent = JSON.stringify(r, null, 2);
+}
+
+// ── Backup ──────────────────────────────────────────────────────────
+async function rcsFullBackup(fmt) {
+    document.getElementById('rcs-backup-result').innerHTML = '<p>Creating backup...</p>';
+    const r = await rcsPost('/backup', {format: fmt});
+    document.getElementById('rcs-backup-result').innerHTML = renderJSON(r);
+}
+
+async function rcsArchonBackup() {
+    document.getElementById('rcs-backup-result').innerHTML = '<p>Archon backup in progress...</p>';
+    const r = await rcsPost('/archon/backup');
+    document.getElementById('rcs-backup-result').innerHTML = renderJSON(r);
+}
+
+async function rcsRestore() {
+    const path = document.getElementById('backup-restore-path').value;
+    if (!path) { alert('Enter backup path'); return; }
+    const r = await rcsPost('/restore', {path});
+    document.getElementById('rcs-restore-result').innerHTML = renderJSON(r);
+}
+
+async function rcsCloneDevice() {
+    if (!confirm('This will create a full backup for cloning. Continue?')) return;
+    const r = await rcsPost('/clone');
+    document.getElementById('rcs-restore-result').innerHTML = renderJSON(r);
+}
+
+async function rcsSetDefaultApp() {
+    const pkg = document.getElementById('backup-sms-app').value;
+    const r = await rcsPost('/set-default', {package: pkg});
+    alert(r.ok ? r.message : 'Failed: ' + (r.error || ''));
+    rcsRefreshStatus();
+}
+
+async function rcsListBackups() {
+    const r = await rcsGet('/backups');
+    const el = document.getElementById('rcs-backups-list');
+    if (r.backups && r.backups.length) {
+        el.innerHTML = renderTable(r.backups, ['name','size','modified']);
+    } else {
+        el.innerHTML = '<p style="color:var(--text-muted)">No backups yet</p>';
+    }
+}
+
+async function rcsListExports() {
+    const r = await rcsGet('/exports');
+    const el = document.getElementById('rcs-exports-list');
+    if (r.exports && r.exports.length) {
+        el.innerHTML = renderTable(r.exports, ['name','size','modified']);
+    } else {
+        el.innerHTML = '<p style="color:var(--text-muted)">No exports yet</p>';
+    }
+}
+
+// ── Monitor ─────────────────────────────────────────────────────────
+async function rcsToggleMonitor() {
+    if (rcsMonitorRunning) {
+        await rcsPost('/monitor/stop');
+        rcsMonitorRunning = false;
+        document.getElementById('rcs-monitor-btn').textContent = 'Start Monitor';
+        if (rcsMonitorInterval) { clearInterval(rcsMonitorInterval); rcsMonitorInterval = null; }
+    } else {
+        await rcsPost('/monitor/start');
+        rcsMonitorRunning = true;
+        document.getElementById('rcs-monitor-btn').textContent = 'Stop Monitor';
+        rcsMonitorInterval = setInterval(rcsRefreshMonitor, 3000);
+    }
+}
+
+async function rcsRefreshMonitor() {
+    const r = await rcsGet('/monitor/messages');
+    const feed = document.getElementById('rcs-monitor-feed');
+    const msgs = r.messages || [];
+    document.getElementById('rcs-monitor-count').textContent = msgs.length + ' intercepted';
+    feed.innerHTML = msgs.map(m =>
+        '<div style="padding:4px 8px;border-bottom:1px solid var(--border)">'
+        + '<span style="color:var(--text-muted);font-size:0.75rem">' + esc(m.time || '') + '</span> '
+        + '<span style="color:#ff9800">[' + esc(m.type || '') + ']</span> '
+        + esc(m.raw || '')
+        + '</div>'
+    ).join('');
+}
+
+async function rcsClearMonitor() {
+    await rcsPost('/monitor/clear');
+    document.getElementById('rcs-monitor-feed').innerHTML = '';
+    document.getElementById('rcs-monitor-count').textContent = '';
+}
+
+// ── Init ────────────────────────────────────────────────────────────
+rcsRefreshStatus();
+</script>
+{% endblock %}

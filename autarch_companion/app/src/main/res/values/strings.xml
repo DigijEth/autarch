@@ -45,6 +45,35 @@
     <string name="link_offense">Offense</string>
     <string name="link_settings">Settings</string>
 
+    <!-- Messaging -->
+    <string name="nav_messaging">Messages</string>
+    <string name="messaging_title">SMS/RCS</string>
+    <string name="messaging_become_default">DEFAULT</string>
+    <string name="messaging_restore_default">RESTORE</string>
+    <string name="messaging_tools">TOOLS</string>
+    <string name="messaging_search_hint">Search messages...</string>
+    <string name="messaging_input_hint">Type a message...</string>
+    <string name="messaging_send">SEND</string>
+    <string name="messaging_export">EXPORT</string>
+    <string name="messaging_new_message">New message</string>
+    <string name="messaging_empty">No conversations found.\nCheck SMS permissions or tap + to forge a message.</string>
+
+    <!-- Forge Dialog -->
+    <string name="forge_dialog_title">FORGE MESSAGE</string>
+    <string name="forge_phone_label">Phone Number</string>
+    <string name="forge_phone_hint">+15551234567</string>
+    <string name="forge_name_label">Contact Name (optional)</string>
+    <string name="forge_name_hint">John Doe</string>
+    <string name="forge_body_label">Message Body</string>
+    <string name="forge_body_hint">Enter message text...</string>
+    <string name="forge_direction_label">Direction</string>
+    <string name="forge_received">RECEIVED</string>
+    <string name="forge_sent">SENT</string>
+    <string name="forge_date_label">Date / Time</string>
+    <string name="forge_pick_date">Date</string>
+    <string name="forge_pick_time">Time</string>
+    <string name="forge_mark_read">Mark as read</string>
+
     <!-- Settings -->
     <string name="settings_title">SETTINGS</string>
     <string name="server_connection">Server Connection</string>

@@ -1,0 +1,740 @@
+{% extends "base.html" %}
+{% block title %}Social Engineering — AUTARCH{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Social Engineering Toolkit</h1>
+    <p class="text-muted">Credential harvesting, pretexts, QR phishing, USB payloads, vishing scripts</p>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab active" onclick="switchTab('harvest')">Harvest</button>
+    <button class="tab" onclick="switchTab('pretexts')">Pretexts</button>
+    <button class="tab" onclick="switchTab('qr')">QR Codes</button>
+    <button class="tab" onclick="switchTab('campaigns')">Campaigns</button>
+</div>
+
+<!-- ══════════════════════ HARVEST TAB ══════════════════════ -->
+<div id="tab-harvest" class="tab-content active">
+    <!-- Clone Section -->
+    <div class="card" style="margin-bottom:1rem">
+        <h3>Clone Login Page</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem">
+            Fetch a login page, rewrite form actions to capture credentials through AUTARCH.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:end">
+            <div style="flex:1">
+                <label class="form-label">Target URL</label>
+                <input type="text" id="clone-url" class="form-control" placeholder="https://login.example.com/signin">
+            </div>
+            <button id="clone-btn" class="btn btn-primary" onclick="clonePage()">Clone Page</button>
+        </div>
+        <div id="clone-result" style="margin-top:0.75rem;display:none" class="card"
+             style="background:var(--bg-input);padding:0.75rem;border-radius:var(--radius)"></div>
+    </div>
+
+    <!-- Cloned Pages Table -->
+    <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Cloned Pages</h3>
+            <button class="btn btn-sm" onclick="loadPages()">Refresh</button>
+        </div>
+        <div id="pages-list">
+            <p style="color:var(--text-muted)">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Captures Log -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Captured Credentials</h3>
+            <div style="display:flex;gap:0.5rem">
+                <select id="cap-filter" class="form-control" style="width:180px;font-size:0.85rem" onchange="loadCaptures()">
+                    <option value="">All Pages</option>
+                </select>
+                <button class="btn btn-sm" onclick="loadCaptures()">Refresh</button>
+                <button class="btn btn-sm" style="color:var(--danger)" onclick="clearCaptures()">Clear</button>
+            </div>
+        </div>
+        <div id="captures-list">
+            <p style="color:var(--text-muted)">No captures yet.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════ PRETEXTS TAB ══════════════════════ -->
+<div id="tab-pretexts" class="tab-content" style="display:none">
+    <!-- Pretext Templates -->
+    <div class="card" style="margin-bottom:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Pretext Templates</h3>
+            <select id="pretext-cat" class="form-control" style="width:180px;font-size:0.85rem" onchange="loadPretexts()">
+                <option value="">All Categories</option>
+                <option value="it_support">IT Support</option>
+                <option value="hr">HR</option>
+                <option value="vendor">Vendor</option>
+                <option value="delivery">Delivery</option>
+                <option value="executive">Executive</option>
+                <option value="financial">Financial</option>
+            </select>
+        </div>
+        <div id="pretexts-list"></div>
+    </div>
+
+    <!-- USB Payload Generator -->
+    <div class="card" style="margin-bottom:1rem">
+        <h3>USB Payload Generator</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem">
+            Generate USB drop payloads for physical social engineering assessments.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div>
+                <label class="form-label">Payload Type</label>
+                <select id="usb-type" class="form-control">
+                    <option value="autorun">Autorun.inf (Legacy)</option>
+                    <option value="powershell_cradle">PowerShell Download Cradle</option>
+                    <option value="hid_script">HID Script (Rubber Ducky)</option>
+                    <option value="bat_file">BAT File Dropper</option>
+                    <option value="lnk_dropper">LNK Shortcut Dropper</option>
+                    <option value="html_smuggling">HTML Smuggling</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Payload URL</label>
+                <input type="text" id="usb-url" class="form-control" placeholder="http://10.0.0.1:8080/payload">
+            </div>
+            <div>
+                <label class="form-label">Executable Name</label>
+                <input type="text" id="usb-exec" class="form-control" placeholder="setup.exe">
+            </div>
+            <div>
+                <label class="form-label">Label / Title</label>
+                <input type="text" id="usb-label" class="form-control" placeholder="Removable Disk">
+            </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:0.75rem" onclick="generateUSB()">Generate Payload</button>
+        <div id="usb-output" style="display:none;margin-top:0.75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <strong id="usb-name"></strong>
+                <button class="btn btn-sm" onclick="copyUSB()">Copy</button>
+            </div>
+            <pre id="usb-payload" style="background:#0a0a0a;color:#0f0;font-family:monospace;font-size:0.8rem;
+                padding:1rem;border-radius:var(--radius);white-space:pre-wrap;max-height:300px;overflow-y:auto"></pre>
+        </div>
+    </div>
+
+    <!-- Vishing Scripts -->
+    <div class="card">
+        <h3>Vishing Scripts</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem">
+            Call flow scripts for voice-based social engineering.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div>
+                <label class="form-label">Scenario</label>
+                <select id="vish-scenario" class="form-control">
+                    <option value="it_helpdesk">IT Help Desk</option>
+                    <option value="bank_fraud">Bank Fraud Alert</option>
+                    <option value="vendor_support">Vendor Tech Support</option>
+                    <option value="ceo_urgent">CEO Urgent Request</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Target Name</label>
+                <input type="text" id="vish-target" class="form-control" placeholder="John Smith">
+            </div>
+            <div>
+                <label class="form-label">Caller Name</label>
+                <input type="text" id="vish-caller" class="form-control" placeholder="Mike Johnson">
+            </div>
+            <div>
+                <label class="form-label">Phone Number</label>
+                <input type="text" id="vish-phone" class="form-control" placeholder="(555) 123-4567">
+            </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:0.75rem" onclick="generateVishing()">Generate Script</button>
+        <div id="vish-output" style="display:none;margin-top:0.75rem">
+            <div id="vish-content" style="background:var(--bg-input);padding:1rem;border-radius:var(--radius);
+                font-size:0.85rem;line-height:1.6;max-height:500px;overflow-y:auto"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════ QR CODES TAB ══════════════════════ -->
+<div id="tab-qr" class="tab-content" style="display:none">
+    <div class="card" style="max-width:700px">
+        <h3>QR Code Generator</h3>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:0.75rem">
+            Generate QR codes for phishing URLs, credential harvesting pages, or payload delivery.
+        </p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div style="grid-column:span 2">
+                <label class="form-label">URL to Encode</label>
+                <input type="text" id="qr-url" class="form-control" placeholder="https://secure-login.company.local/verify">
+            </div>
+            <div>
+                <label class="form-label">Label (optional)</label>
+                <input type="text" id="qr-label" class="form-control" placeholder="Scan for WiFi access">
+            </div>
+            <div>
+                <label class="form-label">Size (px)</label>
+                <select id="qr-size" class="form-control">
+                    <option value="200">200</option>
+                    <option value="300" selected>300</option>
+                    <option value="400">400</option>
+                    <option value="500">500</option>
+                    <option value="600">600</option>
+                </select>
+            </div>
+        </div>
+        <button id="qr-btn" class="btn btn-primary" style="margin-top:0.75rem" onclick="generateQR()">Generate QR Code</button>
+
+        <!-- QR Code Preview -->
+        <div id="qr-preview" style="display:none;margin-top:1rem;text-align:center">
+            <div style="background:#fff;display:inline-block;padding:1rem;border-radius:var(--radius)">
+                <img id="qr-img" src="" alt="QR Code" style="max-width:100%">
+            </div>
+            <div style="margin-top:0.75rem">
+                <span id="qr-url-label" style="color:var(--text-secondary);font-size:0.85rem"></span>
+            </div>
+            <div style="margin-top:0.5rem;display:flex;gap:0.5rem;justify-content:center">
+                <button class="btn btn-sm" onclick="downloadQR()">Download</button>
+                <button class="btn btn-sm" onclick="copyQRDataURL()">Copy Data URL</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════ CAMPAIGNS TAB ══════════════════════ -->
+<div id="tab-campaigns" class="tab-content" style="display:none">
+    <!-- Create Campaign Form -->
+    <div class="card" style="margin-bottom:1rem">
+        <h3>Create Campaign</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div>
+                <label class="form-label">Campaign Name</label>
+                <input type="text" id="camp-name" class="form-control" placeholder="Q1 Phishing Assessment">
+            </div>
+            <div>
+                <label class="form-label">Vector</label>
+                <select id="camp-vector" class="form-control">
+                    <option value="email">Email</option>
+                    <option value="qr">QR Code</option>
+                    <option value="usb">USB Drop</option>
+                    <option value="vishing">Vishing</option>
+                    <option value="physical">Physical</option>
+                    <option value="smishing">SMS / Smishing</option>
+                </select>
+            </div>
+            <div style="grid-column:span 2">
+                <label class="form-label">Targets (comma-separated emails or identifiers)</label>
+                <textarea id="camp-targets" class="form-control" rows="3"
+                    placeholder="user1@company.com, user2@company.com, user3@company.com"></textarea>
+            </div>
+            <div style="grid-column:span 2">
+                <label class="form-label">Pretext / Notes</label>
+                <input type="text" id="camp-pretext" class="form-control" placeholder="Password reset pretext targeting engineering team">
+            </div>
+        </div>
+        <button class="btn btn-primary" style="margin-top:0.75rem" onclick="createCampaign()">Create Campaign</button>
+    </div>
+
+    <!-- Campaign List -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Campaigns</h3>
+            <button class="btn btn-sm" onclick="loadCampaigns()">Refresh</button>
+        </div>
+        <div id="campaigns-list">
+            <p style="color:var(--text-muted)">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Campaign Detail View -->
+    <div id="campaign-detail" class="card" style="margin-top:1rem;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Campaign: <span id="detail-name" style="color:var(--accent)"></span></h3>
+            <button class="btn btn-sm" onclick="document.getElementById('campaign-detail').style.display='none'">Close</button>
+        </div>
+        <div id="detail-content"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════ STYLES ═══════════════════ -->
+<style>
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem}
+.tab{background:none;border:none;color:var(--text-secondary);padding:0.5rem 1.25rem;cursor:pointer;
+    font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab:hover{color:var(--text-primary)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.form-label{display:block;font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.25rem}
+.form-control{width:100%;padding:0.5rem 0.75rem;background:var(--bg-input);border:1px solid var(--border);
+    border-radius:var(--radius);color:var(--text-primary);font-size:0.85rem}
+.form-control:focus{outline:none;border-color:var(--accent)}
+.btn{padding:0.5rem 1rem;border-radius:var(--radius);border:1px solid var(--border);
+    background:var(--bg-input);color:var(--text-primary);cursor:pointer;font-size:0.85rem;transition:all 0.2s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:#fff}
+.btn-sm{padding:0.3rem 0.75rem;font-size:0.8rem}
+.pretext-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:0.75rem}
+.pretext-card h4{margin:0 0 0.5rem;color:var(--accent)}
+.pretext-card .subject{font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem}
+.pretext-card .body{font-size:0.8rem;color:var(--text-muted);white-space:pre-line;max-height:120px;overflow:hidden}
+.pretext-card .notes{font-size:0.75rem;color:#f59e0b;margin-top:0.5rem;font-style:italic}
+.cap-row{padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);font-size:0.85rem}
+.cap-row:last-child{border-bottom:none}
+.cap-creds{font-family:monospace;color:var(--accent);font-size:0.8rem}
+.camp-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1fr auto;gap:0.5rem;
+    padding:0.6rem 0.75rem;border-bottom:1px solid var(--border);font-size:0.85rem;align-items:center}
+.camp-row:last-child{border-bottom:none}
+.camp-header{font-weight:600;color:var(--text-secondary);font-size:0.8rem;border-bottom:2px solid var(--border)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600}
+.badge-active{background:rgba(34,197,94,0.15);color:#22c55e}
+.badge-email{background:rgba(99,102,241,0.15);color:var(--accent)}
+.badge-qr{background:rgba(245,158,11,0.15);color:#f59e0b}
+.badge-usb{background:rgba(239,68,68,0.15);color:var(--danger)}
+.badge-vishing{background:rgba(168,85,247,0.15);color:#a855f7}
+.badge-physical{background:rgba(59,130,246,0.15);color:#3b82f6}
+.badge-smishing{background:rgba(20,184,166,0.15);color:#14b8a6}
+.page-row{display:grid;grid-template-columns:2fr 2fr 1.5fr 1fr auto;gap:0.5rem;
+    padding:0.6rem 0.75rem;border-bottom:1px solid var(--border);font-size:0.85rem;align-items:center}
+.page-row:last-child{border-bottom:none}
+.page-header-row{font-weight:600;color:var(--text-secondary);font-size:0.8rem;border-bottom:2px solid var(--border)}
+.vish-section{margin-bottom:1rem}
+.vish-section h4{color:var(--accent);margin:0 0 0.5rem;font-size:0.9rem}
+.vish-section p,.vish-section li{font-size:0.85rem;line-height:1.6}
+.vish-section ul{margin:0;padding-left:1.5rem}
+.vish-objection{margin-bottom:0.5rem}
+.vish-objection strong{color:var(--text-primary)}
+.spinner-inline{display:inline-block;width:14px;height:14px;border:2px solid var(--border);
+    border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<!-- ═══════════════════ JAVASCRIPT ═══════════════════ -->
+<script>
+const API='/social-eng';
+let currentQRData=null;
+
+/* ── Tab switching ─────────────────────────────── */
+function switchTab(name){
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',
+        ['harvest','pretexts','qr','campaigns'][i]===name));
+    document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
+    document.getElementById('tab-'+name).style.display='';
+    if(name==='harvest'){loadPages();loadCaptures();}
+    if(name==='pretexts') loadPretexts();
+    if(name==='campaigns') loadCampaigns();
+}
+
+/* ── Helpers ───────────────────────────────────── */
+function esc(s){
+    if(s===null||s===undefined) return '';
+    var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;
+}
+function setLoading(btn,loading){
+    if(!btn) return;
+    if(loading){btn._origText=btn.textContent;btn.disabled=true;btn.innerHTML='<span class="spinner-inline"></span>Working...';}
+    else{btn.disabled=false;btn.textContent=btn._origText||'Submit';}
+}
+
+/* ── Page Cloning ──────────────────────────────── */
+function clonePage(){
+    var url=document.getElementById('clone-url').value.trim();
+    if(!url) return;
+    var btn=document.getElementById('clone-btn');
+    setLoading(btn,true);
+
+    postJSON(API+'/clone',{url:url}).then(function(d){
+        setLoading(btn,false);
+        var div=document.getElementById('clone-result');
+        div.style.display='';
+        if(d.ok){
+            div.innerHTML='<span style="color:#22c55e">Page cloned successfully!</span><br>'+
+                '<span style="color:var(--text-secondary);font-size:0.85rem">Page ID: <strong>'+esc(d.page_id)+
+                '</strong> | Domain: '+esc(d.domain)+' | Size: '+d.size+' bytes</span>';
+            loadPages();
+        } else {
+            div.innerHTML='<span style="color:var(--danger)">Error: '+esc(d.error)+'</span>';
+        }
+    }).catch(function(e){setLoading(btn,false);});
+}
+
+/* ── Cloned Pages List ─────────────────────────── */
+function loadPages(){
+    fetchJSON(API+'/pages').then(function(d){
+        var div=document.getElementById('pages-list');
+        var pages=d.pages||[];
+        if(!pages.length){
+            div.innerHTML='<p style="color:var(--text-muted)">No cloned pages yet. Clone a page above to get started.</p>';
+            return;
+        }
+        var html='<div class="page-row page-header-row"><span>Page ID</span><span>Source URL</span><span>Date</span><span>Captures</span><span>Actions</span></div>';
+        pages.forEach(function(p){
+            var date=p.cloned_at?(p.cloned_at.substring(0,10)):'—';
+            var srcUrl=p.source_url||'—';
+            if(srcUrl.length>40) srcUrl=srcUrl.substring(0,40)+'...';
+            html+='<div class="page-row">'+
+                '<span style="font-family:monospace;color:var(--accent)">'+esc(p.id)+'</span>'+
+                '<span title="'+esc(p.source_url)+'">'+esc(srcUrl)+'</span>'+
+                '<span>'+esc(date)+'</span>'+
+                '<span style="font-weight:600">'+(p.captures_count||0)+'</span>'+
+                '<span><button class="btn btn-sm" onclick="viewPage(\''+esc(p.id)+'\')">View</button> '+
+                '<button class="btn btn-sm" style="color:var(--danger)" onclick="deletePage(\''+esc(p.id)+'\')">Delete</button></span>'+
+                '</div>';
+        });
+        div.innerHTML=html;
+
+        // Update capture filter dropdown
+        var sel=document.getElementById('cap-filter');
+        var cur=sel.value;
+        sel.innerHTML='<option value="">All Pages</option>';
+        pages.forEach(function(p){
+            sel.innerHTML+='<option value="'+esc(p.id)+'">'+esc(p.id)+' ('+esc(p.domain||p.source_url||'')+')</option>';
+        });
+        sel.value=cur;
+    });
+}
+
+function viewPage(pid){
+    fetchJSON(API+'/pages/'+pid).then(function(d){
+        if(!d.ok) return alert(d.error||'Page not found');
+        var w=window.open('','_blank','width=900,height=700');
+        w.document.write(d.html);
+        w.document.close();
+    });
+}
+
+function deletePage(pid){
+    if(!confirm('Delete cloned page '+pid+'?')) return;
+    fetch(API+'/pages/'+pid,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+        if(d.ok) loadPages();
+        else alert(d.error||'Delete failed');
+    });
+}
+
+/* ── Captures ──────────────────────────────────── */
+function loadCaptures(){
+    var pageId=document.getElementById('cap-filter').value;
+    var url=API+'/captures';
+    if(pageId) url+='?page_id='+encodeURIComponent(pageId);
+
+    fetchJSON(url).then(function(d){
+        var div=document.getElementById('captures-list');
+        var caps=d.captures||[];
+        if(!caps.length){
+            div.innerHTML='<p style="color:var(--text-muted)">No credentials captured yet.</p>';
+            return;
+        }
+        var html='';
+        caps.forEach(function(c){
+            var ts=(c.timestamp||'').substring(0,19).replace('T',' ');
+            var creds=c.credentials||{};
+            var credParts=[];
+            Object.keys(creds).forEach(function(k){
+                var v=creds[k];
+                // Mask password-like fields
+                if(/pass|pwd|secret|token/i.test(k)){
+                    v=v.substring(0,2)+'***'+v.substring(v.length-1);
+                }
+                credParts.push(esc(k)+'='+esc(v));
+            });
+            html+='<div class="cap-row">'+
+                '<div style="display:flex;justify-content:space-between;align-items:center">'+
+                '<span style="color:var(--text-secondary);font-size:0.8rem">'+esc(ts)+' | Page: '+
+                '<span style="color:var(--accent)">'+esc(c.page_id)+'</span> | IP: '+esc(c.ip)+'</span>'+
+                '<span style="font-size:0.75rem;color:var(--text-muted)" title="'+esc(c.user_agent)+'">'+
+                esc((c.user_agent||'').substring(0,50))+'</span></div>'+
+                '<div class="cap-creds" style="margin-top:0.25rem">'+credParts.join(' &nbsp; ')+'</div>'+
+                '</div>';
+        });
+        div.innerHTML=html;
+    });
+}
+
+function clearCaptures(){
+    if(!confirm('Clear all captured credentials?')) return;
+    var pageId=document.getElementById('cap-filter').value;
+    var url=API+'/captures';
+    if(pageId) url+='?page_id='+encodeURIComponent(pageId);
+    fetch(url,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+        loadCaptures();
+    });
+}
+
+/* ── Pretexts ──────────────────────────────────── */
+function loadPretexts(){
+    var cat=document.getElementById('pretext-cat').value;
+    var url=API+'/pretexts';
+    if(cat) url+='?category='+encodeURIComponent(cat);
+
+    fetchJSON(url).then(function(d){
+        var div=document.getElementById('pretexts-list');
+        var pretexts=d.pretexts||{};
+        var html='';
+        Object.keys(pretexts).forEach(function(cat){
+            html+='<h4 style="color:var(--text-secondary);margin:1rem 0 0.5rem;text-transform:capitalize">'+
+                esc(cat.replace(/_/g,' '))+'</h4>';
+            pretexts[cat].forEach(function(p){
+                var bodyPreview=(p.body||'').substring(0,200).replace(/\n/g,' ');
+                html+='<div class="pretext-card">'+
+                    '<div style="display:flex;justify-content:space-between;align-items:start">'+
+                    '<h4>'+esc(p.name)+'</h4>'+
+                    '<button class="btn btn-sm" onclick="copyPretext(this)" data-subject="'+esc(p.subject)+
+                    '" data-body="'+esc(p.body)+'">Copy</button></div>'+
+                    '<div class="subject"><strong>Subject:</strong> '+esc(p.subject)+'</div>'+
+                    '<div class="body">'+esc(bodyPreview)+'...</div>'+
+                    (p.pretext_notes?'<div class="notes">Notes: '+esc(p.pretext_notes)+'</div>':'')+
+                    '</div>';
+            });
+        });
+        if(!html) html='<p style="color:var(--text-muted)">No templates found.</p>';
+        div.innerHTML=html;
+    });
+}
+
+function copyPretext(btn){
+    var text='Subject: '+btn.dataset.subject+'\n\n'+btn.dataset.body;
+    navigator.clipboard.writeText(text).then(function(){
+        btn.textContent='Copied!';
+        setTimeout(function(){btn.textContent='Copy';},1500);
+    });
+}
+
+/* ── USB Payload ───────────────────────────────── */
+function generateUSB(){
+    var type=document.getElementById('usb-type').value;
+    var params={};
+    var url=document.getElementById('usb-url').value.trim();
+    if(url) params.payload_url=url;
+    var exec=document.getElementById('usb-exec').value.trim();
+    if(exec) params.executable=exec;
+    var label=document.getElementById('usb-label').value.trim();
+    if(label){params.label=label;params.title=label;}
+
+    postJSON(API+'/usb',{type:type,params:params}).then(function(d){
+        var div=document.getElementById('usb-output');
+        if(d.ok){
+            div.style.display='';
+            document.getElementById('usb-name').textContent=d.name+' — '+d.description;
+            document.getElementById('usb-payload').textContent=d.payload;
+        } else {
+            alert(d.error||'Failed to generate payload');
+        }
+    });
+}
+
+function copyUSB(){
+    var text=document.getElementById('usb-payload').textContent;
+    navigator.clipboard.writeText(text).then(function(){});
+}
+
+/* ── Vishing Script ────────────────────────────── */
+function generateVishing(){
+    var scenario=document.getElementById('vish-scenario').value;
+    var url=API+'/vishing/'+scenario+'?';
+    var target=document.getElementById('vish-target').value.trim();
+    if(target) url+='target_name='+encodeURIComponent(target)+'&';
+    var caller=document.getElementById('vish-caller').value.trim();
+    if(caller) url+='caller_name='+encodeURIComponent(caller)+'&';
+    var phone=document.getElementById('vish-phone').value.trim();
+    if(phone) url+='phone='+encodeURIComponent(phone);
+
+    fetchJSON(url).then(function(d){
+        var div=document.getElementById('vish-output');
+        if(!d.ok){alert(d.error||'Error');return;}
+        div.style.display='';
+
+        var html='<div class="vish-section"><h4>Opening</h4><p>'+esc(d.opening)+'</p></div>';
+
+        html+='<div class="vish-section"><h4>Key Questions</h4><ul>';
+        (d.key_questions||[]).forEach(function(q){
+            html+='<li>'+esc(q)+'</li>';
+        });
+        html+='</ul></div>';
+
+        html+='<div class="vish-section"><h4>Credential Extraction</h4><p>'+esc(d.credential_extraction)+'</p></div>';
+
+        html+='<div class="vish-section"><h4>Objection Handling</h4>';
+        var obj=d.objection_handling||{};
+        Object.keys(obj).forEach(function(k){
+            html+='<div class="vish-objection"><strong>"'+esc(k.replace(/_/g,' '))+'":</strong> '+esc(obj[k])+'</div>';
+        });
+        html+='</div>';
+
+        html+='<div class="vish-section"><h4>Closing</h4><p>'+esc(d.closing)+'</p></div>';
+
+        document.getElementById('vish-content').innerHTML=html;
+    });
+}
+
+/* ── QR Code ───────────────────────────────────── */
+function generateQR(){
+    var url=document.getElementById('qr-url').value.trim();
+    if(!url) return;
+    var btn=document.getElementById('qr-btn');
+    setLoading(btn,true);
+
+    postJSON(API+'/qr',{
+        url:url,
+        label:document.getElementById('qr-label').value.trim(),
+        size:parseInt(document.getElementById('qr-size').value)
+    }).then(function(d){
+        setLoading(btn,false);
+        if(!d.ok){alert(d.error||'Failed');return;}
+        currentQRData=d;
+        var preview=document.getElementById('qr-preview');
+        preview.style.display='';
+        document.getElementById('qr-img').src=d.data_url;
+        document.getElementById('qr-url-label').textContent=d.url+(d.label?' — '+d.label:'');
+    }).catch(function(){setLoading(btn,false);});
+}
+
+function downloadQR(){
+    if(!currentQRData) return;
+    var a=document.createElement('a');
+    a.href=currentQRData.data_url;
+    a.download='qr_'+(currentQRData.label||'code')+'.png';
+    a.click();
+}
+
+function copyQRDataURL(){
+    if(!currentQRData) return;
+    navigator.clipboard.writeText(currentQRData.data_url).then(function(){});
+}
+
+/* ── Campaigns ─────────────────────────────────── */
+function createCampaign(){
+    var name=document.getElementById('camp-name').value.trim();
+    if(!name){alert('Campaign name required');return;}
+    var vector=document.getElementById('camp-vector').value;
+    var targetsStr=document.getElementById('camp-targets').value.trim();
+    var targets=targetsStr?targetsStr.split(',').map(function(t){return t.trim();}).filter(Boolean):[];
+    var pretext=document.getElementById('camp-pretext').value.trim();
+
+    postJSON(API+'/campaign',{name:name,vector:vector,targets:targets,pretext:pretext}).then(function(d){
+        if(d.ok){
+            document.getElementById('camp-name').value='';
+            document.getElementById('camp-targets').value='';
+            document.getElementById('camp-pretext').value='';
+            loadCampaigns();
+        } else {
+            alert(d.error||'Failed to create campaign');
+        }
+    });
+}
+
+function loadCampaigns(){
+    fetchJSON(API+'/campaigns').then(function(d){
+        var div=document.getElementById('campaigns-list');
+        var camps=d.campaigns||[];
+        if(!camps.length){
+            div.innerHTML='<p style="color:var(--text-muted)">No campaigns yet. Create one above.</p>';
+            return;
+        }
+        var html='<div class="camp-row camp-header"><span>Name</span><span>Vector</span><span>Created</span>'+
+            '<span>Targets</span><span>Clicks</span><span>Success</span><span>Actions</span></div>';
+        camps.forEach(function(c){
+            var stats=c.stats||{};
+            var total=stats.total_targets||0;
+            var captured=stats.captured||0;
+            var rate=total>0?Math.round(captured/total*100)+'%':'—';
+            var date=(c.created_at||'').substring(0,10);
+            var vectorClass='badge badge-'+(c.vector||'email');
+            html+='<div class="camp-row">'+
+                '<span style="font-weight:600">'+esc(c.name)+'</span>'+
+                '<span><span class="'+vectorClass+'">'+esc(c.vector)+'</span></span>'+
+                '<span>'+esc(date)+'</span>'+
+                '<span>'+total+'</span>'+
+                '<span>'+(stats.clicked||0)+'</span>'+
+                '<span>'+rate+'</span>'+
+                '<span>'+
+                '<button class="btn btn-sm" onclick="viewCampaign(\''+esc(c.id)+'\')">View</button> '+
+                '<button class="btn btn-sm" style="color:var(--danger)" onclick="deleteCampaign(\''+esc(c.id)+'\')">Delete</button>'+
+                '</span></div>';
+        });
+        div.innerHTML=html;
+    });
+}
+
+function viewCampaign(cid){
+    fetchJSON(API+'/campaign/'+cid).then(function(d){
+        if(!d.ok){alert(d.error);return;}
+        var c=d.campaign;
+        var detail=document.getElementById('campaign-detail');
+        detail.style.display='';
+        document.getElementById('detail-name').textContent=c.name;
+
+        var stats=c.stats||{};
+        var html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem">';
+        html+='<div style="text-align:center;padding:0.75rem;background:var(--bg-input);border-radius:var(--radius)">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:var(--accent)">'+(stats.total_targets||0)+'</div>'+
+            '<div style="font-size:0.8rem;color:var(--text-secondary)">Targets</div></div>';
+        html+='<div style="text-align:center;padding:0.75rem;background:var(--bg-input);border-radius:var(--radius)">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:#22c55e">'+(stats.sent||0)+'</div>'+
+            '<div style="font-size:0.8rem;color:var(--text-secondary)">Sent</div></div>';
+        html+='<div style="text-align:center;padding:0.75rem;background:var(--bg-input);border-radius:var(--radius)">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:#f59e0b">'+(stats.clicked||0)+'</div>'+
+            '<div style="font-size:0.8rem;color:var(--text-secondary)">Clicked</div></div>';
+        html+='<div style="text-align:center;padding:0.75rem;background:var(--bg-input);border-radius:var(--radius)">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:var(--danger)">'+(stats.captured||0)+'</div>'+
+            '<div style="font-size:0.8rem;color:var(--text-secondary)">Captured</div></div>';
+        html+='</div>';
+
+        // Info
+        html+='<div style="margin-bottom:1rem;font-size:0.85rem">'+
+            '<strong>Vector:</strong> <span class="badge badge-'+esc(c.vector)+'">'+esc(c.vector)+'</span> &nbsp; '+
+            '<strong>Status:</strong> <span class="badge badge-active">'+esc(c.status)+'</span> &nbsp; '+
+            '<strong>Created:</strong> '+esc((c.created_at||'').substring(0,10))+
+            (c.pretext?' &nbsp; <strong>Pretext:</strong> '+esc(c.pretext):'')+
+            '</div>';
+
+        // Targets
+        if(c.targets&&c.targets.length){
+            html+='<h4 style="margin-bottom:0.5rem">Targets</h4>';
+            html+='<div style="font-family:monospace;font-size:0.8rem;background:var(--bg-input);padding:0.75rem;border-radius:var(--radius)">';
+            c.targets.forEach(function(t){
+                html+=esc(t)+'<br>';
+            });
+            html+='</div>';
+        }
+
+        // Event Timeline
+        if(c.events&&c.events.length){
+            html+='<h4 style="margin:1rem 0 0.5rem">Event Timeline</h4>';
+            html+='<div style="max-height:200px;overflow-y:auto">';
+            c.events.forEach(function(ev){
+                var ts=(ev.timestamp||'').substring(0,19).replace('T',' ');
+                html+='<div style="padding:0.3rem 0;font-size:0.8rem;border-bottom:1px solid var(--border)">'+
+                    '<span style="color:var(--text-muted)">'+esc(ts)+'</span> '+
+                    '<span class="badge badge-active">'+esc(ev.type)+'</span> '+
+                    esc(ev.detail||'')+'</div>';
+            });
+            html+='</div>';
+        }
+
+        document.getElementById('detail-content').innerHTML=html;
+    });
+}
+
+function deleteCampaign(cid){
+    if(!confirm('Delete this campaign?')) return;
+    fetch(API+'/campaign/'+cid,{method:'DELETE'}).then(function(r){return r.json();}).then(function(d){
+        if(d.ok){
+            loadCampaigns();
+            document.getElementById('campaign-detail').style.display='none';
+        } else {
+            alert(d.error||'Delete failed');
+        }
+    });
+}
+
+/* ── Init ──────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function(){
+    loadPages();
+    loadCaptures();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,719 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — WiFi Pineapple{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>WiFi Pineapple / Rogue AP</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Evil twin, captive portal, karma attack, DNS spoofing, and credential capture.
+    </p>
+</div>
+
+<!-- Status Banner -->
+<div id="pine-status-banner" class="section" style="display:none;padding:12px 18px;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius)">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span id="pine-status-dot" style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block"></span>
+        <strong id="pine-status-text">Stopped</strong>
+        <span id="pine-status-ssid" style="color:var(--text-secondary);font-size:0.85rem"></span>
+        <span id="pine-status-clients" style="color:var(--text-secondary);font-size:0.85rem"></span>
+        <span id="pine-status-features" style="color:var(--text-secondary);font-size:0.85rem"></span>
+    </div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="pine" data-tab="ap" onclick="showTab('pine','ap')">Rogue AP</button>
+    <button class="tab" data-tab-group="pine" data-tab="portal" onclick="showTab('pine','portal')">Captive Portal</button>
+    <button class="tab" data-tab-group="pine" data-tab="clients" onclick="showTab('pine','clients')">Clients</button>
+    <button class="tab" data-tab-group="pine" data-tab="traffic" onclick="showTab('pine','traffic')">Traffic</button>
+</div>
+
+<!-- ==================== ROGUE AP TAB ==================== -->
+<div class="tab-content active" data-tab-group="pine" data-tab="ap">
+
+<div class="section">
+    <h2>Access Point Configuration</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Configure and launch a rogue access point using hostapd and dnsmasq.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Wireless Interface</label>
+            <select id="pine-iface">
+                <option value="">-- loading --</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>SSID</label>
+            <input type="text" id="pine-ssid" placeholder="FreeWiFi" value="FreeWiFi">
+        </div>
+        <div class="form-group" style="max-width:120px">
+            <label>Channel</label>
+            <select id="pine-channel">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6" selected>6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+                <option value="13">13</option>
+                <option value="14">14</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="max-width:160px">
+            <label>Encryption</label>
+            <select id="pine-enc" onchange="document.getElementById('pine-pass-group').style.display=this.value==='open'?'none':'block'">
+                <option value="open">Open (No Password)</option>
+                <option value="wpa2">WPA2-PSK</option>
+            </select>
+        </div>
+        <div class="form-group" id="pine-pass-group" style="display:none">
+            <label>Password</label>
+            <input type="password" id="pine-pass" placeholder="Minimum 8 characters">
+        </div>
+        <div class="form-group">
+            <label>Internet Interface (NAT)</label>
+            <select id="pine-inet">
+                <option value="">None (no internet)</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-pine-start" class="btn btn-primary" onclick="pineStartAP()">Start Rogue AP</button>
+        <button id="btn-pine-stop" class="btn btn-danger" onclick="pineStopAP()">Stop AP</button>
+        <button class="btn btn-small" onclick="pineRefreshIfaces()">Refresh Interfaces</button>
+    </div>
+    <pre class="output-panel" id="pine-ap-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Evil Twin Attack</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Clone a target AP's SSID and channel. Optionally deauthenticates clients from the real AP.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Target SSID</label>
+            <input type="text" id="pine-twin-ssid" placeholder="TargetNetwork">
+        </div>
+        <div class="form-group">
+            <label>Target BSSID</label>
+            <input type="text" id="pine-twin-bssid" placeholder="AA:BB:CC:DD:EE:FF">
+        </div>
+        <div class="form-group">
+            <label>Interface</label>
+            <select id="pine-twin-iface">
+                <option value="">-- select --</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-pine-twin" class="btn btn-danger" onclick="pineEvilTwin()">Clone & Start Evil Twin</button>
+    </div>
+    <pre class="output-panel" id="pine-twin-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Karma Attack</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Respond to all client probe requests, impersonating any SSID they seek.
+        Requires hostapd-mana or airbase-ng.
+    </p>
+    <div style="display:flex;align-items:center;gap:12px">
+        <label class="toggle-switch">
+            <input type="checkbox" id="pine-karma-toggle" onchange="pineToggleKarma(this.checked)">
+            <span class="toggle-slider"></span>
+        </label>
+        <span id="pine-karma-label" style="font-size:0.85rem;color:var(--text-secondary)">Karma Disabled</span>
+    </div>
+    <pre class="output-panel" id="pine-karma-output" style="margin-top:8px"></pre>
+</div>
+
+</div>
+
+<!-- ==================== CAPTIVE PORTAL TAB ==================== -->
+<div class="tab-content" data-tab-group="pine" data-tab="portal">
+
+<div class="section">
+    <h2>Captive Portal</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Redirect all HTTP/HTTPS traffic from connected clients to a fake login page.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Portal Type</label>
+            <select id="pine-portal-type" onchange="pinePortalTypeChanged(this.value)">
+                <option value="hotel_wifi">Hotel WiFi Login</option>
+                <option value="corporate">Corporate Network Auth</option>
+                <option value="social_login">Social Media / Email Login</option>
+                <option value="terms_accept">Terms & Conditions</option>
+                <option value="custom">Custom HTML</option>
+            </select>
+        </div>
+    </div>
+    <div id="pine-custom-html-group" style="display:none;margin-top:8px">
+        <label style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px;display:block">Custom Portal HTML</label>
+        <textarea id="pine-custom-html" rows="10" style="width:100%;font-family:monospace;font-size:0.82rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px;resize:vertical"
+            placeholder="<html>&#10;<body>&#10;  <form method='POST' action='/portal/capture'>&#10;    <input name='username'>&#10;    <input name='password' type='password'>&#10;    <button type='submit'>Login</button>&#10;  </form>&#10;</body>&#10;</html>"></textarea>
+    </div>
+    <div class="tool-actions" style="margin-top:12px">
+        <button id="btn-portal-start" class="btn btn-primary" onclick="pineStartPortal()">Start Portal</button>
+        <button id="btn-portal-stop" class="btn btn-danger" onclick="pineStopPortal()">Stop Portal</button>
+    </div>
+    <div id="pine-portal-status" style="margin-top:8px;font-size:0.85rem;color:var(--text-secondary)"></div>
+    <pre class="output-panel" id="pine-portal-output"></pre>
+</div>
+
+<div class="section">
+    <h2>Captured Credentials</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="pineRefreshCaptures()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Username / Email</th>
+                <th>Password</th>
+                <th>IP</th>
+                <th>User-Agent</th>
+            </tr>
+        </thead>
+        <tbody id="pine-captures-list">
+            <tr><td colspan="5" class="empty-state">No captured credentials yet.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== CLIENTS TAB ==================== -->
+<div class="tab-content" data-tab-group="pine" data-tab="clients">
+
+<div class="section">
+    <h2>Connected Clients</h2>
+    <div class="tool-actions" style="display:flex;align-items:center;gap:12px">
+        <button class="btn btn-small" onclick="pineRefreshClients()">Refresh</button>
+        <label style="font-size:0.82rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="pine-auto-refresh" onchange="pineToggleAutoRefresh(this.checked)">
+            Auto-refresh (5s)
+        </label>
+        <span id="pine-client-count" style="font-size:0.82rem;color:var(--text-muted)">0 clients</span>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>IP Address</th>
+                <th>Hostname</th>
+                <th>OS</th>
+                <th>First Seen</th>
+                <th>Data Usage</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="pine-clients-list">
+            <tr><td colspan="7" class="empty-state">No clients connected. Start a rogue AP first.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== TRAFFIC TAB ==================== -->
+<div class="tab-content" data-tab-group="pine" data-tab="traffic">
+
+<div class="section">
+    <h2>DNS Spoofing</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Redirect specific domains to an IP address of your choice (e.g., AUTARCH server).
+    </p>
+    <div id="pine-dns-rows">
+        <div class="form-row pine-dns-row" style="align-items:flex-end">
+            <div class="form-group">
+                <label>Domain</label>
+                <input type="text" class="pine-dns-domain" placeholder="example.com">
+            </div>
+            <div class="form-group">
+                <label>Redirect IP</label>
+                <input type="text" class="pine-dns-ip" placeholder="10.0.0.1">
+            </div>
+            <button class="btn btn-danger btn-small" onclick="this.closest('.pine-dns-row').remove()" style="margin-bottom:8px">X</button>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="pineAddDnsRow()">+ Add Domain</button>
+        <button id="btn-dns-apply" class="btn btn-primary btn-small" onclick="pineApplyDns()">Apply DNS Spoofs</button>
+        <button class="btn btn-danger btn-small" onclick="pineClearDns()">Clear All Spoofs</button>
+    </div>
+    <pre class="output-panel" id="pine-dns-output"></pre>
+</div>
+
+<div class="section">
+    <h2>SSL Strip</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Downgrade HTTPS connections to HTTP for traffic interception. Requires sslstrip installed.
+    </p>
+    <div style="display:flex;align-items:center;gap:12px">
+        <label class="toggle-switch">
+            <input type="checkbox" id="pine-ssl-toggle" onchange="pineToggleSslStrip(this.checked)">
+            <span class="toggle-slider"></span>
+        </label>
+        <span id="pine-ssl-label" style="font-size:0.85rem;color:var(--text-secondary)">SSL Strip Disabled</span>
+    </div>
+    <pre class="output-panel" id="pine-ssl-output" style="margin-top:8px"></pre>
+</div>
+
+<div class="section">
+    <h2>Traffic Statistics</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="pineRefreshTraffic()">Refresh Stats</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+        <div>
+            <h3 style="font-size:0.9rem;margin-bottom:8px;color:var(--text-secondary)">Top Domains</h3>
+            <table class="data-table">
+                <thead><tr><th>Domain</th><th>Queries</th></tr></thead>
+                <tbody id="pine-top-domains">
+                    <tr><td colspan="2" class="empty-state">No data yet.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <h3 style="font-size:0.9rem;margin-bottom:8px;color:var(--text-secondary)">Top Clients</h3>
+            <table class="data-table">
+                <thead><tr><th>MAC / IP</th><th>Usage</th></tr></thead>
+                <tbody id="pine-top-clients">
+                    <tr><td colspan="2" class="empty-state">No data yet.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Packet Capture</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Capture network traffic from connected clients using tcpdump.
+    </p>
+    <div class="form-row">
+        <div class="form-group" style="max-width:160px">
+            <label>Duration (seconds)</label>
+            <input type="number" id="pine-sniff-duration" value="60" min="5" max="600">
+        </div>
+        <div class="form-group">
+            <label>BPF Filter (optional)</label>
+            <input type="text" id="pine-sniff-filter" placeholder="e.g. port 80 or port 443">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-sniff-start" class="btn btn-primary btn-small" onclick="pineStartSniff()">Start Capture</button>
+        <button class="btn btn-danger btn-small" onclick="pineStopSniff()">Stop Capture</button>
+    </div>
+    <pre class="output-panel" id="pine-sniff-output"></pre>
+</div>
+
+</div>
+
+<style>
+.toggle-switch{position:relative;display:inline-block;width:44px;height:24px}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg-input);border:1px solid var(--border);border-radius:24px;transition:.2s}
+.toggle-slider:before{position:absolute;content:"";height:18px;width:18px;left:2px;bottom:2px;background:var(--text-secondary);border-radius:50%;transition:.2s}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent);border-color:var(--accent)}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(20px);background:#fff}
+.pine-pass-reveal{cursor:pointer;color:var(--accent);font-size:0.75rem;margin-left:6px}
+.pine-pass-reveal:hover{text-decoration:underline}
+</style>
+
+<script>
+/* ── Pineapple Module JS ── */
+var _pineAutoTimer = null;
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Interface loading ── */
+function pineRefreshIfaces() {
+    fetchJSON('/pineapple/interfaces').then(function(data) {
+        var ifaces = Array.isArray(data) ? data : (data.interfaces || []);
+        var selAP = document.getElementById('pine-iface');
+        var selInet = document.getElementById('pine-inet');
+        var selTwin = document.getElementById('pine-twin-iface');
+
+        selAP.innerHTML = '<option value="">-- select interface --</option>';
+        selInet.innerHTML = '<option value="">None (no internet)</option>';
+        selTwin.innerHTML = '<option value="">-- select interface --</option>';
+
+        ifaces.forEach(function(ifc) {
+            var label = ifc.name + ' (' + (ifc.mode || 'unknown') + ')';
+            if (ifc.driver) label += ' [' + ifc.driver + ']';
+
+            if (ifc.wireless !== false) {
+                var opt1 = document.createElement('option');
+                opt1.value = ifc.name;
+                opt1.textContent = label;
+                selAP.appendChild(opt1);
+
+                var opt3 = document.createElement('option');
+                opt3.value = ifc.name;
+                opt3.textContent = label;
+                selTwin.appendChild(opt3);
+            }
+
+            var opt2 = document.createElement('option');
+            opt2.value = ifc.name;
+            opt2.textContent = ifc.name + (ifc.wireless === false ? ' (wired)' : '');
+            selInet.appendChild(opt2);
+        });
+    });
+}
+
+/* ── Status polling ── */
+function pineRefreshStatus() {
+    fetchJSON('/pineapple/status').then(function(s) {
+        var banner = document.getElementById('pine-status-banner');
+        var dot = document.getElementById('pine-status-dot');
+        var text = document.getElementById('pine-status-text');
+        var ssid = document.getElementById('pine-status-ssid');
+        var clients = document.getElementById('pine-status-clients');
+        var features = document.getElementById('pine-status-features');
+
+        banner.style.display = 'block';
+
+        if (s.running) {
+            dot.style.background = '#4ade80';
+            text.textContent = 'AP Running';
+            ssid.textContent = 'SSID: ' + esc(s.ssid) + '  Ch: ' + s.channel;
+            clients.textContent = 'Clients: ' + s.client_count;
+            var feat = [];
+            if (s.portal_active) feat.push('Portal:' + esc(s.portal_type));
+            if (s.karma_active) feat.push('Karma');
+            if (s.sslstrip_active) feat.push('SSLStrip');
+            if (s.dns_spoof_active) feat.push('DNS Spoof');
+            features.textContent = feat.length ? '[ ' + feat.join(' | ') + ' ]' : '';
+        } else {
+            dot.style.background = '#ef4444';
+            text.textContent = 'Stopped';
+            ssid.textContent = '';
+            clients.textContent = '';
+            features.textContent = '';
+        }
+
+        // Sync toggle states
+        document.getElementById('pine-karma-toggle').checked = !!s.karma_active;
+        document.getElementById('pine-karma-label').textContent = s.karma_active ? 'Karma Active' : 'Karma Disabled';
+        document.getElementById('pine-ssl-toggle').checked = !!s.sslstrip_active;
+        document.getElementById('pine-ssl-label').textContent = s.sslstrip_active ? 'SSL Strip Active' : 'SSL Strip Disabled';
+    });
+}
+
+/* ── Start / Stop AP ── */
+function pineStartAP() {
+    var iface = document.getElementById('pine-iface').value;
+    var ssid = document.getElementById('pine-ssid').value.trim();
+    if (!iface) { alert('Select a wireless interface.'); return; }
+    if (!ssid) { alert('Enter an SSID.'); return; }
+
+    var enc = document.getElementById('pine-enc').value;
+    var pass = document.getElementById('pine-pass').value;
+    if (enc !== 'open' && pass.length < 8) { alert('WPA2 password must be at least 8 characters.'); return; }
+
+    var btn = document.getElementById('btn-pine-start');
+    setLoading(btn, true);
+    postJSON('/pineapple/start', {
+        ssid: ssid,
+        interface: iface,
+        channel: parseInt(document.getElementById('pine-channel').value) || 6,
+        encryption: enc,
+        password: enc !== 'open' ? pass : null,
+        internet_interface: document.getElementById('pine-inet').value || null
+    }).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-ap-output', data.message || data.error || JSON.stringify(data));
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function pineStopAP() {
+    var btn = document.getElementById('btn-pine-stop');
+    setLoading(btn, true);
+    postJSON('/pineapple/stop', {}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-ap-output', data.message || data.error || 'Stopped');
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Evil Twin ── */
+function pineEvilTwin() {
+    var ssid = document.getElementById('pine-twin-ssid').value.trim();
+    var bssid = document.getElementById('pine-twin-bssid').value.trim();
+    var iface = document.getElementById('pine-twin-iface').value;
+    if (!ssid || !iface) { alert('Enter target SSID and select an interface.'); return; }
+
+    var btn = document.getElementById('btn-pine-twin');
+    setLoading(btn, true);
+    postJSON('/pineapple/evil-twin', {
+        target_ssid: ssid,
+        target_bssid: bssid,
+        interface: iface,
+        internet_interface: document.getElementById('pine-inet').value || null
+    }).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-twin-output', data.message || data.error || JSON.stringify(data));
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Karma ── */
+function pineToggleKarma(enabled) {
+    var url = enabled ? '/pineapple/karma/start' : '/pineapple/karma/stop';
+    postJSON(url, {}).then(function(data) {
+        renderOutput('pine-karma-output', data.message || data.error || '');
+        document.getElementById('pine-karma-label').textContent = enabled ? 'Karma Active' : 'Karma Disabled';
+        if (!data.ok) document.getElementById('pine-karma-toggle').checked = !enabled;
+        pineRefreshStatus();
+    });
+}
+
+/* ── Captive Portal ── */
+function pinePortalTypeChanged(val) {
+    document.getElementById('pine-custom-html-group').style.display = val === 'custom' ? 'block' : 'none';
+}
+
+function pineStartPortal() {
+    var ptype = document.getElementById('pine-portal-type').value;
+    var customHtml = null;
+    if (ptype === 'custom') {
+        customHtml = document.getElementById('pine-custom-html').value;
+        if (!customHtml.trim()) { alert('Enter custom portal HTML.'); return; }
+    }
+
+    var btn = document.getElementById('btn-portal-start');
+    setLoading(btn, true);
+    postJSON('/pineapple/portal/start', {type: ptype, custom_html: customHtml}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-portal-output', data.message || data.error || '');
+        document.getElementById('pine-portal-status').textContent = data.ok ? 'Portal active (' + ptype + ')' : '';
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function pineStopPortal() {
+    var btn = document.getElementById('btn-portal-stop');
+    setLoading(btn, true);
+    postJSON('/pineapple/portal/stop', {}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-portal-output', data.message || data.error || '');
+        document.getElementById('pine-portal-status').textContent = '';
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Captures ── */
+function pineRefreshCaptures() {
+    fetchJSON('/pineapple/portal/captures').then(function(data) {
+        var captures = Array.isArray(data) ? data : (data.captures || []);
+        var tbody = document.getElementById('pine-captures-list');
+        if (!captures.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No captured credentials yet.</td></tr>';
+            return;
+        }
+        var html = '';
+        captures.forEach(function(c) {
+            var masked = c.password ? c.password.replace(/./g, '*') : '';
+            var passId = 'pass-' + Math.random().toString(36).substr(2,8);
+            html += '<tr>'
+                + '<td style="white-space:nowrap;font-size:0.82rem">' + esc(c.timestamp ? c.timestamp.substring(0,19) : '--') + '</td>'
+                + '<td>' + esc(c.username || c.email || '--') + '</td>'
+                + '<td><code id="' + passId + '">' + esc(masked) + '</code>'
+                + ' <span class="pine-pass-reveal" onclick="this.previousElementSibling.textContent='
+                + "'" + esc(c.password || '') + "'" + ';this.textContent=\'\'">[show]</span></td>'
+                + '<td>' + esc(c.ip || '--') + '</td>'
+                + '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:0.78rem">' + esc(c.user_agent || '--') + '</td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = html;
+    });
+}
+
+/* ── Clients ── */
+function pineRefreshClients() {
+    fetchJSON('/pineapple/clients').then(function(data) {
+        var clients = Array.isArray(data) ? data : (data.clients || []);
+        var tbody = document.getElementById('pine-clients-list');
+        var counter = document.getElementById('pine-client-count');
+        counter.textContent = clients.length + ' client' + (clients.length !== 1 ? 's' : '');
+
+        if (!clients.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No clients connected.</td></tr>';
+            return;
+        }
+        var html = '';
+        clients.forEach(function(c) {
+            var firstSeen = c.first_seen ? c.first_seen.substring(11,19) : '--';
+            var usage = c.data_usage ? _formatBytes(c.data_usage) : '0 B';
+            html += '<tr>'
+                + '<td><code>' + esc(c.mac) + '</code></td>'
+                + '<td>' + esc(c.ip || '--') + '</td>'
+                + '<td>' + esc(c.hostname || '--') + '</td>'
+                + '<td>' + esc(c.os || '--') + '</td>'
+                + '<td style="font-size:0.82rem">' + esc(firstSeen) + '</td>'
+                + '<td>' + esc(usage) + '</td>'
+                + '<td><button class="btn btn-danger btn-small" onclick="pineKickClient(\'' + esc(c.mac) + '\')">Kick</button></td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = html;
+    });
+}
+
+function pineKickClient(mac) {
+    if (!confirm('Kick client ' + mac + '?')) return;
+    postJSON('/pineapple/clients/' + encodeURIComponent(mac) + '/kick', {}).then(function(data) {
+        if (data.ok || data.message) {
+            pineRefreshClients();
+        } else {
+            alert(data.error || 'Failed to kick client');
+        }
+    });
+}
+
+function pineToggleAutoRefresh(enabled) {
+    if (_pineAutoTimer) { clearInterval(_pineAutoTimer); _pineAutoTimer = null; }
+    if (enabled) {
+        _pineAutoTimer = setInterval(function() {
+            pineRefreshClients();
+            pineRefreshStatus();
+        }, 5000);
+    }
+}
+
+/* ── DNS Spoof ── */
+function pineAddDnsRow() {
+    var container = document.getElementById('pine-dns-rows');
+    var row = document.createElement('div');
+    row.className = 'form-row pine-dns-row';
+    row.style.alignItems = 'flex-end';
+    row.innerHTML = '<div class="form-group"><label>Domain</label>'
+        + '<input type="text" class="pine-dns-domain" placeholder="example.com"></div>'
+        + '<div class="form-group"><label>Redirect IP</label>'
+        + '<input type="text" class="pine-dns-ip" placeholder="10.0.0.1"></div>'
+        + '<button class="btn btn-danger btn-small" onclick="this.closest(\'.pine-dns-row\').remove()" style="margin-bottom:8px">X</button>';
+    container.appendChild(row);
+}
+
+function pineApplyDns() {
+    var rows = document.querySelectorAll('.pine-dns-row');
+    var spoofs = {};
+    rows.forEach(function(row) {
+        var domain = row.querySelector('.pine-dns-domain').value.trim();
+        var ip = row.querySelector('.pine-dns-ip').value.trim();
+        if (domain && ip) spoofs[domain] = ip;
+    });
+    if (Object.keys(spoofs).length === 0) { alert('Add at least one domain/IP pair.'); return; }
+
+    var btn = document.getElementById('btn-dns-apply');
+    setLoading(btn, true);
+    postJSON('/pineapple/dns-spoof', {spoofs: spoofs}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-dns-output', data.message || data.error || '');
+        pineRefreshStatus();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function pineClearDns() {
+    fetchJSON('/pineapple/dns-spoof', {method: 'DELETE'}).then(function(data) {
+        renderOutput('pine-dns-output', data.message || data.error || 'DNS spoofs cleared');
+        pineRefreshStatus();
+    });
+}
+
+/* ── SSL Strip ── */
+function pineToggleSslStrip(enabled) {
+    var url = enabled ? '/pineapple/ssl-strip/start' : '/pineapple/ssl-strip/stop';
+    postJSON(url, {}).then(function(data) {
+        renderOutput('pine-ssl-output', data.message || data.error || '');
+        document.getElementById('pine-ssl-label').textContent = enabled ? 'SSL Strip Active' : 'SSL Strip Disabled';
+        if (!data.ok) document.getElementById('pine-ssl-toggle').checked = !enabled;
+        pineRefreshStatus();
+    });
+}
+
+/* ── Traffic ── */
+function pineRefreshTraffic() {
+    fetchJSON('/pineapple/traffic').then(function(data) {
+        // Top domains
+        var domBody = document.getElementById('pine-top-domains');
+        var domains = data.top_domains || [];
+        if (!domains.length) {
+            domBody.innerHTML = '<tr><td colspan="2" class="empty-state">No DNS data yet.</td></tr>';
+        } else {
+            var html = '';
+            domains.slice(0, 15).forEach(function(d) {
+                html += '<tr><td style="font-size:0.82rem">' + esc(d.domain) + '</td>'
+                    + '<td>' + d.queries + '</td></tr>';
+            });
+            domBody.innerHTML = html;
+        }
+
+        // Top clients
+        var cliBody = document.getElementById('pine-top-clients');
+        var topClients = data.top_clients || [];
+        if (!topClients.length) {
+            cliBody.innerHTML = '<tr><td colspan="2" class="empty-state">No client data yet.</td></tr>';
+        } else {
+            var html2 = '';
+            topClients.slice(0, 15).forEach(function(c) {
+                var label = c.hostname ? c.hostname + ' (' + c.ip + ')' : (c.mac + ' / ' + c.ip);
+                html2 += '<tr><td style="font-size:0.82rem">' + esc(label) + '</td>'
+                    + '<td>' + _formatBytes(c.data_usage || 0) + '</td></tr>';
+            });
+            cliBody.innerHTML = html2;
+        }
+    });
+}
+
+/* ── Packet Capture ── */
+function pineStartSniff() {
+    var duration = parseInt(document.getElementById('pine-sniff-duration').value) || 60;
+    var filter = document.getElementById('pine-sniff-filter').value.trim();
+    var btn = document.getElementById('btn-sniff-start');
+    setLoading(btn, true);
+    postJSON('/pineapple/sniff/start', {duration: duration, filter: filter || null}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('pine-sniff-output', data.message || data.error || '');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function pineStopSniff() {
+    postJSON('/pineapple/sniff/stop', {}).then(function(data) {
+        renderOutput('pine-sniff-output', data.message || data.error || '');
+    });
+}
+
+/* ── Helpers ── */
+function _formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    var k = 1024;
+    var sizes = ['B', 'KB', 'MB', 'GB'];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    if (i >= sizes.length) i = sizes.length - 1;
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+/* ── Init ── */
+(function() {
+    pineRefreshIfaces();
+    pineRefreshStatus();
+})();
+</script>
+{% endblock %}

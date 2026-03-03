@@ -1,0 +1,753 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Email Security{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Email Security</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        DMARC, SPF, DKIM analysis, email header forensics, phishing detection, and mailbox inspection.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="es" data-tab="analyze" onclick="showTab('es','analyze')">Analyze</button>
+    <button class="tab" data-tab-group="es" data-tab="headers" onclick="showTab('es','headers')">Headers</button>
+    <button class="tab" data-tab-group="es" data-tab="mailbox" onclick="showTab('es','mailbox')">Mailbox</button>
+</div>
+
+<!-- ==================== ANALYZE TAB ==================== -->
+<div class="tab-content active" data-tab-group="es" data-tab="analyze">
+
+<div class="section">
+    <h2>Domain Email Security Check</h2>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>Domain</label>
+            <input type="text" id="es-domain" placeholder="example.com" onkeypress="if(event.key==='Enter')esDomainAnalyze()">
+        </div>
+        <div class="form-group" style="align-self:flex-end">
+            <button id="btn-es-domain" class="btn btn-primary" onclick="esDomainAnalyze()">Analyze Domain</button>
+        </div>
+    </div>
+</div>
+
+<!-- Results Dashboard (hidden until analysis runs) -->
+<div id="es-results" style="display:none">
+    <!-- Overall Score -->
+    <div class="section" style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="score-display" style="min-width:140px;text-align:center">
+            <div class="score-value" id="es-grade" style="font-size:3rem">--</div>
+            <div class="score-label">Email Security Grade</div>
+            <div id="es-score-num" style="font-size:0.85rem;color:var(--text-secondary);margin-top:4px">--/100</div>
+        </div>
+        <div style="flex:1;min-width:250px">
+            <table class="data-table" style="max-width:400px">
+                <thead><tr><th>Check</th><th>Status</th></tr></thead>
+                <tbody>
+                    <tr><td>SPF</td><td id="es-sum-spf">--</td></tr>
+                    <tr><td>DMARC</td><td id="es-sum-dmarc">--</td></tr>
+                    <tr><td>DKIM</td><td id="es-sum-dkim">--</td></tr>
+                    <tr><td>MX / STARTTLS</td><td id="es-sum-mx">--</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SPF Card -->
+    <div class="section">
+        <h2>SPF Record</h2>
+        <pre class="output-panel" id="es-spf-record" style="margin-bottom:12px"></pre>
+        <div id="es-spf-mechanisms"></div>
+        <div id="es-spf-findings"></div>
+    </div>
+
+    <!-- DMARC Card -->
+    <div class="section">
+        <h2>DMARC Record</h2>
+        <pre class="output-panel" id="es-dmarc-record" style="margin-bottom:12px"></pre>
+        <table class="data-table" style="max-width:500px">
+            <tbody>
+                <tr><td>Policy</td><td id="es-dmarc-policy">--</td></tr>
+                <tr><td>Subdomain Policy</td><td id="es-dmarc-sp">--</td></tr>
+                <tr><td>Percentage</td><td id="es-dmarc-pct">--</td></tr>
+                <tr><td>SPF Alignment</td><td id="es-dmarc-aspf">--</td></tr>
+                <tr><td>DKIM Alignment</td><td id="es-dmarc-adkim">--</td></tr>
+                <tr><td>Aggregate Reports (rua)</td><td id="es-dmarc-rua">--</td></tr>
+                <tr><td>Forensic Reports (ruf)</td><td id="es-dmarc-ruf">--</td></tr>
+            </tbody>
+        </table>
+        <div id="es-dmarc-findings" style="margin-top:12px"></div>
+    </div>
+
+    <!-- DKIM Card -->
+    <div class="section">
+        <h2>DKIM Selectors</h2>
+        <div id="es-dkim-selectors"></div>
+        <div id="es-dkim-findings"></div>
+    </div>
+
+    <!-- MX Card -->
+    <div class="section">
+        <h2>MX Records</h2>
+        <table class="data-table">
+            <thead><tr><th>Priority</th><th>Host</th><th>IP</th><th>STARTTLS</th><th>Banner</th></tr></thead>
+            <tbody id="es-mx-rows">
+                <tr><td colspan="5" class="empty-state">No data</td></tr>
+            </tbody>
+        </table>
+        <div id="es-mx-findings" style="margin-top:12px"></div>
+    </div>
+</div>
+
+<!-- Blacklist Check -->
+<div class="section">
+    <h2>Blacklist Check</h2>
+    <div class="form-row">
+        <div class="form-group" style="flex:1">
+            <label>IP Address or Domain</label>
+            <input type="text" id="es-bl-target" placeholder="1.2.3.4 or example.com" onkeypress="if(event.key==='Enter')esBlCheck()">
+        </div>
+        <div class="form-group" style="align-self:flex-end">
+            <button id="btn-es-bl" class="btn btn-primary" onclick="esBlCheck()">Check Blacklists</button>
+        </div>
+    </div>
+    <div id="es-bl-summary" style="margin:8px 0;display:none"></div>
+    <div style="max-height:400px;overflow-y:auto">
+        <table class="data-table">
+            <thead><tr><th>Blacklist</th><th>Status</th><th>Details</th></tr></thead>
+            <tbody id="es-bl-rows">
+                <tr><td colspan="3" class="empty-state">Enter an IP or domain above.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div><!-- /analyze tab -->
+
+<!-- ==================== HEADERS TAB ==================== -->
+<div class="tab-content" data-tab-group="es" data-tab="headers">
+
+<!-- Header Analysis -->
+<div class="section">
+    <h2>Email Header Analysis</h2>
+    <div class="form-group">
+        <label>Paste raw email headers</label>
+        <textarea id="es-raw-headers" rows="10" placeholder="Paste full email headers here..."></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-es-headers" class="btn btn-primary" onclick="esAnalyzeHeaders()">Analyze Headers</button>
+    </div>
+</div>
+
+<div id="es-hdr-results" style="display:none">
+    <!-- Authentication Results -->
+    <div class="section">
+        <h2>Authentication Results</h2>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+            <span class="badge" id="es-hdr-spf">SPF: --</span>
+            <span class="badge" id="es-hdr-dkim">DKIM: --</span>
+            <span class="badge" id="es-hdr-dmarc">DMARC: --</span>
+        </div>
+        <table class="data-table" style="max-width:600px">
+            <tbody>
+                <tr><td>From</td><td id="es-hdr-from">--</td></tr>
+                <tr><td>Return-Path</td><td id="es-hdr-rpath">--</td></tr>
+                <tr><td>Reply-To</td><td id="es-hdr-replyto">--</td></tr>
+                <tr><td>Subject</td><td id="es-hdr-subject">--</td></tr>
+                <tr><td>Date</td><td id="es-hdr-date">--</td></tr>
+                <tr><td>Originating IP</td><td id="es-hdr-origip">--</td></tr>
+                <tr><td>Message-ID</td><td id="es-hdr-msgid">--</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Received Chain -->
+    <div class="section">
+        <h2>Received Chain</h2>
+        <div id="es-hdr-chain"></div>
+    </div>
+
+    <!-- Spoofing Indicators -->
+    <div class="section" id="es-hdr-spoof-section" style="display:none">
+        <h2>Spoofing Indicators</h2>
+        <div id="es-hdr-spoofing"></div>
+    </div>
+
+    <!-- Findings -->
+    <div class="section" id="es-hdr-findings-section" style="display:none">
+        <h2>Findings</h2>
+        <div id="es-hdr-findings"></div>
+    </div>
+</div>
+
+<!-- Phishing Detection -->
+<div class="section">
+    <h2>Phishing Detection</h2>
+    <div class="form-group">
+        <label>Paste email content (body, headers, or both)</label>
+        <textarea id="es-phish-content" rows="8" placeholder="Paste the email body or full email content..."></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-es-phish" class="btn btn-primary" onclick="esDetectPhishing()">Detect Phishing</button>
+    </div>
+</div>
+
+<div id="es-phish-results" style="display:none">
+    <div class="section">
+        <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+            <div class="score-display" style="min-width:120px;text-align:center">
+                <div class="score-value" id="es-phish-score" style="font-size:2.5rem">0</div>
+                <div class="score-label">Risk Score</div>
+                <div id="es-phish-level" style="margin-top:4px;font-weight:700;font-size:0.9rem">Low</div>
+            </div>
+            <div style="flex:1;min-width:250px">
+                <h3 style="margin-bottom:8px">Findings</h3>
+                <div id="es-phish-findings"></div>
+                <div id="es-phish-urls" style="margin-top:16px"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Abuse Report -->
+<div class="section">
+    <h2>Abuse Report Generator</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Incident Type</label>
+            <select id="es-abuse-type">
+                <option value="spam">Spam</option>
+                <option value="phishing">Phishing</option>
+                <option value="malware">Malware Distribution</option>
+                <option value="spoofing">Email Spoofing</option>
+                <option value="scam">Scam / Fraud</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Source IP</label>
+            <input type="text" id="es-abuse-ip" placeholder="Offending IP address">
+        </div>
+        <div class="form-group">
+            <label>Source Domain</label>
+            <input type="text" id="es-abuse-domain" placeholder="Offending domain">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Description</label>
+        <textarea id="es-abuse-desc" rows="3" placeholder="Describe the incident..."></textarea>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Reporter Name</label>
+            <input type="text" id="es-abuse-reporter" placeholder="Your name or organization">
+        </div>
+        <div class="form-group">
+            <label>Reporter Email</label>
+            <input type="text" id="es-abuse-email" placeholder="your@email.com">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Evidence — Headers (optional)</label>
+        <textarea id="es-abuse-headers" rows="4" placeholder="Paste relevant email headers..."></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-es-abuse" class="btn btn-primary" onclick="esAbuseReport()">Generate Report</button>
+    </div>
+    <div id="es-abuse-output" style="display:none;margin-top:12px">
+        <pre class="output-panel" id="es-abuse-text" style="max-height:500px;overflow-y:auto;white-space:pre-wrap"></pre>
+        <button class="btn btn-small" style="margin-top:8px" onclick="esAbuseCopy()">Copy to Clipboard</button>
+    </div>
+</div>
+
+</div><!-- /headers tab -->
+
+<!-- ==================== MAILBOX TAB ==================== -->
+<div class="tab-content" data-tab-group="es" data-tab="mailbox">
+
+<div class="section">
+    <h2>Mailbox Connection</h2>
+    <div class="form-row">
+        <div class="form-group" style="flex:2">
+            <label>Mail Server Host</label>
+            <input type="text" id="es-mb-host" placeholder="imap.example.com">
+        </div>
+        <div class="form-group" style="max-width:130px">
+            <label>Protocol</label>
+            <select id="es-mb-proto" onchange="esMbProtoChanged()">
+                <option value="imap">IMAP</option>
+                <option value="pop3">POP3</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:100px">
+            <label>SSL</label>
+            <select id="es-mb-ssl">
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="es-mb-user" placeholder="user@example.com">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="es-mb-pass" placeholder="Password">
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Search</h2>
+    <div class="form-row">
+        <div class="form-group" style="max-width:180px">
+            <label>Folder</label>
+            <input type="text" id="es-mb-folder" value="INBOX" placeholder="INBOX">
+        </div>
+        <div class="form-group" style="flex:1">
+            <label>Query (subject, sender email, or IMAP search)</label>
+            <input type="text" id="es-mb-query" placeholder="e.g. invoice, user@sender.com, or IMAP criteria"
+                   onkeypress="if(event.key==='Enter')esMbSearch()">
+        </div>
+        <div class="form-group" style="align-self:flex-end">
+            <button id="btn-es-mb-search" class="btn btn-primary" onclick="esMbSearch()">Search</button>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Results</h2>
+    <div id="es-mb-status" style="margin-bottom:8px;font-size:0.85rem;color:var(--text-secondary)"></div>
+    <div style="max-height:500px;overflow-y:auto">
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>From</th><th>Subject</th><th>Size</th><th>Actions</th></tr></thead>
+            <tbody id="es-mb-rows">
+                <tr><td colspan="5" class="empty-state">Connect and search to see results.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Email Viewer Modal -->
+<div id="es-mb-viewer" style="display:none" class="section">
+    <h2>Email Viewer
+        <button class="btn btn-small" style="float:right" onclick="document.getElementById('es-mb-viewer').style.display='none'">Close</button>
+    </h2>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-small" onclick="esViewerTab('headers')">Headers</button>
+        <button class="btn btn-small" onclick="esViewerTab('body')">Body</button>
+        <button class="btn btn-small" onclick="esViewerTab('attachments')">Attachments</button>
+    </div>
+    <div id="es-viewer-headers">
+        <pre class="output-panel" id="es-viewer-headers-text" style="max-height:400px;overflow-y:auto;white-space:pre-wrap"></pre>
+    </div>
+    <div id="es-viewer-body" style="display:none">
+        <pre class="output-panel" id="es-viewer-body-text" style="max-height:400px;overflow-y:auto;white-space:pre-wrap"></pre>
+    </div>
+    <div id="es-viewer-attachments" style="display:none">
+        <table class="data-table">
+            <thead><tr><th>Filename</th><th>Type</th><th>Size</th></tr></thead>
+            <tbody id="es-viewer-att-rows">
+                <tr><td colspan="3" class="empty-state">No attachments</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div><!-- /mailbox tab -->
+
+<script>
+/* ── helpers ── */
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function setLoading(btn,on){if(!btn)return;btn.disabled=on;btn.dataset.origText=btn.dataset.origText||btn.textContent;btn.textContent=on?'Working...':btn.dataset.origText;}
+
+function statusBadge(s){
+    var colors={pass:'var(--success,#22c55e)',warn:'#eab308',fail:'var(--danger,#ef4444)',none:'var(--text-muted)'};
+    var labels={pass:'PASS',warn:'WARN',fail:'FAIL',none:'N/A'};
+    var c=colors[s]||colors.none, l=labels[s]||s;
+    return '<span style="display:inline-block;padding:2px 10px;border-radius:4px;font-size:0.78rem;font-weight:700;background:'+c+'22;color:'+c+';border:1px solid '+c+'44">'+l+'</span>';
+}
+
+function renderFindings(containerId,findings){
+    var el=document.getElementById(containerId);if(!el)return;
+    if(!findings||!findings.length){el.innerHTML='';return;}
+    var html='';
+    findings.forEach(function(f){
+        var color=f.level==='pass'?'var(--success,#22c55e)':f.level==='warn'?'#eab308':'var(--danger,#ef4444)';
+        var icon=f.level==='pass'?'[+]':f.level==='warn'?'[!]':'[X]';
+        html+='<div style="padding:4px 0;color:'+color+';font-size:0.85rem">'+icon+' '+esc(f.message||f.detail||'')+'</div>';
+    });
+    el.innerHTML=html;
+}
+
+function fmtBytes(b){
+    if(!b||b<1)return '--';
+    if(b<1024)return b+' B';
+    if(b<1048576)return (b/1024).toFixed(1)+' KB';
+    return (b/1048576).toFixed(1)+' MB';
+}
+
+/* ---- DOMAIN ANALYSIS ---- */
+function esDomainAnalyze(){
+    var domain=document.getElementById('es-domain').value.trim();
+    if(!domain)return;
+    var btn=document.getElementById('btn-es-domain');
+    setLoading(btn,true);
+
+    postJSON('/email-sec/domain',{domain:domain}).then(function(d){
+        setLoading(btn,false);
+        if(d.error){alert(d.error);return;}
+        document.getElementById('es-results').style.display='';
+
+        /* Grade & score */
+        var gradeEl=document.getElementById('es-grade');
+        gradeEl.textContent=d.grade||'?';
+        var gc={A:'#22c55e',B:'#86efac',C:'#eab308',D:'#f97316',F:'#ef4444'};
+        gradeEl.style.color=gc[d.grade]||'var(--text-primary)';
+        document.getElementById('es-score-num').textContent=(d.score||0)+'/100';
+
+        /* Summary row */
+        document.getElementById('es-sum-spf').innerHTML=statusBadge(d.summary.spf_status);
+        document.getElementById('es-sum-dmarc').innerHTML=statusBadge(d.summary.dmarc_status);
+        document.getElementById('es-sum-dkim').innerHTML=statusBadge(d.summary.dkim_status);
+        document.getElementById('es-sum-mx').innerHTML=statusBadge(d.summary.mx_status);
+
+        /* SPF */
+        document.getElementById('es-spf-record').textContent=d.spf.record||'(none)';
+        var mechHtml='';
+        if(d.spf.mechanisms&&d.spf.mechanisms.length){
+            mechHtml='<table class="data-table" style="margin-bottom:8px"><thead><tr><th>Type</th><th>Value</th><th>Qualifier</th></tr></thead><tbody>';
+            d.spf.mechanisms.forEach(function(m){
+                var qLabels={'+':'Pass','-':'Fail','~':'SoftFail','?':'Neutral'};
+                mechHtml+='<tr><td>'+esc(m.type)+'</td><td>'+esc(m.value)+'</td><td>'+esc(qLabels[m.qualifier]||m.qualifier)+'</td></tr>';
+            });
+            mechHtml+='</tbody></table>';
+            mechHtml+='<div style="font-size:0.82rem;color:var(--text-secondary)">DNS lookups: '+d.spf.dns_lookups+'/10</div>';
+        }
+        document.getElementById('es-spf-mechanisms').innerHTML=mechHtml;
+        renderFindings('es-spf-findings',d.spf.findings);
+
+        /* DMARC */
+        document.getElementById('es-dmarc-record').textContent=d.dmarc.record||'(none)';
+        document.getElementById('es-dmarc-policy').textContent=d.dmarc.policy||'none';
+        document.getElementById('es-dmarc-sp').textContent=d.dmarc.subdomain_policy||'(inherits domain)';
+        document.getElementById('es-dmarc-pct').textContent=(d.dmarc.pct!=null?d.dmarc.pct+'%':'--');
+        document.getElementById('es-dmarc-aspf').textContent=d.dmarc.aspf==='s'?'strict':'relaxed';
+        document.getElementById('es-dmarc-adkim').textContent=d.dmarc.adkim==='s'?'strict':'relaxed';
+        document.getElementById('es-dmarc-rua').textContent=d.dmarc.rua&&d.dmarc.rua.length?d.dmarc.rua.join(', '):'(none)';
+        document.getElementById('es-dmarc-ruf').textContent=d.dmarc.ruf&&d.dmarc.ruf.length?d.dmarc.ruf.join(', '):'(none)';
+        renderFindings('es-dmarc-findings',d.dmarc.findings);
+
+        /* DKIM */
+        var dkimHtml='';
+        if(d.dkim.found_selectors&&d.dkim.found_selectors.length){
+            dkimHtml='<table class="data-table"><thead><tr><th>Selector</th><th>Key Type</th><th>Status</th></tr></thead><tbody>';
+            d.dkim.found_selectors.forEach(function(s){
+                var st=s.revoked?'<span style="color:var(--danger)">Revoked</span>':'<span style="color:var(--success,#22c55e)">Active</span>';
+                dkimHtml+='<tr><td>'+esc(s.selector)+'</td><td>'+esc(s.key_type||'rsa')+'</td><td>'+st+'</td></tr>';
+            });
+            dkimHtml+='</tbody></table>';
+        } else {
+            dkimHtml='<div class="empty-state">No DKIM selectors found among common names.</div>';
+        }
+        document.getElementById('es-dkim-selectors').innerHTML=dkimHtml;
+        renderFindings('es-dkim-findings',d.dkim.findings);
+
+        /* MX */
+        var mxBody=document.getElementById('es-mx-rows');
+        if(d.mx.mx_records&&d.mx.mx_records.length){
+            var rows='';
+            d.mx.mx_records.forEach(function(m){
+                var tlsIcon=m.starttls?'<span style="color:var(--success,#22c55e);font-weight:700">Yes</span>':'<span style="color:var(--danger)">No</span>';
+                if(m.starttls_error)tlsIcon+=' <span style="font-size:0.75rem;color:var(--text-muted)">('+esc(m.starttls_error)+')</span>';
+                rows+='<tr><td>'+m.priority+'</td><td>'+esc(m.host)+'</td><td>'+esc(m.ip||'--')+'</td><td>'+tlsIcon+'</td><td style="font-size:0.78rem;color:var(--text-muted)">'+esc(m.banner||'').substring(0,60)+'</td></tr>';
+            });
+            mxBody.innerHTML=rows;
+        } else {
+            mxBody.innerHTML='<tr><td colspan="5" class="empty-state">No MX records found</td></tr>';
+        }
+        renderFindings('es-mx-findings',d.mx.findings);
+
+    }).catch(function(e){setLoading(btn,false);alert('Error: '+e);});
+}
+
+/* ---- BLACKLIST CHECK ---- */
+function esBlCheck(){
+    var target=document.getElementById('es-bl-target').value.trim();
+    if(!target)return;
+    var btn=document.getElementById('btn-es-bl');
+    setLoading(btn,true);
+    document.getElementById('es-bl-summary').style.display='none';
+
+    postJSON('/email-sec/blacklist',{ip_or_domain:target}).then(function(d){
+        setLoading(btn,false);
+        if(d.error){document.getElementById('es-bl-rows').innerHTML='<tr><td colspan="3" style="color:var(--danger)">'+esc(d.error)+'</td></tr>';return;}
+
+        var sum=document.getElementById('es-bl-summary');
+        sum.style.display='';
+        if(d.clean){
+            sum.innerHTML='<span style="color:var(--success,#22c55e);font-weight:700">CLEAN</span> — not listed on any of '+d.total_checked+' blacklists (IP: '+esc(d.ip)+')';
+        } else {
+            sum.innerHTML='<span style="color:var(--danger);font-weight:700">LISTED</span> on '+d.listed_count+'/'+d.total_checked+' blacklists (IP: '+esc(d.ip)+')';
+        }
+
+        var rows='';
+        d.results.forEach(function(r){
+            var st=r.listed?'<span style="color:var(--danger);font-weight:700">LISTED</span>':'<span style="color:var(--success,#22c55e)">Clean</span>';
+            rows+='<tr><td>'+esc(r.blacklist)+'</td><td>'+st+'</td><td style="font-size:0.82rem">'+esc(r.details)+'</td></tr>';
+        });
+        document.getElementById('es-bl-rows').innerHTML=rows;
+    }).catch(function(e){setLoading(btn,false);alert('Error: '+e);});
+}
+
+/* ---- HEADER ANALYSIS ---- */
+function esAnalyzeHeaders(){
+    var raw=document.getElementById('es-raw-headers').value.trim();
+    if(!raw){alert('Please paste email headers');return;}
+    var btn=document.getElementById('btn-es-headers');
+    setLoading(btn,true);
+
+    postJSON('/email-sec/headers',{raw_headers:raw}).then(function(d){
+        setLoading(btn,false);
+        if(d.error){alert(d.error);return;}
+        document.getElementById('es-hdr-results').style.display='';
+
+        /* Auth badges */
+        var authColors={pass:'var(--success,#22c55e)',fail:'var(--danger)',none:'var(--text-muted)'};
+        ['spf','dkim','dmarc'].forEach(function(k){
+            var v=d.authentication[k]||'none';
+            var el=document.getElementById('es-hdr-'+k);
+            el.textContent=k.toUpperCase()+': '+v.toUpperCase();
+            el.style.background=(authColors[v]||authColors.none)+'22';
+            el.style.color=authColors[v]||authColors.none;
+            el.style.border='1px solid '+(authColors[v]||authColors.none)+'44';
+            el.style.padding='4px 14px';el.style.borderRadius='4px';el.style.fontWeight='700';el.style.fontSize='0.82rem';
+        });
+
+        document.getElementById('es-hdr-from').textContent=d.from||'--';
+        document.getElementById('es-hdr-rpath').textContent=d.return_path||'--';
+        document.getElementById('es-hdr-replyto').textContent=d.reply_to||'--';
+        document.getElementById('es-hdr-subject').textContent=d.subject||'--';
+        document.getElementById('es-hdr-date').textContent=d.date||'--';
+        document.getElementById('es-hdr-origip').textContent=d.originating_ip||'Unknown';
+        document.getElementById('es-hdr-msgid').textContent=d.message_id||'--';
+
+        /* Received chain */
+        var chainEl=document.getElementById('es-hdr-chain');
+        if(d.received_chain&&d.received_chain.length){
+            var html='<div style="position:relative;padding-left:24px">';
+            d.received_chain.forEach(function(hop,i){
+                var isLast=i===d.received_chain.length-1;
+                html+='<div style="position:relative;padding:8px 0 12px 0;border-left:2px solid var(--border);margin-left:6px;padding-left:20px">';
+                html+='<div style="position:absolute;left:-7px;top:10px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--bg-card)"></div>';
+                html+='<div style="font-weight:700;font-size:0.85rem;color:var(--text-primary)">Hop '+hop.hop+'</div>';
+                if(hop.from)html+='<div style="font-size:0.82rem"><span style="color:var(--text-muted)">from</span> '+esc(hop.from)+'</div>';
+                if(hop.by)html+='<div style="font-size:0.82rem"><span style="color:var(--text-muted)">by</span> '+esc(hop.by)+'</div>';
+                if(hop.ip)html+='<div style="font-size:0.82rem"><span style="color:var(--text-muted)">IP</span> <strong>'+esc(hop.ip)+'</strong></div>';
+                if(hop.timestamp)html+='<div style="font-size:0.75rem;color:var(--text-muted)">'+esc(hop.timestamp)+'</div>';
+                html+='</div>';
+            });
+            html+='</div>';
+            chainEl.innerHTML=html;
+        } else {
+            chainEl.innerHTML='<div class="empty-state">No Received headers found.</div>';
+        }
+
+        /* Spoofing */
+        var spoofSect=document.getElementById('es-hdr-spoof-section');
+        var spoofEl=document.getElementById('es-hdr-spoofing');
+        if(d.spoofing_indicators&&d.spoofing_indicators.length){
+            spoofSect.style.display='';
+            var sh='';
+            d.spoofing_indicators.forEach(function(s){
+                sh+='<div style="padding:6px 10px;margin-bottom:6px;background:var(--danger)11;border:1px solid var(--danger)33;border-radius:var(--radius);font-size:0.85rem">';
+                sh+='<strong style="color:var(--danger)">[!] '+esc(s.indicator)+'</strong><br>';
+                sh+='<span style="color:var(--text-secondary)">'+esc(s.detail)+'</span></div>';
+            });
+            spoofEl.innerHTML=sh;
+        } else {
+            spoofSect.style.display='none';
+        }
+
+        /* Findings */
+        var findSect=document.getElementById('es-hdr-findings-section');
+        if(d.findings&&d.findings.length){
+            findSect.style.display='';
+            renderFindings('es-hdr-findings',d.findings);
+        } else {
+            findSect.style.display='none';
+        }
+    }).catch(function(e){setLoading(btn,false);alert('Error: '+e);});
+}
+
+/* ---- PHISHING DETECTION ---- */
+function esDetectPhishing(){
+    var content=document.getElementById('es-phish-content').value.trim();
+    if(!content){alert('Please paste email content');return;}
+    var btn=document.getElementById('btn-es-phish');
+    setLoading(btn,true);
+
+    postJSON('/email-sec/phishing',{email_content:content}).then(function(d){
+        setLoading(btn,false);
+        if(d.error){alert(d.error);return;}
+        document.getElementById('es-phish-results').style.display='';
+
+        var scoreEl=document.getElementById('es-phish-score');
+        scoreEl.textContent=d.risk_score;
+        var levelEl=document.getElementById('es-phish-level');
+        levelEl.textContent=d.risk_level.toUpperCase();
+        var riskColors={low:'var(--success,#22c55e)',medium:'#eab308',high:'#f97316',critical:'var(--danger)'};
+        var rc=riskColors[d.risk_level]||riskColors.low;
+        scoreEl.style.color=rc;
+        levelEl.style.color=rc;
+
+        var fHtml='';
+        if(d.findings&&d.findings.length){
+            d.findings.forEach(function(f){
+                var sevC=f.severity==='high'?'var(--danger)':f.severity==='medium'?'#eab308':'var(--text-secondary)';
+                fHtml+='<div style="padding:6px 10px;margin-bottom:6px;background:var(--bg-input);border-radius:var(--radius);font-size:0.85rem">';
+                fHtml+='<strong style="color:'+sevC+'">'+esc(f.category).replace(/_/g,' ')+'</strong>';
+                fHtml+=' <span style="font-size:0.75rem;color:var(--text-muted)">(weight: '+f.weight+')</span><br>';
+                fHtml+='<span style="color:var(--text-secondary)">Matches: '+esc(f.matches.join(', '))+'</span></div>';
+            });
+        } else {
+            fHtml='<div style="color:var(--success,#22c55e);font-size:0.85rem">No phishing indicators detected.</div>';
+        }
+        document.getElementById('es-phish-findings').innerHTML=fHtml;
+
+        var uHtml='';
+        if(d.suspicious_urls&&d.suspicious_urls.length){
+            uHtml='<h3 style="margin-bottom:8px;font-size:0.9rem">Suspicious URLs</h3>';
+            d.suspicious_urls.forEach(function(u){
+                uHtml+='<div style="padding:6px 10px;margin-bottom:6px;background:var(--danger)11;border:1px solid var(--danger)33;border-radius:var(--radius);font-size:0.82rem">';
+                uHtml+='<div style="word-break:break-all;color:var(--danger)">'+esc(u.url)+'</div>';
+                u.reasons.forEach(function(r){uHtml+='<div style="color:var(--text-secondary);padding-left:12px">- '+esc(r)+'</div>';});
+                uHtml+='</div>';
+            });
+        }
+        document.getElementById('es-phish-urls').innerHTML=uHtml;
+    }).catch(function(e){setLoading(btn,false);alert('Error: '+e);});
+}
+
+/* ---- ABUSE REPORT ---- */
+function esAbuseReport(){
+    var btn=document.getElementById('btn-es-abuse');
+    setLoading(btn,true);
+
+    var data={
+        type:document.getElementById('es-abuse-type').value,
+        source_ip:document.getElementById('es-abuse-ip').value.trim(),
+        source_domain:document.getElementById('es-abuse-domain').value.trim(),
+        description:document.getElementById('es-abuse-desc').value.trim(),
+        reporter_name:document.getElementById('es-abuse-reporter').value.trim(),
+        reporter_email:document.getElementById('es-abuse-email').value.trim(),
+        headers:document.getElementById('es-abuse-headers').value.trim()
+    };
+
+    postJSON('/email-sec/abuse-report',{incident_data:data}).then(function(d){
+        setLoading(btn,false);
+        if(d.error){alert(d.error);return;}
+        document.getElementById('es-abuse-output').style.display='';
+        document.getElementById('es-abuse-text').textContent=d.report_text;
+    }).catch(function(e){setLoading(btn,false);alert('Error: '+e);});
+}
+function esAbuseCopy(){
+    var text=document.getElementById('es-abuse-text').textContent;
+    navigator.clipboard.writeText(text).then(function(){alert('Copied to clipboard');});
+}
+
+/* ---- MAILBOX ---- */
+var _esMbConn={};
+
+function esMbProtoChanged(){
+    /* Hint: change placeholder port */
+}
+
+function esMbSearch(){
+    var host=document.getElementById('es-mb-host').value.trim();
+    var user=document.getElementById('es-mb-user').value.trim();
+    var pass=document.getElementById('es-mb-pass').value;
+    if(!host||!user||!pass){alert('Host, username, and password are required');return;}
+
+    _esMbConn={host:host,username:user,password:pass,
+               protocol:document.getElementById('es-mb-proto').value,
+               ssl:document.getElementById('es-mb-ssl').value==='true'};
+
+    var btn=document.getElementById('btn-es-mb-search');
+    setLoading(btn,true);
+    document.getElementById('es-mb-status').textContent='Connecting to '+host+'...';
+
+    postJSON('/email-sec/mailbox/search',{
+        host:host, username:user, password:pass,
+        protocol:_esMbConn.protocol,
+        query:document.getElementById('es-mb-query').value.trim()||null,
+        folder:document.getElementById('es-mb-folder').value.trim()||'INBOX',
+        ssl:_esMbConn.ssl
+    }).then(function(d){
+        setLoading(btn,false);
+        if(d.error){
+            document.getElementById('es-mb-status').innerHTML='<span style="color:var(--danger)">Error: '+esc(d.error)+'</span>';
+            document.getElementById('es-mb-rows').innerHTML='<tr><td colspan="5" class="empty-state">Connection failed.</td></tr>';
+            return;
+        }
+        document.getElementById('es-mb-status').textContent='Found '+d.total+' messages (showing '+((d.messages||[]).length)+')';
+        var rows='';
+        if(d.messages&&d.messages.length){
+            d.messages.reverse().forEach(function(m){
+                rows+='<tr>';
+                rows+='<td style="white-space:nowrap;font-size:0.82rem">'+esc((m.date||'').substring(0,22))+'</td>';
+                rows+='<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:0.82rem">'+esc(m.from)+'</td>';
+                rows+='<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis">'+esc(m.subject)+'</td>';
+                rows+='<td style="font-size:0.82rem">'+fmtBytes(m.size)+'</td>';
+                rows+='<td><button class="btn btn-small" onclick="esMbView(\''+esc(m.id)+'\')">View</button></td>';
+                rows+='</tr>';
+            });
+        } else {
+            rows='<tr><td colspan="5" class="empty-state">No messages found.</td></tr>';
+        }
+        document.getElementById('es-mb-rows').innerHTML=rows;
+    }).catch(function(e){setLoading(btn,false);document.getElementById('es-mb-status').innerHTML='<span style="color:var(--danger)">'+esc(String(e))+'</span>';});
+}
+
+function esMbView(msgId){
+    if(!_esMbConn.host){alert('Not connected');return;}
+    document.getElementById('es-mb-viewer').style.display='';
+    document.getElementById('es-viewer-headers-text').textContent='Loading...';
+    document.getElementById('es-viewer-body-text').textContent='';
+    document.getElementById('es-viewer-att-rows').innerHTML='<tr><td colspan="3">Loading...</td></tr>';
+    esViewerTab('headers');
+
+    postJSON('/email-sec/mailbox/fetch',{
+        host:_esMbConn.host, username:_esMbConn.username,
+        password:_esMbConn.password, message_id:msgId,
+        protocol:_esMbConn.protocol, ssl:_esMbConn.ssl
+    }).then(function(d){
+        if(d.error){
+            document.getElementById('es-viewer-headers-text').textContent='Error: '+d.error;
+            return;
+        }
+        document.getElementById('es-viewer-headers-text').textContent=d.raw_headers||'(no headers)';
+        document.getElementById('es-viewer-body-text').textContent=d.body||'(empty body)';
+
+        var attRows='';
+        if(d.attachments&&d.attachments.length){
+            d.attachments.forEach(function(a){
+                attRows+='<tr><td>'+esc(a.filename)+'</td><td>'+esc(a.content_type)+'</td><td>'+fmtBytes(a.size)+'</td></tr>';
+            });
+        } else {
+            attRows='<tr><td colspan="3" class="empty-state">No attachments</td></tr>';
+        }
+        document.getElementById('es-viewer-att-rows').innerHTML=attRows;
+    }).catch(function(e){document.getElementById('es-viewer-headers-text').textContent='Error: '+e;});
+}
+
+function esViewerTab(tab){
+    ['headers','body','attachments'].forEach(function(t){
+        var el=document.getElementById('es-viewer-'+t);
+        if(el)el.style.display=t===tab?'':'none';
+    });
+}
+</script>
+{% endblock %}

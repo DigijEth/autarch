@@ -1,0 +1,900 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Starlink Hacking{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 style="color:#ef4444">Starlink Terminal Security Analysis</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        gRPC exploitation, firmware analysis, network attacks, and RF analysis for Starlink user terminals.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="sl" data-tab="discovery" onclick="showTab('sl','discovery')">Discovery &amp; Status</button>
+    <button class="tab" data-tab-group="sl" data-tab="grpc" onclick="showTab('sl','grpc')">gRPC Control</button>
+    <button class="tab" data-tab-group="sl" data-tab="network" onclick="showTab('sl','network')">Network Attack</button>
+    <button class="tab" data-tab-group="sl" data-tab="rffirmware" onclick="showTab('sl','rffirmware')">RF &amp; Firmware</button>
+</div>
+
+<!-- ==================== DISCOVERY & STATUS TAB ==================== -->
+<div class="tab-content active" data-tab-group="sl" data-tab="discovery">
+
+<!-- Discover Dish -->
+<div class="section">
+    <h2>Discover Dish</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Dish IP</label>
+            <input type="text" id="sl-dish-ip" class="form-control" value="192.168.100.1" style="width:200px">
+        </div>
+        <button id="btn-sl-discover" class="btn btn-primary" onclick="slDiscover()">Discover</button>
+        <button class="btn" onclick="slModuleStatus()" title="Module status">Status</button>
+    </div>
+    <div id="sl-discover-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Dish Status -->
+<div class="section">
+    <h2>Dish Status</h2>
+    <div style="margin-bottom:8px">
+        <button id="btn-sl-status" class="btn btn-primary" onclick="slGetStatus()">Get Status</button>
+        <button class="btn" onclick="slGetInfo()">Device Info</button>
+    </div>
+    <div id="sl-status-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Network Info -->
+<div class="section">
+    <h2>Network &amp; WiFi Clients</h2>
+    <button id="btn-sl-network" class="btn btn-primary" onclick="slGetNetwork()">Get Network Info</button>
+    <div id="sl-network-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Port Scan -->
+<div class="section">
+    <h2>Port Scan</h2>
+    <button id="btn-sl-portscan" class="btn btn-primary" onclick="slPortScan()">Scan Dish Ports</button>
+    <span id="sl-portscan-status" style="margin-left:12px;font-size:0.85rem;color:var(--text-secondary)"></span>
+    <div id="sl-portscan-result" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<!-- ==================== gRPC CONTROL TAB ==================== -->
+<div class="tab-content" data-tab-group="sl" data-tab="grpc">
+
+<!-- Enumerate Methods -->
+<div class="section">
+    <h2>Enumerate gRPC Methods</h2>
+    <button id="btn-sl-grpc-enum" class="btn btn-primary" onclick="slGrpcEnum()">Enumerate Methods</button>
+    <div id="sl-grpc-enum-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Quick Actions -->
+<div class="section">
+    <h2>Quick Actions</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Send commands to the Starlink dish via gRPC. Use with caution on production hardware.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" style="border-color:#f97316;color:#f97316" onclick="slGrpcStow()">Stow Dish</button>
+        <button class="btn" style="border-color:#22c55e;color:#22c55e" onclick="slGrpcUnstow()">Unstow Dish</button>
+        <button class="btn" style="border-color:#ef4444;color:#ef4444" onclick="slGrpcReboot()">Reboot Dish</button>
+        <button class="btn" style="border-color:#ef4444;color:#ef4444;opacity:0.7" onclick="slGrpcFactoryReset()">Factory Reset</button>
+    </div>
+    <div id="sl-grpc-action-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Custom gRPC Call -->
+<div class="section">
+    <h2>Custom gRPC Call</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;max-width:800px">
+        <div class="form-group" style="flex:1;min-width:200px;margin:0">
+            <label>Method</label>
+            <input type="text" id="sl-grpc-method" class="form-control" placeholder="e.g. get_status">
+        </div>
+        <button class="btn btn-primary" onclick="slGrpcCall()">Execute</button>
+    </div>
+    <div class="form-group" style="margin-top:8px;max-width:800px">
+        <label>Parameters (JSON)</label>
+        <textarea id="sl-grpc-params" class="form-control" rows="3" placeholder='{"getStatus": {}}'
+            style="font-family:monospace;font-size:0.85rem"></textarea>
+    </div>
+    <div id="sl-grpc-call-result" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<!-- ==================== NETWORK ATTACK TAB ==================== -->
+<div class="tab-content" data-tab-group="sl" data-tab="network">
+
+<!-- Traffic Interception -->
+<div class="section">
+    <h2>Traffic Interception (ARP Spoof)</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        ARP spoofing between dish and gateway to intercept traffic. Requires arpspoof or ettercap.
+    </p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Gateway IP</label>
+            <input type="text" id="sl-intercept-gateway" class="form-control" value="192.168.1.1" style="width:180px">
+        </div>
+        <div class="form-group" style="margin:0">
+            <label>Interface (optional)</label>
+            <input type="text" id="sl-intercept-iface" class="form-control" placeholder="auto" style="width:130px">
+        </div>
+        <button class="btn btn-primary" onclick="slInterceptStart()">Start Intercept</button>
+        <button class="btn" style="border-color:#ef4444;color:#ef4444" onclick="slInterceptStop()">Stop</button>
+    </div>
+    <div id="sl-intercept-result" style="margin-top:12px"></div>
+</div>
+
+<!-- DNS Spoofing -->
+<div class="section">
+    <h2>DNS Spoofing</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Redirect DNS queries for a domain to a controlled IP. Requires dnsspoof or ettercap.
+    </p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Domain</label>
+            <input type="text" id="sl-dns-domain" class="form-control" placeholder="example.com" style="width:200px">
+        </div>
+        <div class="form-group" style="margin:0">
+            <label>Spoof IP</label>
+            <input type="text" id="sl-dns-ip" class="form-control" placeholder="10.0.0.1" style="width:160px">
+        </div>
+        <button class="btn btn-primary" onclick="slDnsStart()">Start DNS Spoof</button>
+        <button class="btn" style="border-color:#ef4444;color:#ef4444" onclick="slDnsStop()">Stop</button>
+    </div>
+    <div id="sl-dns-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Client Deauth -->
+<div class="section">
+    <h2>WiFi Client Deauthentication</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Send deauth packets to disconnect WiFi clients from the Starlink router. Requires aircrack-ng or mdk4.
+    </p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Target MAC (empty=broadcast)</label>
+            <input type="text" id="sl-deauth-mac" class="form-control" placeholder="AA:BB:CC:DD:EE:FF" style="width:200px">
+        </div>
+        <div class="form-group" style="margin:0">
+            <label>Wireless Interface</label>
+            <input type="text" id="sl-deauth-iface" class="form-control" placeholder="wlan0mon" style="width:140px">
+        </div>
+        <button class="btn btn-primary" onclick="slDeauth()">Send Deauth</button>
+    </div>
+    <div id="sl-deauth-result" style="margin-top:12px"></div>
+</div>
+
+<!-- MITM -->
+<div class="section">
+    <h2>MITM WiFi Clients</h2>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Interface (optional)</label>
+            <input type="text" id="sl-mitm-iface" class="form-control" placeholder="auto" style="width:140px">
+        </div>
+        <button class="btn btn-primary" onclick="slMitm()">Start MITM</button>
+    </div>
+    <div id="sl-mitm-result" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<!-- ==================== RF & FIRMWARE TAB ==================== -->
+<div class="tab-content" data-tab-group="sl" data-tab="rffirmware">
+
+<!-- Firmware Version Check -->
+<div class="section">
+    <h2>Firmware Version Check</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Check the running firmware version against known vulnerable versions.
+    </p>
+    <button id="btn-sl-fw-check" class="btn btn-primary" onclick="slFirmwareCheck()">Check Firmware</button>
+    <div id="sl-fw-check-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Firmware Upload & Analyze -->
+<div class="section">
+    <h2>Firmware Analysis</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Upload a firmware image for signature scanning, entropy analysis, and string extraction.
+    </p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Firmware File</label>
+            <input type="file" id="sl-fw-file" class="form-control" style="max-width:350px">
+        </div>
+        <button class="btn btn-primary" onclick="slFirmwareAnalyze()">Analyze</button>
+    </div>
+    <div id="sl-fw-analyze-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Debug Interfaces -->
+<div class="section">
+    <h2>Debug Interface Scan</h2>
+    <button class="btn btn-primary" onclick="slDebugInterfaces()">Scan Debug Interfaces</button>
+    <div id="sl-debug-result" style="margin-top:12px"></div>
+</div>
+
+<!-- RF Downlink Analysis -->
+<div class="section">
+    <h2>RF Downlink Analysis</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Ku-band downlink analysis (10.7-12.7 GHz). Requires SDR hardware (HackRF or RTL-SDR with LNB).
+    </p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin:0">
+            <label>Device</label>
+            <select id="sl-rf-device" class="form-control" style="width:130px">
+                <option value="hackrf">HackRF</option>
+                <option value="rtl">RTL-SDR</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0">
+            <label>Duration (s)</label>
+            <input type="number" id="sl-rf-duration" class="form-control" value="30" min="5" max="300" style="width:100px">
+        </div>
+        <button class="btn btn-primary" onclick="slRfDownlink()">Analyze Downlink</button>
+    </div>
+    <div id="sl-rf-downlink-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Jamming Detection -->
+<div class="section">
+    <h2>Jamming Detection</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:10px">
+        Check for signal jamming indicators by analyzing dish diagnostics (drop rate, latency, throughput, SNR).
+    </p>
+    <button class="btn btn-primary" onclick="slDetectJamming()">Detect Jamming</button>
+    <div id="sl-jamming-result" style="margin-top:12px"></div>
+</div>
+
+<!-- Known CVEs -->
+<div class="section">
+    <h2>Known Vulnerabilities</h2>
+    <button class="btn btn-primary" onclick="slLoadCves()">Load CVE Database</button>
+    <button class="btn" onclick="slExportResults()" style="margin-left:8px">Export All Results</button>
+    <div id="sl-cve-result" style="margin-top:12px"></div>
+</div>
+
+</div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+/* ── helpers (from app.js) ── */
+/* postJSON, fetchJSON, esc, setLoading, showTab are globally available */
+
+function slShowResult(elId, html) {
+    document.getElementById(elId).innerHTML = html;
+}
+
+function slCardHtml(title, rows) {
+    let h = '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px">';
+    if (title) h += '<h3 style="margin:0 0 8px 0;font-size:0.95rem;color:#f97316">' + esc(title) + '</h3>';
+    for (const [k, v] of rows) {
+        h += '<div style="display:flex;gap:8px;margin-bottom:3px;font-size:0.85rem">';
+        h += '<span style="color:var(--text-secondary);min-width:160px">' + esc(k) + '</span>';
+        h += '<span style="color:var(--text-primary);word-break:break-all">' + esc(String(v)) + '</span>';
+        h += '</div>';
+    }
+    h += '</div>';
+    return h;
+}
+
+function slTableHtml(headers, rows) {
+    let h = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:8px">';
+    h += '<thead><tr>';
+    for (const hdr of headers) h += '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text-secondary)">' + esc(hdr) + '</th>';
+    h += '</tr></thead><tbody>';
+    for (const row of rows) {
+        h += '<tr>';
+        for (const cell of row) h += '<td style="padding:5px 8px;border-bottom:1px solid rgba(51,54,80,0.4)">' + esc(String(cell)) + '</td>';
+        h += '</tr>';
+    }
+    h += '</tbody></table>';
+    return h;
+}
+
+function slAlert(msg, type) {
+    const color = type === 'error' ? '#ef4444' : type === 'warning' ? '#f97316' : '#22c55e';
+    return '<div style="padding:8px 12px;border-left:3px solid ' + color + ';background:var(--bg-card);border-radius:var(--radius);font-size:0.85rem;margin-bottom:8px;color:' + color + '">' + esc(msg) + '</div>';
+}
+
+function slJsonBlock(data) {
+    return '<pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:0.8rem;overflow-x:auto;max-height:400px;color:var(--text-primary)">' + esc(JSON.stringify(data, null, 2)) + '</pre>';
+}
+
+/* ── Discovery & Status ── */
+
+async function slDiscover() {
+    const ip = document.getElementById('sl-dish-ip').value.trim();
+    setLoading('btn-sl-discover', true);
+    slShowResult('sl-discover-result', '<span style="color:var(--text-muted)">Discovering...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/discover', {ip: ip || undefined});
+        let h = '';
+        if (r.found) {
+            h += slAlert('Dish found at ' + (r.target || ip), 'success');
+            h += slCardHtml('Discovery Results', [
+                ['Target IP', r.target],
+                ['gRPC Port (9200)', r.grpc_available ? 'OPEN' : 'closed'],
+                ['HTTP Port (80)', r.http_available ? 'OPEN' : 'closed'],
+                ['Firmware', r.firmware || 'unknown'],
+                ['Hardware', r.hardware || 'unknown'],
+                ['Extra Open Ports', (r.details?.extra_open_ports || []).join(', ') || 'none'],
+            ]);
+        } else {
+            h += slAlert(r.error || 'Dish not found', 'error');
+        }
+        slShowResult('sl-discover-result', h);
+    } catch (e) {
+        slShowResult('sl-discover-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+    setLoading('btn-sl-discover', false);
+}
+
+async function slGetStatus() {
+    setLoading('btn-sl-status', true);
+    slShowResult('sl-status-result', '<span style="color:var(--text-muted)">Loading...</span>');
+    try {
+        const r = await fetchJSON('/starlink-hack/dish-status');
+        let h = '';
+        if (r.ok) {
+            h += slCardHtml('Dish Status', [
+                ['State', r.device_state],
+                ['Uptime', r.uptime_human],
+                ['Firmware', r.software_version],
+                ['Hardware', r.hardware_version],
+                ['Alerts', r.alert_count + ' active' + (r.alerts?.length ? ': ' + r.alerts.join(', ') : '')],
+                ['Obstruction', (r.obstruction?.fraction_obstructed || 0) + '%'],
+                ['Downlink', (r.downlink_throughput_bps || 0).toLocaleString() + ' bps'],
+                ['Uplink', (r.uplink_throughput_bps || 0).toLocaleString() + ' bps'],
+                ['Latency', (r.pop_ping_latency_ms || 0) + ' ms'],
+                ['Drop Rate', ((r.pop_ping_drop_rate || 0) * 100).toFixed(1) + '%'],
+                ['ETH Speed', (r.eth_speed_mbps || 0) + ' Mbps'],
+                ['SNR OK', r.snr_above_noise_floor ? 'Yes' : 'No'],
+                ['Stowed', r.stowed ? 'Yes' : 'No'],
+            ]);
+        } else {
+            h += slAlert(r.error || 'Failed to get status', 'error');
+        }
+        slShowResult('sl-status-result', h);
+    } catch (e) {
+        slShowResult('sl-status-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+    setLoading('btn-sl-status', false);
+}
+
+async function slGetInfo() {
+    slShowResult('sl-status-result', '<span style="color:var(--text-muted)">Loading device info...</span>');
+    try {
+        const r = await fetchJSON('/starlink-hack/dish-info');
+        let h = '';
+        if (r.ok) {
+            h += slCardHtml('Device Info', [
+                ['Device ID', r.device_id],
+                ['Hardware Version', r.hardware_version],
+                ['Software Version', r.software_version],
+                ['Country Code', r.country_code],
+                ['Boot Count', r.bootcount || 'N/A'],
+                ['Is Dev', r.is_dev ? 'Yes' : 'No'],
+                ['Board Rev', r.board_rev || 'N/A'],
+                ['Anti-Rollback', r.anti_rollback_version || 'N/A'],
+            ]);
+        } else {
+            h += slAlert(r.error || 'Failed to get info', 'error');
+        }
+        slShowResult('sl-status-result', h);
+    } catch (e) {
+        slShowResult('sl-status-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+}
+
+async function slGetNetwork() {
+    setLoading('btn-sl-network', true);
+    slShowResult('sl-network-result', '<span style="color:var(--text-muted)">Loading...</span>');
+    try {
+        const r = await fetchJSON('/starlink-hack/network');
+        let h = '';
+        const cfg = r.wifi_config || {};
+        h += slCardHtml('WiFi Configuration', [
+            ['SSID', cfg.ssid || 'unknown'],
+            ['Security', cfg.security || 'unknown'],
+            ['Band', cfg.band || 'unknown'],
+            ['Channel', cfg.channel || 'auto'],
+        ]);
+        const clients = r.wifi_clients || [];
+        if (clients.length) {
+            const rows = clients.map(c => [c.name || 'unknown', c.mac || '?', c.ip || '?', (c.signal_strength != null ? c.signal_strength + ' dBm' : 'N/A'), c.band || '?']);
+            h += '<h3 style="font-size:0.95rem;color:#f97316;margin:12px 0 4px 0">WiFi Clients (' + clients.length + ')</h3>';
+            h += slTableHtml(['Name', 'MAC', 'IP', 'Signal', 'Band'], rows);
+        } else {
+            h += '<p style="font-size:0.85rem;color:var(--text-muted)">No WiFi clients found.</p>';
+        }
+        slShowResult('sl-network-result', h);
+    } catch (e) {
+        slShowResult('sl-network-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+    setLoading('btn-sl-network', false);
+}
+
+async function slPortScan() {
+    setLoading('btn-sl-portscan', true);
+    document.getElementById('sl-portscan-status').textContent = 'Scanning (this may take a while)...';
+    slShowResult('sl-portscan-result', '');
+    try {
+        const r = await postJSON('/starlink-hack/scan-ports', {target: document.getElementById('sl-dish-ip').value.trim() || undefined});
+        let h = '';
+        if (r.ok) {
+            const ports = r.ports || [];
+            document.getElementById('sl-portscan-status').textContent = ports.length + ' open ports found (' + (r.scanner || 'unknown') + ')';
+            if (ports.length) {
+                h += slTableHtml(['Port', 'Protocol', 'State', 'Service'], ports.map(p => [p.port, p.protocol, p.state, p.service]));
+            } else {
+                h += '<p style="font-size:0.85rem;color:var(--text-muted)">No open ports found.</p>';
+            }
+        } else {
+            document.getElementById('sl-portscan-status').textContent = '';
+            h += slAlert(r.error || 'Scan failed', 'error');
+        }
+        slShowResult('sl-portscan-result', h);
+    } catch (e) {
+        document.getElementById('sl-portscan-status').textContent = '';
+        slShowResult('sl-portscan-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+    setLoading('btn-sl-portscan', false);
+}
+
+async function slModuleStatus() {
+    try {
+        const r = await fetchJSON('/starlink-hack/status');
+        let h = slCardHtml('Module Status', [
+            ['Module', r.module + ' v' + r.version],
+            ['Category', r.category],
+            ['Dish IP', r.dish_ip],
+            ['Results Count', r.results_count],
+            ['Intercept Running', r.intercept_running ? 'Yes' : 'No'],
+            ['Data Dir', r.data_dir],
+        ]);
+        const tools = r.tools || {};
+        const toolRows = Object.entries(tools).map(([k, v]) => [k, v ? 'Available' : 'Missing']);
+        h += '<h3 style="font-size:0.95rem;color:#f97316;margin:12px 0 4px 0">Tool Availability</h3>';
+        h += slTableHtml(['Tool', 'Status'], toolRows);
+        slShowResult('sl-discover-result', h);
+    } catch (e) {
+        slShowResult('sl-discover-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+}
+
+/* ── gRPC Control ── */
+
+async function slGrpcEnum() {
+    setLoading('btn-sl-grpc-enum', true);
+    slShowResult('sl-grpc-enum-result', '<span style="color:var(--text-muted)">Enumerating...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/enumerate', {});
+        let h = '';
+        if (r.ok) {
+            const src = r.source ? ' (source: ' + r.source + ')' : '';
+            h += '<p style="font-size:0.85rem;color:var(--text-secondary)">' + (r.method_count || 0) + ' methods found' + esc(src) + '</p>';
+            if (r.note) h += '<p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">' + esc(r.note) + '</p>';
+            const methods = r.methods || [];
+            if (methods.length) {
+                const rows = methods.map(m => {
+                    if (typeof m === 'object') return [m.method || m.name || '?', m.service || '', m.description || m.desc || ''];
+                    return [m, '', ''];
+                });
+                h += slTableHtml(['Method', 'Service', 'Description'], rows);
+            }
+        } else {
+            h += slAlert(r.error || 'Enumeration failed', 'error');
+        }
+        slShowResult('sl-grpc-enum-result', h);
+    } catch (e) {
+        slShowResult('sl-grpc-enum-result', slAlert('Request failed: ' + e.message, 'error'));
+    }
+    setLoading('btn-sl-grpc-enum', false);
+}
+
+async function slGrpcStow() {
+    if (!confirm('Stow the dish? This will park the antenna.')) return;
+    slShowResult('sl-grpc-action-result', '<span style="color:var(--text-muted)">Sending stow...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/stow', {});
+        slShowResult('sl-grpc-action-result', r.ok ? slAlert(r.message || 'Stow sent', 'success') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-grpc-action-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slGrpcUnstow() {
+    slShowResult('sl-grpc-action-result', '<span style="color:var(--text-muted)">Sending unstow...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/unstow', {});
+        slShowResult('sl-grpc-action-result', r.ok ? slAlert(r.message || 'Unstow sent', 'success') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-grpc-action-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slGrpcReboot() {
+    if (!confirm('Reboot the Starlink dish? It will be offline for ~2 minutes.')) return;
+    slShowResult('sl-grpc-action-result', '<span style="color:var(--text-muted)">Sending reboot...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/reboot', {});
+        slShowResult('sl-grpc-action-result', r.ok ? slAlert(r.message || 'Reboot sent', 'success') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-grpc-action-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slGrpcFactoryReset() {
+    if (!confirm('FACTORY RESET the Starlink dish? This will ERASE ALL settings!')) return;
+    if (!confirm('Are you ABSOLUTELY sure? This is irreversible.')) return;
+    slShowResult('sl-grpc-action-result', '<span style="color:var(--text-muted)">Sending factory reset...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/factory-reset', {confirm: true});
+        slShowResult('sl-grpc-action-result', r.ok ? slAlert(r.message || 'Factory reset sent', 'warning') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-grpc-action-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slGrpcCall() {
+    const method = document.getElementById('sl-grpc-method').value.trim();
+    const paramsStr = document.getElementById('sl-grpc-params').value.trim();
+    if (!method) { slShowResult('sl-grpc-call-result', slAlert('Method name is required', 'error')); return; }
+    let params = null;
+    if (paramsStr) {
+        try { params = JSON.parse(paramsStr); } catch (e) { slShowResult('sl-grpc-call-result', slAlert('Invalid JSON: ' + e.message, 'error')); return; }
+    }
+    slShowResult('sl-grpc-call-result', '<span style="color:var(--text-muted)">Calling ' + esc(method) + '...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/grpc/call', {method, params});
+        let h = '';
+        if (r.ok) {
+            h += slAlert('Call successful', 'success');
+            h += slJsonBlock(r.response || {});
+        } else {
+            h += slAlert(r.error || 'Call failed', 'error');
+        }
+        slShowResult('sl-grpc-call-result', h);
+    } catch (e) {
+        slShowResult('sl-grpc-call-result', slAlert(e.message, 'error'));
+    }
+}
+
+/* ── Network Attack ── */
+
+async function slInterceptStart() {
+    const gateway = document.getElementById('sl-intercept-gateway').value.trim();
+    const iface = document.getElementById('sl-intercept-iface').value.trim();
+    slShowResult('sl-intercept-result', '<span style="color:var(--text-muted)">Starting interception...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/network/intercept', {target_ip: gateway || undefined, interface: iface || undefined});
+        let h = '';
+        if (r.ok) {
+            h += slAlert('Interception running (PID: ' + (r.pid || '?') + ', Tool: ' + (r.tool || '?') + ')', 'success');
+            if (r.capture_file) h += '<p style="font-size:0.85rem;color:var(--text-secondary)">Capture: ' + esc(r.capture_file) + '</p>';
+        } else {
+            h += slAlert(r.error || 'Failed', 'error');
+        }
+        slShowResult('sl-intercept-result', h);
+    } catch (e) {
+        slShowResult('sl-intercept-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slInterceptStop() {
+    try {
+        const r = await postJSON('/starlink-hack/network/intercept/stop', {});
+        slShowResult('sl-intercept-result', slAlert(r.message || 'Stopped', 'success'));
+    } catch (e) {
+        slShowResult('sl-intercept-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slDnsStart() {
+    const domain = document.getElementById('sl-dns-domain').value.trim();
+    const ip = document.getElementById('sl-dns-ip').value.trim();
+    if (!domain || !ip) { slShowResult('sl-dns-result', slAlert('Domain and IP are required', 'error')); return; }
+    slShowResult('sl-dns-result', '<span style="color:var(--text-muted)">Starting DNS spoof...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/network/dns-spoof', {domain, ip});
+        slShowResult('sl-dns-result', r.ok ? slAlert('DNS spoofing active: ' + domain + ' -> ' + ip, 'success') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-dns-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slDnsStop() {
+    try {
+        const r = await postJSON('/starlink-hack/network/dns-spoof/stop', {});
+        slShowResult('sl-dns-result', slAlert(r.message || 'Stopped', 'success'));
+    } catch (e) {
+        slShowResult('sl-dns-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slDeauth() {
+    const mac = document.getElementById('sl-deauth-mac').value.trim();
+    const iface = document.getElementById('sl-deauth-iface').value.trim();
+    if (!iface) { slShowResult('sl-deauth-result', slAlert('Wireless interface is required', 'error')); return; }
+    slShowResult('sl-deauth-result', '<span style="color:var(--text-muted)">Sending deauth...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/network/deauth', {target_mac: mac || undefined, interface: iface});
+        slShowResult('sl-deauth-result', r.ok ? slAlert('Deauth sent to ' + (r.target || 'broadcast'), 'success') : slAlert(r.error || 'Failed', 'error'));
+    } catch (e) {
+        slShowResult('sl-deauth-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slMitm() {
+    const iface = document.getElementById('sl-mitm-iface').value.trim();
+    slShowResult('sl-mitm-result', '<span style="color:var(--text-muted)">Starting MITM...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/network/mitm', {interface: iface || undefined});
+        let h = '';
+        if (r.ok) {
+            h += slAlert('MITM running (Tool: ' + (r.tool || '?') + ', PID: ' + (r.pid || '?') + ')', 'success');
+            if (r.note) h += '<p style="font-size:0.85rem;color:var(--text-secondary)">' + esc(r.note) + '</p>';
+        } else {
+            h += slAlert(r.error || 'Failed', 'error');
+        }
+        slShowResult('sl-mitm-result', h);
+    } catch (e) {
+        slShowResult('sl-mitm-result', slAlert(e.message, 'error'));
+    }
+}
+
+/* ── RF & Firmware ── */
+
+async function slFirmwareCheck() {
+    setLoading('btn-sl-fw-check', true);
+    slShowResult('sl-fw-check-result', '<span style="color:var(--text-muted)">Checking firmware...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/firmware/check', {});
+        let h = '';
+        if (r.ok) {
+            h += slCardHtml('Firmware Check', [
+                ['Software Version', r.software_version || 'unknown'],
+                ['Hardware Version', r.hardware_version || 'unknown'],
+                ['Version Age', r.version_age || 'unknown'],
+                ['Vulnerable', r.vulnerable ? 'YES' : 'No'],
+            ]);
+            if (r.vulnerable) {
+                h += '<h3 style="color:#ef4444;font-size:0.95rem;margin:8px 0 4px 0">Matched Vulnerabilities</h3>';
+                const vulnRows = (r.vulnerabilities || []).map(v => [v.cve, v.title, v.severity, v.cvss]);
+                h += slTableHtml(['CVE', 'Title', 'Severity', 'CVSS'], vulnRows);
+            }
+            if (r.hardware_note) h += '<p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px">' + esc(r.hardware_note) + '</p>';
+        } else {
+            h += slAlert(r.error || 'Check failed', 'error');
+        }
+        slShowResult('sl-fw-check-result', h);
+    } catch (e) {
+        slShowResult('sl-fw-check-result', slAlert(e.message, 'error'));
+    }
+    setLoading('btn-sl-fw-check', false);
+}
+
+async function slFirmwareAnalyze() {
+    const fileInput = document.getElementById('sl-fw-file');
+    if (!fileInput.files.length) { slShowResult('sl-fw-analyze-result', slAlert('Select a firmware file', 'error')); return; }
+    slShowResult('sl-fw-analyze-result', '<span style="color:var(--text-muted)">Analyzing firmware (may take a while)...</span>');
+    const form = new FormData();
+    form.append('file', fileInput.files[0]);
+    try {
+        const resp = await fetch('/starlink-hack/firmware/analyze', {method: 'POST', body: form});
+        const r = await resp.json();
+        let h = '';
+        if (r.ok) {
+            const fi = r.file_info || {};
+            h += slCardHtml('File Info', [
+                ['Name', fi.name || '?'],
+                ['Size', fi.size_human || '?'],
+                ['Signatures Found', r.signature_count || 0],
+                ['Interesting Strings', r.interesting_strings_count || 0],
+            ]);
+            const ent = r.entropy_analysis || {};
+            if (ent.average !== undefined) {
+                h += slCardHtml('Entropy Analysis', [
+                    ['Average Entropy', ent.average],
+                    ['Max Entropy', ent.max],
+                    ['Min Entropy', ent.min],
+                    ['High Entropy Blocks', ent.high_entropy_blocks],
+                    ['Likely Encrypted', ent.likely_encrypted ? 'Yes' : 'No'],
+                    ['Likely Compressed', ent.likely_compressed ? 'Yes' : 'No'],
+                ]);
+            }
+            const sigs = r.signatures || [];
+            if (sigs.length) {
+                h += '<h3 style="font-size:0.95rem;color:#f97316;margin:12px 0 4px 0">Signatures (' + sigs.length + ')</h3>';
+                h += slTableHtml(['Offset', 'Description'], sigs.slice(0, 50).map(s => [s.hex_offset || ('0x' + (s.offset || 0).toString(16)), s.description || '?']));
+            }
+            const strs = r.strings_of_interest || [];
+            if (strs.length) {
+                h += '<h3 style="font-size:0.95rem;color:#f97316;margin:12px 0 4px 0">Interesting Strings (' + strs.length + ')</h3>';
+                h += '<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:10px;max-height:300px;overflow-y:auto;font-family:monospace;font-size:0.8rem">';
+                for (const s of strs.slice(0, 100)) h += '<div>' + esc(s) + '</div>';
+                h += '</div>';
+            }
+        } else {
+            h += slAlert(r.error || 'Analysis failed', 'error');
+        }
+        slShowResult('sl-fw-analyze-result', h);
+    } catch (e) {
+        slShowResult('sl-fw-analyze-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slDebugInterfaces() {
+    slShowResult('sl-debug-result', '<span style="color:var(--text-muted)">Scanning...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/firmware/debug', {});
+        let h = '';
+        if (r.ok) {
+            const ports = r.serial_ports || [];
+            h += slCardHtml('Debug Interface Scan', [
+                ['Serial Ports Found', ports.length],
+                ['JTAG Adapter Detected', r.jtag_detected ? 'Yes' : 'No'],
+                ['OpenOCD Available', r.openocd_available ? 'Yes' : 'No'],
+            ]);
+            if (ports.length) {
+                h += slTableHtml(['Device', 'Description', 'VID:PID', 'JTAG?'],
+                    ports.map(p => [p.device, p.description, p.vid_pid || 'N/A', p.possible_jtag ? 'POSSIBLE' : '-']));
+            }
+            const inst = r.instructions || {};
+            if (inst.uart) {
+                h += slCardHtml('UART Instructions', [
+                    ['Settings', inst.uart.settings],
+                    ['Location', inst.uart.location],
+                    ['Tools', inst.uart.tools_needed],
+                ]);
+            }
+        } else {
+            h += slAlert(r.error || 'Scan failed', 'error');
+        }
+        slShowResult('sl-debug-result', h);
+    } catch (e) {
+        slShowResult('sl-debug-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slRfDownlink() {
+    const device = document.getElementById('sl-rf-device').value;
+    const duration = parseInt(document.getElementById('sl-rf-duration').value) || 30;
+    slShowResult('sl-rf-downlink-result', '<span style="color:var(--text-muted)">Analyzing downlink (this may take ' + duration + 's)...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/rf/downlink', {device, duration});
+        let h = '';
+        if (r.ok) {
+            h += slCardHtml('Downlink Analysis', [
+                ['Band', r.band || 'Ku-band'],
+                ['Freq Range', r.freq_range || '10.7-12.7 GHz'],
+                ['Source', r.source || r.tool || 'unknown'],
+                ['Capture File', r.capture_file || 'N/A'],
+                ['Sweep Points', r.sweep_points || 'N/A'],
+            ]);
+            if (r.dish_diagnostics) {
+                h += slCardHtml('Dish Diagnostics (Fallback)', [
+                    ['Downlink Throughput', (r.dish_diagnostics.downlink_throughput_bps || 0).toLocaleString() + ' bps'],
+                    ['Latency', (r.dish_diagnostics.pop_ping_latency_ms || 0) + ' ms'],
+                    ['Obstruction', (r.dish_diagnostics.obstruction_pct || 0) + '%'],
+                    ['SNR OK', r.dish_diagnostics.snr_above_noise_floor ? 'Yes' : 'No'],
+                ]);
+            }
+            if (r.note) h += '<p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">' + esc(r.note) + '</p>';
+            if (r.alternatives) {
+                h += '<p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px"><strong>LNB method:</strong> ' + esc(r.alternatives.lnb_method) + '</p>';
+            }
+        } else {
+            h += slAlert(r.error || 'Analysis failed', 'error');
+        }
+        slShowResult('sl-rf-downlink-result', h);
+    } catch (e) {
+        slShowResult('sl-rf-downlink-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slDetectJamming() {
+    slShowResult('sl-jamming-result', '<span style="color:var(--text-muted)">Analyzing jamming indicators...</span>');
+    try {
+        const r = await postJSON('/starlink-hack/rf/jamming', {});
+        let h = '';
+        if (r.ok) {
+            if (r.jamming_detected) {
+                h += slAlert('JAMMING INDICATORS DETECTED (Confidence: ' + (r.confidence || 'unknown') + ')', 'error');
+            } else {
+                h += slAlert('No jamming indicators detected (Confidence: ' + (r.confidence || 'none') + ')', 'success');
+            }
+            const indicators = r.indicators || [];
+            if (indicators.length) {
+                const rows = indicators.map(i => {
+                    const sevColor = i.severity === 'high' ? '#ef4444' : i.severity === 'medium' ? '#f97316' : '#eab308';
+                    return ['<span style="color:' + sevColor + '">' + esc(i.severity.toUpperCase()) + '</span>', esc(i.type), esc(i.detail)];
+                });
+                h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:8px"><thead><tr>';
+                h += '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text-secondary)">Severity</th>';
+                h += '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text-secondary)">Type</th>';
+                h += '<th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text-secondary)">Detail</th>';
+                h += '</tr></thead><tbody>';
+                for (const row of rows) {
+                    h += '<tr><td style="padding:5px 8px;border-bottom:1px solid rgba(51,54,80,0.4)">' + row[0] + '</td>';
+                    h += '<td style="padding:5px 8px;border-bottom:1px solid rgba(51,54,80,0.4)">' + row[1] + '</td>';
+                    h += '<td style="padding:5px 8px;border-bottom:1px solid rgba(51,54,80,0.4)">' + row[2] + '</td></tr>';
+                }
+                h += '</tbody></table>';
+            }
+            if (r.recommendation) h += '<p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px">' + esc(r.recommendation) + '</p>';
+        } else {
+            h += slAlert(r.error || 'Detection failed', 'error');
+        }
+        slShowResult('sl-jamming-result', h);
+    } catch (e) {
+        slShowResult('sl-jamming-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slLoadCves() {
+    slShowResult('sl-cve-result', '<span style="color:var(--text-muted)">Loading CVE database...</span>');
+    try {
+        const r = await fetchJSON('/starlink-hack/cves');
+        let h = '';
+        if (r.ok) {
+            if (r.current_firmware) {
+                h += '<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px">Current firmware: <strong>' + esc(r.current_firmware) + '</strong>';
+                if (r.applicable_count > 0) {
+                    h += ' — <span style="color:#ef4444">' + r.applicable_count + ' applicable CVE(s)</span>';
+                }
+                h += '</p>';
+            }
+            const cves = r.cves || [];
+            h += '<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:8px">Total known CVEs: ' + cves.length + '</p>';
+            for (const cve of cves) {
+                const sevColor = cve.severity === 'Critical' ? '#ef4444' : cve.severity === 'High' ? '#f97316' : cve.severity === 'Medium' ? '#eab308' : '#22c55e';
+                h += '<div style="background:var(--bg-card);border:1px solid var(--border);border-left:3px solid ' + sevColor + ';border-radius:var(--radius);padding:12px;margin-bottom:10px">';
+                h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+                h += '<strong style="color:' + sevColor + '">' + esc(cve.cve) + '</strong>';
+                h += '<span style="font-size:0.8rem;color:' + sevColor + '">' + esc(cve.severity) + ' (CVSS ' + cve.cvss + ')</span>';
+                h += '</div>';
+                h += '<div style="font-size:0.9rem;font-weight:600;margin-bottom:4px">' + esc(cve.title) + '</div>';
+                h += '<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:4px">' + esc(cve.description) + '</div>';
+                h += '<div style="font-size:0.8rem;color:var(--text-muted)"><strong>Affected:</strong> ' + esc(cve.affected) + '</div>';
+                h += '<div style="font-size:0.8rem;color:var(--text-muted)"><strong>Technique:</strong> ' + esc(cve.technique) + '</div>';
+                if (cve.references && cve.references.length) {
+                    h += '<div style="font-size:0.8rem;margin-top:4px">';
+                    for (const ref of cve.references) h += '<a href="' + esc(ref) + '" target="_blank" rel="noopener" style="display:block;color:var(--accent);font-size:0.78rem">' + esc(ref) + '</a>';
+                    h += '</div>';
+                }
+                h += '</div>';
+            }
+        } else {
+            h += slAlert('Failed to load CVEs', 'error');
+        }
+        slShowResult('sl-cve-result', h);
+    } catch (e) {
+        slShowResult('sl-cve-result', slAlert(e.message, 'error'));
+    }
+}
+
+async function slExportResults() {
+    try {
+        const r = await postJSON('/starlink-hack/export', {});
+        if (r.ok) {
+            slShowResult('sl-cve-result', slAlert('Results exported to: ' + (r.path || '?') + ' (' + (r.size_human || '?') + ', ' + (r.entries || 0) + ' entries)', 'success'));
+        } else {
+            slShowResult('sl-cve-result', slAlert(r.error || 'Export failed', 'error'));
+        }
+    } catch (e) {
+        slShowResult('sl-cve-result', slAlert(e.message, 'error'));
+    }
+}
+</script>
+{% endblock %}

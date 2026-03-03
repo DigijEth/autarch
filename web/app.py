@@ -87,6 +87,21 @@ def create_app():
     from web.routes.malware_sandbox import malware_sandbox_bp
     from web.routes.log_correlator import log_correlator_bp
     from web.routes.anti_forensics import anti_forensics_bp
+    from web.routes.vuln_scanner import vuln_scanner_bp
+    from web.routes.social_eng import social_eng_bp
+    from web.routes.deauth import deauth_bp
+    from web.routes.exploit_dev import exploit_dev_bp
+    from web.routes.ad_audit import ad_audit_bp
+    from web.routes.container_sec import container_sec_bp
+    from web.routes.sdr_tools import sdr_tools_bp
+    from web.routes.reverse_eng import reverse_eng_bp
+    from web.routes.email_sec import email_sec_bp
+    from web.routes.mitm_proxy import mitm_proxy_bp
+    from web.routes.pineapple import pineapple_bp
+    from web.routes.incident_resp import incident_resp_bp
+    from web.routes.sms_forge import sms_forge_bp
+    from web.routes.starlink_hack import starlink_hack_bp
+    from web.routes.rcs_tools import rcs_tools_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -133,6 +148,21 @@ def create_app():
     app.register_blueprint(malware_sandbox_bp)
     app.register_blueprint(log_correlator_bp)
     app.register_blueprint(anti_forensics_bp)
+    app.register_blueprint(vuln_scanner_bp)
+    app.register_blueprint(social_eng_bp)
+    app.register_blueprint(deauth_bp)
+    app.register_blueprint(exploit_dev_bp)
+    app.register_blueprint(ad_audit_bp)
+    app.register_blueprint(sdr_tools_bp)
+    app.register_blueprint(reverse_eng_bp)
+    app.register_blueprint(container_sec_bp)
+    app.register_blueprint(email_sec_bp)
+    app.register_blueprint(mitm_proxy_bp)
+    app.register_blueprint(pineapple_bp)
+    app.register_blueprint(incident_resp_bp)
+    app.register_blueprint(sms_forge_bp)
+    app.register_blueprint(starlink_hack_bp)
+    app.register_blueprint(rcs_tools_bp)
 
     # Start network discovery advertising (mDNS + Bluetooth)
     try:

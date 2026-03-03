@@ -1,0 +1,625 @@
+{% extends "base.html" %}
+{% block title %}MITM Proxy - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>MITM Proxy</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            HTTP/HTTPS interception proxy with traffic analysis, rule engine, and secret detection.
+        </p>
+    </div>
+    <a href="{{ url_for('offense.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Offense</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="mitm" data-tab="proxy" onclick="showTab('mitm','proxy')">Proxy</button>
+    <button class="tab" data-tab-group="mitm" data-tab="rules" onclick="showTab('mitm','rules')">Rules</button>
+    <button class="tab" data-tab-group="mitm" data-tab="traffic" onclick="showTab('mitm','traffic');mitmLoadTraffic()">Traffic Log</button>
+</div>
+
+<!-- ==================== PROXY TAB ==================== -->
+<div class="tab-content active" data-tab-group="mitm" data-tab="proxy">
+
+<!-- Status Card -->
+<div class="section">
+    <h2>Proxy Status</h2>
+    <table class="data-table" style="max-width:500px">
+        <tbody>
+            <tr><td>State</td><td><strong id="mitm-state">--</strong></td></tr>
+            <tr><td>Listen Address</td><td id="mitm-addr">--</td></tr>
+            <tr><td>Engine</td><td id="mitm-engine">--</td></tr>
+            <tr><td>Request Count</td><td id="mitm-reqcount">0</td></tr>
+            <tr><td>SSL Strip</td><td id="mitm-sslstrip">OFF</td></tr>
+            <tr><td>Upstream Proxy</td><td id="mitm-upstream">None</td></tr>
+        </tbody>
+    </table>
+    <div class="tool-actions" style="margin-top:12px">
+        <button id="btn-mitm-start" class="btn btn-primary" onclick="mitmStart()">Start Proxy</button>
+        <button id="btn-mitm-stop" class="btn btn-danger" onclick="mitmStop()" disabled>Stop Proxy</button>
+        <button id="btn-mitm-refresh" class="btn btn-sm" onclick="mitmStatus()" style="margin-left:8px">Refresh</button>
+    </div>
+</div>
+
+<!-- Configuration -->
+<div class="section">
+    <h2>Configuration</h2>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="min-width:160px">
+            <label>Listen Host</label>
+            <input type="text" id="mitm-host" class="form-control" value="127.0.0.1" placeholder="127.0.0.1">
+        </div>
+        <div class="form-group" style="min-width:100px">
+            <label>Listen Port</label>
+            <input type="number" id="mitm-port" class="form-control" value="8888" min="1" max="65535">
+        </div>
+        <div class="form-group" style="min-width:220px">
+            <label>Upstream Proxy <span style="color:var(--text-muted)">(optional)</span></label>
+            <input type="text" id="mitm-upstream-input" class="form-control" placeholder="host:port">
+        </div>
+    </div>
+    <div style="margin-top:12px">
+        <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="mitm-sslstrip-toggle" onchange="mitmToggleSSL()">
+            <span>Enable SSL Stripping</span>
+            <span style="font-size:0.75rem;color:var(--text-muted)">(rewrite HTTPS links to HTTP)</span>
+        </label>
+    </div>
+</div>
+
+<!-- CA Certificate -->
+<div class="section">
+    <h2>CA Certificate</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px">
+        Generate and install a CA certificate for HTTPS interception.
+        The client must trust this certificate to avoid browser warnings.
+    </p>
+    <div class="tool-actions">
+        <button id="btn-cert-gen" class="btn btn-primary" onclick="mitmGenCert()">Generate CA Certificate</button>
+        <button id="btn-cert-dl" class="btn btn-sm" onclick="mitmDownloadCert()">Download CA Cert</button>
+    </div>
+    <div id="cert-info" style="margin-top:12px"></div>
+    <details style="margin-top:12px;font-size:0.82rem;color:var(--text-secondary)">
+        <summary style="cursor:pointer;color:var(--accent)">Installation Instructions</summary>
+        <div style="margin-top:8px;padding:12px;background:var(--bg-card);border-radius:var(--radius);line-height:1.7">
+            <strong>Windows:</strong> Double-click the .pem file &rarr; Install Certificate &rarr;
+            Local Machine &rarr; Trusted Root Certification Authorities.<br>
+            <strong>macOS:</strong> Double-click the .pem &rarr; Add to System keychain &rarr;
+            Trust &rarr; Always Trust.<br>
+            <strong>Linux:</strong> Copy to <code>/usr/local/share/ca-certificates/</code> and run
+            <code>sudo update-ca-certificates</code>.<br>
+            <strong>Firefox:</strong> Settings &rarr; Privacy &amp; Security &rarr; Certificates &rarr;
+            View Certificates &rarr; Import.<br>
+            <strong>Chrome:</strong> Settings &rarr; Privacy &rarr; Security &rarr; Manage certificates &rarr;
+            Authorities &rarr; Import.<br>
+            <strong>Android:</strong> Settings &rarr; Security &rarr; Encryption &rarr;
+            Install from storage &rarr; select .pem file.<br>
+            <strong>iOS:</strong> AirDrop or email the .pem &rarr; Install Profile &rarr;
+            Settings &rarr; General &rarr; About &rarr; Certificate Trust Settings &rarr; Enable.
+        </div>
+    </details>
+</div>
+
+</div>
+
+<!-- ==================== RULES TAB ==================== -->
+<div class="tab-content" data-tab-group="mitm" data-tab="rules">
+
+<!-- Add Rule Form -->
+<div class="section">
+    <h2>Add Rule</h2>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="min-width:220px;flex:1">
+            <label>URL Pattern <span style="color:var(--text-muted)">(regex)</span></label>
+            <input type="text" id="rule-url" class="form-control" placeholder=".*example\.com.*">
+        </div>
+        <div class="form-group" style="min-width:120px">
+            <label>Method</label>
+            <select id="rule-method" class="form-control">
+                <option value="ANY">ANY</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="PATCH">PATCH</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width:160px">
+            <label>Action</label>
+            <select id="rule-action" class="form-control" onchange="mitmRuleActionChanged()">
+                <option value="block">Block</option>
+                <option value="redirect">Redirect</option>
+                <option value="modify_header">Modify Header</option>
+                <option value="inject_header">Inject Header</option>
+                <option value="modify_body">Modify Body</option>
+            </select>
+        </div>
+    </div>
+    <!-- Dynamic params -->
+    <div id="rule-params" style="margin-top:12px;display:none">
+        <div id="rule-params-redirect" style="display:none">
+            <div class="form-group" style="max-width:500px">
+                <label>Redirect Target URL</label>
+                <input type="text" id="rule-redirect-url" class="form-control" placeholder="https://example.com/new">
+            </div>
+        </div>
+        <div id="rule-params-header" style="display:none">
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div class="form-group" style="min-width:180px;flex:1">
+                    <label>Header Name</label>
+                    <input type="text" id="rule-header-name" class="form-control" placeholder="X-Custom-Header">
+                </div>
+                <div class="form-group" style="min-width:220px;flex:1">
+                    <label>Header Value</label>
+                    <input type="text" id="rule-header-value" class="form-control" placeholder="value">
+                </div>
+            </div>
+        </div>
+        <div id="rule-params-body" style="display:none">
+            <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div class="form-group" style="min-width:220px;flex:1">
+                    <label>Search String</label>
+                    <input type="text" id="rule-body-search" class="form-control" placeholder="original text">
+                </div>
+                <div class="form-group" style="min-width:220px;flex:1">
+                    <label>Replace With</label>
+                    <input type="text" id="rule-body-replace" class="form-control" placeholder="replacement text">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-top:12px">
+        <button id="btn-add-rule" class="btn btn-primary" onclick="mitmAddRule()">Add Rule</button>
+    </div>
+</div>
+
+<!-- Active Rules Table -->
+<div class="section">
+    <h2>Active Rules</h2>
+    <div style="overflow-x:auto">
+        <table class="data-table" style="font-size:0.82rem">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>URL Pattern</th>
+                    <th>Method</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="rules-table">
+                <tr><td colspan="6" class="empty-state">No rules configured. Add a rule above.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="tool-actions" style="margin-top:8px">
+        <button class="btn btn-sm" onclick="mitmLoadRules()">Refresh Rules</button>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== TRAFFIC LOG TAB ==================== -->
+<div class="tab-content" data-tab-group="mitm" data-tab="traffic">
+
+<!-- Filters -->
+<div class="section">
+    <h2>Traffic Log</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
+        <div class="form-group" style="min-width:200px;flex:1">
+            <label>URL Filter</label>
+            <input type="text" id="traffic-filter-url" class="form-control" placeholder="Search URL...">
+        </div>
+        <div class="form-group" style="min-width:100px">
+            <label>Method</label>
+            <select id="traffic-filter-method" class="form-control">
+                <option value="">All</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+                <option value="CONNECT">CONNECT</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width:100px">
+            <label>Status</label>
+            <input type="text" id="traffic-filter-status" class="form-control" placeholder="200">
+        </div>
+        <button class="btn btn-primary" onclick="mitmLoadTraffic()">Filter</button>
+        <button class="btn btn-sm" onclick="mitmClearTraffic()">Clear All</button>
+        <button class="btn btn-sm" onclick="mitmExportTraffic('json')">Export JSON</button>
+        <button class="btn btn-sm" onclick="mitmExportTraffic('csv')">Export CSV</button>
+    </div>
+    <p style="font-size:0.75rem;color:var(--text-muted)" id="traffic-summary">--</p>
+
+    <!-- Traffic Table -->
+    <div style="overflow-x:auto;margin-top:8px">
+        <table class="data-table" style="font-size:0.8rem">
+            <thead>
+                <tr>
+                    <th style="width:50px">ID</th>
+                    <th style="width:140px">Time</th>
+                    <th style="width:70px">Method</th>
+                    <th>URL</th>
+                    <th style="width:60px">Status</th>
+                    <th style="width:70px">Size</th>
+                    <th style="width:70px">Duration</th>
+                    <th style="width:50px">Sec</th>
+                </tr>
+            </thead>
+            <tbody id="traffic-table">
+                <tr><td colspan="8" class="empty-state">No traffic captured. Start the proxy and route traffic through it.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Request Detail (expandable) -->
+<div class="section" id="traffic-detail-section" style="display:none">
+    <h2>Request Detail <span id="traffic-detail-id" style="font-size:0.8rem;color:var(--text-muted)"></span></h2>
+    <button class="btn btn-sm" onclick="document.getElementById('traffic-detail-section').style.display='none'" style="float:right;margin-top:-32px">Close</button>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+        <!-- Request -->
+        <div style="flex:1;min-width:300px">
+            <h3 style="font-size:0.85rem;margin-bottom:8px;color:var(--accent)">Request</h3>
+            <div style="font-size:0.78rem;margin-bottom:6px">
+                <strong id="detail-method">GET</strong>
+                <span id="detail-url" style="color:var(--text-secondary);word-break:break-all"></span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Headers:</div>
+            <pre class="output-panel" id="detail-req-headers" style="max-height:200px;font-size:0.72rem;overflow:auto"></pre>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;margin-bottom:4px">Body:</div>
+            <pre class="output-panel" id="detail-req-body" style="max-height:200px;font-size:0.72rem;overflow:auto"></pre>
+        </div>
+        <!-- Response -->
+        <div style="flex:1;min-width:300px">
+            <h3 style="font-size:0.85rem;margin-bottom:8px;color:var(--success)">Response <span id="detail-status" style="font-weight:bold"></span></h3>
+            <div style="font-size:0.78rem;margin-bottom:6px">
+                <span id="detail-size" style="color:var(--text-secondary)"></span>
+                <span id="detail-duration" style="color:var(--text-muted);margin-left:12px"></span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Headers:</div>
+            <pre class="output-panel" id="detail-resp-headers" style="max-height:200px;font-size:0.72rem;overflow:auto"></pre>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;margin-bottom:4px">Body:</div>
+            <pre class="output-panel" id="detail-resp-body" style="max-height:200px;font-size:0.72rem;overflow:auto"></pre>
+        </div>
+    </div>
+
+    <!-- Secrets -->
+    <div id="detail-secrets" style="display:none;margin-top:12px">
+        <h3 style="font-size:0.85rem;margin-bottom:8px;color:var(--warning)">Secrets Found</h3>
+        <div id="detail-secrets-list"></div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== JavaScript ==================== -->
+<script>
+(function() {
+
+    /* ── Helpers ──────────────────────────────────────────────────── */
+
+    var esc = escapeHtml;
+    var autoRefreshTimer = null;
+
+    /* ── Status ──────────────────────────────────────────────────── */
+
+    function mitmStatus() {
+        fetchJSON('/mitm-proxy/status').then(function(d) {
+            var stateEl = document.getElementById('mitm-state');
+            if (d.running) {
+                stateEl.textContent = 'RUNNING';
+                stateEl.style.color = 'var(--success)';
+                document.getElementById('btn-mitm-start').disabled = true;
+                document.getElementById('btn-mitm-stop').disabled = false;
+            } else {
+                stateEl.textContent = 'STOPPED';
+                stateEl.style.color = 'var(--danger)';
+                document.getElementById('btn-mitm-start').disabled = false;
+                document.getElementById('btn-mitm-stop').disabled = true;
+            }
+            document.getElementById('mitm-addr').textContent = d.host + ':' + d.port;
+            document.getElementById('mitm-engine').textContent = d.engine || '--';
+            document.getElementById('mitm-reqcount').textContent = d.request_count || 0;
+            document.getElementById('mitm-sslstrip').textContent = d.ssl_strip ? 'ON' : 'OFF';
+            document.getElementById('mitm-sslstrip').style.color = d.ssl_strip ? 'var(--warning)' : 'var(--text-muted)';
+            document.getElementById('mitm-upstream').textContent = d.upstream_proxy || 'None';
+            document.getElementById('mitm-sslstrip-toggle').checked = d.ssl_strip;
+        });
+    }
+
+    window.mitmStatus = mitmStatus;
+    mitmStatus();
+
+    /* ── Start / Stop ────────────────────────────────────────────── */
+
+    window.mitmStart = function() {
+        var btn = document.getElementById('btn-mitm-start');
+        setLoading(btn, true);
+        var body = {
+            host: document.getElementById('mitm-host').value.trim() || '127.0.0.1',
+            port: parseInt(document.getElementById('mitm-port').value) || 8888,
+            upstream: document.getElementById('mitm-upstream-input').value.trim() || null
+        };
+        postJSON('/mitm-proxy/start', body).then(function(d) {
+            setLoading(btn, false);
+            if (d.success) {
+                mitmStatus();
+                startAutoRefresh();
+            } else {
+                alert(d.error || 'Failed to start proxy');
+            }
+        }).catch(function() { setLoading(btn, false); });
+    };
+
+    window.mitmStop = function() {
+        var btn = document.getElementById('btn-mitm-stop');
+        setLoading(btn, true);
+        postJSON('/mitm-proxy/stop', {}).then(function(d) {
+            setLoading(btn, false);
+            mitmStatus();
+            stopAutoRefresh();
+        }).catch(function() { setLoading(btn, false); });
+    };
+
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        autoRefreshTimer = setInterval(function() { mitmStatus(); }, 5000);
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    }
+
+    /* ── SSL Strip Toggle ────────────────────────────────────────── */
+
+    window.mitmToggleSSL = function() {
+        var enabled = document.getElementById('mitm-sslstrip-toggle').checked;
+        postJSON('/mitm-proxy/ssl-strip', { enabled: enabled }).then(function(d) {
+            mitmStatus();
+        });
+    };
+
+    /* ── Certificate ─────────────────────────────────────────────── */
+
+    window.mitmGenCert = function() {
+        var btn = document.getElementById('btn-cert-gen');
+        setLoading(btn, true);
+        postJSON('/mitm-proxy/cert/generate', {}).then(function(d) {
+            setLoading(btn, false);
+            var info = document.getElementById('cert-info');
+            if (d.success) {
+                info.innerHTML = '<div style="padding:10px;background:var(--bg-card);border-radius:var(--radius);font-size:0.82rem">'
+                    + '<span style="color:var(--success)">&#x2713; ' + esc(d.message) + '</span><br>'
+                    + '<span style="color:var(--text-muted)">Path: ' + esc(d.cert_path) + '</span></div>';
+            } else {
+                info.innerHTML = '<span style="color:var(--danger)">' + esc(d.error) + '</span>';
+            }
+        }).catch(function() { setLoading(btn, false); });
+    };
+
+    window.mitmDownloadCert = function() {
+        window.location.href = '/mitm-proxy/cert';
+    };
+
+    /* ── Rules ───────────────────────────────────────────────────── */
+
+    window.mitmRuleActionChanged = function() {
+        var action = document.getElementById('rule-action').value;
+        var paramsDiv = document.getElementById('rule-params');
+        paramsDiv.style.display = (action === 'block') ? 'none' : 'block';
+        document.getElementById('rule-params-redirect').style.display = (action === 'redirect') ? 'block' : 'none';
+        document.getElementById('rule-params-header').style.display =
+            (action === 'modify_header' || action === 'inject_header') ? 'block' : 'none';
+        document.getElementById('rule-params-body').style.display = (action === 'modify_body') ? 'block' : 'none';
+    };
+
+    window.mitmAddRule = function() {
+        var action = document.getElementById('rule-action').value;
+        var params = {};
+        if (action === 'redirect') {
+            params.target_url = document.getElementById('rule-redirect-url').value.trim();
+        } else if (action === 'modify_header' || action === 'inject_header') {
+            params.header_name = document.getElementById('rule-header-name').value.trim();
+            params.header_value = document.getElementById('rule-header-value').value.trim();
+        } else if (action === 'modify_body') {
+            params.search = document.getElementById('rule-body-search').value;
+            params.replace = document.getElementById('rule-body-replace').value;
+        }
+        var body = {
+            match_url: document.getElementById('rule-url').value.trim() || '.*',
+            match_method: document.getElementById('rule-method').value,
+            action: action,
+            params: params
+        };
+        var btn = document.getElementById('btn-add-rule');
+        setLoading(btn, true);
+        postJSON('/mitm-proxy/rules', body).then(function(d) {
+            setLoading(btn, false);
+            if (d.success) {
+                document.getElementById('rule-url').value = '';
+                mitmLoadRules();
+            } else {
+                alert(d.error || 'Failed to add rule');
+            }
+        }).catch(function() { setLoading(btn, false); });
+    };
+
+    window.mitmLoadRules = function() {
+        fetchJSON('/mitm-proxy/rules').then(function(d) {
+            var rules = d.rules || [];
+            var tbody = document.getElementById('rules-table');
+            if (!rules.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No rules configured.</td></tr>';
+                return;
+            }
+            var html = '';
+            rules.forEach(function(r) {
+                var stateColor = r.enabled ? 'var(--success)' : 'var(--text-muted)';
+                var stateText = r.enabled ? 'Enabled' : 'Disabled';
+                var paramStr = '';
+                if (r.action === 'redirect' && r.params && r.params.target_url) {
+                    paramStr = ' &rarr; ' + esc(r.params.target_url.substring(0, 40));
+                } else if ((r.action === 'modify_header' || r.action === 'inject_header') && r.params) {
+                    paramStr = ' [' + esc(r.params.header_name || '') + ']';
+                } else if (r.action === 'modify_body' && r.params) {
+                    paramStr = ' s/' + esc((r.params.search || '').substring(0, 20)) + '/';
+                }
+                html += '<tr>'
+                    + '<td>' + r.id + '</td>'
+                    + '<td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(r.match_url) + '">' + esc(r.match_url) + '</td>'
+                    + '<td>' + esc(r.match_method) + '</td>'
+                    + '<td>' + esc(r.action) + paramStr + '</td>'
+                    + '<td style="color:' + stateColor + '">' + stateText + '</td>'
+                    + '<td style="white-space:nowrap">'
+                    + '<button class="btn btn-sm" onclick="mitmToggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? 'Disable' : 'Enable') + '</button> '
+                    + '<button class="btn btn-sm btn-danger" onclick="mitmDeleteRule(' + r.id + ')" title="Delete">Del</button>'
+                    + '</td></tr>';
+            });
+            tbody.innerHTML = html;
+        });
+    };
+
+    window.mitmToggleRule = function(id) {
+        postJSON('/mitm-proxy/rules/' + id + '/toggle', {}).then(function() {
+            mitmLoadRules();
+        });
+    };
+
+    window.mitmDeleteRule = function(id) {
+        if (!confirm('Delete rule #' + id + '?')) return;
+        fetchJSON('/mitm-proxy/rules/' + id, { method: 'DELETE' }).then(function() {
+            mitmLoadRules();
+        });
+    };
+
+    // Load rules on tab switch
+    mitmLoadRules();
+
+    /* ── Traffic ─────────────────────────────────────────────────── */
+
+    window.mitmLoadTraffic = function() {
+        var params = new URLSearchParams();
+        params.set('limit', '100');
+        var url = document.getElementById('traffic-filter-url').value.trim();
+        var method = document.getElementById('traffic-filter-method').value;
+        var status = document.getElementById('traffic-filter-status').value.trim();
+        if (url) params.set('filter_url', url);
+        if (method) params.set('filter_method', method);
+        if (status) params.set('filter_status', status);
+
+        fetchJSON('/mitm-proxy/traffic?' + params.toString()).then(function(d) {
+            var entries = d.entries || [];
+            var total = d.total || 0;
+            document.getElementById('traffic-summary').textContent =
+                'Showing ' + entries.length + ' of ' + total + ' entries';
+
+            var tbody = document.getElementById('traffic-table');
+            if (!entries.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No traffic captured.</td></tr>';
+                return;
+            }
+            var html = '';
+            entries.forEach(function(e) {
+                var statusColor = '';
+                if (e.status >= 200 && e.status < 300) statusColor = 'color:var(--success)';
+                else if (e.status >= 300 && e.status < 400) statusColor = 'color:var(--accent)';
+                else if (e.status >= 400 && e.status < 500) statusColor = 'color:var(--warning)';
+                else if (e.status >= 500) statusColor = 'color:var(--danger)';
+
+                var sizeStr = e.size > 1024 ? (e.size / 1024).toFixed(1) + 'K' : e.size + 'B';
+                var timeStr = e.timestamp ? e.timestamp.split('T')[1].split('.')[0] : '--';
+                var secFlag = e.secrets_found
+                    ? '<span style="color:var(--warning);font-weight:bold" title="Secrets detected">!</span>'
+                    : '';
+                var truncUrl = e.url.length > 80 ? e.url.substring(0, 77) + '...' : e.url;
+
+                html += '<tr style="cursor:pointer" onclick="mitmShowDetail(' + e.id + ')">'
+                    + '<td>' + e.id + '</td>'
+                    + '<td style="font-size:0.72rem;color:var(--text-muted)">' + esc(timeStr) + '</td>'
+                    + '<td><strong>' + esc(e.method) + '</strong></td>'
+                    + '<td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(e.url) + '">' + esc(truncUrl) + '</td>'
+                    + '<td style="' + statusColor + '">' + e.status + '</td>'
+                    + '<td style="text-align:right">' + sizeStr + '</td>'
+                    + '<td style="text-align:right">' + e.duration + 'ms</td>'
+                    + '<td style="text-align:center">' + secFlag + '</td>'
+                    + '</tr>';
+            });
+            tbody.innerHTML = html;
+        });
+    };
+
+    window.mitmShowDetail = function(id) {
+        fetchJSON('/mitm-proxy/traffic/' + id).then(function(d) {
+            if (!d.success) return;
+            var e = d.entry;
+            document.getElementById('traffic-detail-section').style.display = 'block';
+            document.getElementById('traffic-detail-id').textContent = '#' + e.id;
+            document.getElementById('detail-method').textContent = e.method;
+            document.getElementById('detail-url').textContent = e.url;
+            document.getElementById('detail-status').textContent = e.status;
+            document.getElementById('detail-size').textContent = (e.size > 1024 ? (e.size / 1024).toFixed(1) + ' KB' : e.size + ' bytes');
+            document.getElementById('detail-duration').textContent = e.duration + ' ms';
+
+            // Headers
+            var reqH = '';
+            if (e.request_headers) {
+                Object.keys(e.request_headers).forEach(function(k) {
+                    reqH += k + ': ' + e.request_headers[k] + '\n';
+                });
+            }
+            document.getElementById('detail-req-headers').textContent = reqH || '(none)';
+            document.getElementById('detail-req-body').textContent = e.request_body || '(empty)';
+
+            var respH = '';
+            if (e.response_headers) {
+                Object.keys(e.response_headers).forEach(function(k) {
+                    respH += k + ': ' + e.response_headers[k] + '\n';
+                });
+            }
+            document.getElementById('detail-resp-headers').textContent = respH || '(none)';
+            document.getElementById('detail-resp-body').textContent = e.response_body || '(empty)';
+
+            // Secrets
+            var secrets = e.secrets_found || [];
+            var secretsDiv = document.getElementById('detail-secrets');
+            var secretsList = document.getElementById('detail-secrets-list');
+            if (secrets.length) {
+                secretsDiv.style.display = 'block';
+                var shtml = '';
+                secrets.forEach(function(s) {
+                    shtml += '<div style="padding:6px 10px;margin-bottom:4px;background:rgba(245,158,11,0.1);border-left:3px solid var(--warning);border-radius:4px;font-size:0.8rem">'
+                        + '<strong style="color:var(--warning)">' + esc(s.type) + '</strong>: '
+                        + '<code style="color:var(--text-primary)">' + esc(s.value_masked) + '</code>'
+                        + ' <span style="color:var(--text-muted);font-size:0.72rem">(' + esc(s.location) + ')</span>'
+                        + '</div>';
+                });
+                secretsList.innerHTML = shtml;
+            } else {
+                secretsDiv.style.display = 'none';
+            }
+
+            // Scroll to detail
+            document.getElementById('traffic-detail-section').scrollIntoView({ behavior: 'smooth' });
+        });
+    };
+
+    window.mitmClearTraffic = function() {
+        if (!confirm('Clear all captured traffic?')) return;
+        fetchJSON('/mitm-proxy/traffic', { method: 'DELETE' }).then(function() {
+            mitmLoadTraffic();
+            mitmStatus();
+        });
+    };
+
+    window.mitmExportTraffic = function(fmt) {
+        window.location.href = '/mitm-proxy/traffic/export?format=' + fmt;
+    };
+
+})();
+</script>
+{% endblock %}

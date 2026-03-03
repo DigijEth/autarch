@@ -11,6 +11,11 @@
         android:label="@string/nav_dashboard" />
 
     <fragment
+        android:id="@+id/nav_messaging"
+        android:name="com.darkhal.archon.ui.MessagingFragment"
+        android:label="@string/nav_messaging" />
+
+    <fragment
         android:id="@+id/nav_links"
         android:name="com.darkhal.archon.ui.LinksFragment"
         android:label="@string/nav_links" />

@@ -5,9 +5,9 @@
         android:icon="@android:drawable/ic_menu_compass"
         android:title="@string/nav_dashboard" />
     <item
-        android:id="@+id/nav_links"
-        android:icon="@android:drawable/ic_menu_share"
-        android:title="@string/nav_links" />
+        android:id="@+id/nav_messaging"
+        android:icon="@android:drawable/ic_dialog_email"
+        android:title="@string/nav_messaging" />
     <item
         android:id="@+id/nav_modules"
         android:icon="@android:drawable/ic_menu_manage"
