@@ -13,8 +13,8 @@
 
 [Setup]
 AppName=AUTARCH
-AppVersion=2.0
-AppVerName=AUTARCH 2.0
+AppVersion=2.2
+AppVerName=AUTARCH 2.2
 AppPublisher=darkHal Security Group
 AppPublisherURL=https://github.com/darkhal
 AppSupportURL=https://github.com/darkhal
@@ -46,6 +46,8 @@ Name: "startupicon"; Description: "Launch Web Dashboard on Windows startup"; Gro
 ; Everything from PyInstaller output (compressed with lzma2)
 ; NOTE: GGUF model excluded — download separately from release page
 Source: "dist\autarch\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "_internal\models\Hal_v2.gguf"
+; DNS server binary (bundled via PyInstaller data, but also ensure standalone copy)
+Source: "services\dns-server\autarch-dns.exe"; DestDir: "{app}\services\dns-server"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 ; Start Menu
@@ -67,6 +69,7 @@ Filename: "{app}\autarch_web.exe"; Description: "Launch AUTARCH Web Dashboard"; 
 ; Kill running instances before uninstall
 Filename: "taskkill"; Parameters: "/F /IM autarch.exe"; Flags: runhidden
 Filename: "taskkill"; Parameters: "/F /IM autarch_web.exe"; Flags: runhidden
+Filename: "taskkill"; Parameters: "/F /IM autarch-dns.exe"; Flags: runhidden
 
 [UninstallDelete]
 ; Clean up runtime-generated files

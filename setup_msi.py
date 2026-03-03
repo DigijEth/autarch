@@ -117,7 +117,7 @@ bdist_msi_options = {
 
 setup(
     name='AUTARCH',
-    version='2.0',
+    version='2.2',
     description='AUTARCH — Autonomous Tactical Agent for Reconnaissance, Counterintelligence, and Hacking',
     author='darkHal Security Group & Setec Security Labs',
     options={

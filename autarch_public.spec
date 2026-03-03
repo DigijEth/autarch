@@ -29,6 +29,9 @@ _candidate_files = [
     # Icon
     (SRC / 'autarch.ico',            '.'),
 
+    # DNS server binary
+    (SRC / 'services' / 'dns-server' / 'autarch-dns.exe', 'services/dns-server'),
+
     # Root-level config and docs
     (SRC / 'autarch_settings.conf',  '.'),
     (SRC / 'user_manual.md',         '.'),

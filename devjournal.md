@@ -2406,8 +2406,51 @@ Massive toolkit expansion across two back-to-back sessions. Added 11 new modules
 - **After:** ~37 modules, 30 blueprints, 27 templates
 
 ### Remaining Phase 2 modules (from plan)
-- WiFi Auditing, Threat Intel Feed, Steganography, API Fuzzer, BLE Scanner, Forensics Toolkit
-- Lower priority: RFID/NFC, Cloud Security, Malware Sandbox, Log Correlator, Anti-Forensics
+- ~~WiFi Auditing, Threat Intel Feed, Steganography, API Fuzzer, BLE Scanner, Forensics Toolkit~~
+- ~~Lower priority: RFID/NFC, Cloud Security, Malware Sandbox, Log Correlator, Anti-Forensics~~
+- **ALL COMPLETE** — see v2.2.0 session below
 
 **Phase status:** Phases 0–5.10 DONE, Phase 6 (Docker) NOT STARTED
+
+---
+
+## v2.2.0 Session — 2026-03-03
+
+### Full Arsenal Expansion Complete
+
+Completed all 11 remaining Phase 2 modules in a single session. Each module includes full backend (CLI + class), Flask routes (blueprint), and web UI template (Jinja2 with tabs).
+
+### New modules built
+
+| Module | Category | Route Prefix | Lines |
+|--------|----------|-------------|-------|
+| WiFi Audit | Offense | `/wifi/` | ~500 |
+| Threat Intel | Defense | `/threat-intel/` | ~550 |
+| Steganography | Counter | `/stego/` | ~600 |
+| API Fuzzer | Offense | `/api-fuzzer/` | ~550 |
+| BLE Scanner | Analyze | `/ble/` | ~400 |
+| Forensics | Analyze | `/forensics/` | ~550 |
+| RFID/NFC | Analyze | `/rfid/` | ~400 |
+| Cloud Scanner | Offense | `/cloud/` | ~350 |
+| Malware Sandbox | Analyze | `/sandbox/` | ~450 |
+| Log Correlator | Defense | `/logs/` | ~500 |
+| Anti-Forensics | Counter | `/anti-forensics/` | ~500 |
+
+### Wiring
+
+- All 11 blueprints registered in `web/app.py`
+- Sidebar links added to `base.html` (Defense: Threat Intel, Log Correlator; Offense: WiFi, API Fuzzer, Cloud; Counter: Stego, Anti-Forensics; Analyze: BLE, Forensics, RFID/NFC, Malware Sandbox)
+- Build configs: `autarch_public.spec` + `setup_msi.py` updated with 22 new hidden imports
+- CHANGELOG.md updated with full v2.2.0 entry
+- Fixed regex syntax warnings in forensics.py and anti_forensics.py (b'' → rb'')
+
+### Totals after v2.2.0
+
+- **48 modules** across modules/ directory
+- **41 Flask blueprints** registered in web/app.py
+- **38 web templates** in web/templates/
+- **88 files changed, 36,457 insertions** in the commit
+- Git commit: `2322f69`, pushed to origin/main
+
+**Phase 2: COMPLETE** — all 16 arsenal modules operational
 
