@@ -1,6 +1,6 @@
 """RFID/NFC Tools routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 rfid_tools_bp = Blueprint('rfid_tools', __name__, url_prefix='/rfid')
 

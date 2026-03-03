@@ -1,6 +1,6 @@
 """Anti-Forensics routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 anti_forensics_bp = Blueprint('anti_forensics', __name__, url_prefix='/anti-forensics')
 

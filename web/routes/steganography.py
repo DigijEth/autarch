@@ -2,7 +2,7 @@
 import os
 import base64
 from flask import Blueprint, request, jsonify, render_template, current_app
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 steganography_bp = Blueprint('steganography', __name__, url_prefix='/stego')
 

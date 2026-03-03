@@ -1,6 +1,6 @@
 """WiFi Auditing routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 wifi_audit_bp = Blueprint('wifi_audit', __name__, url_prefix='/wifi')
 

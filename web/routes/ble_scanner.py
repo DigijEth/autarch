@@ -1,6 +1,6 @@
 """BLE Scanner routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 ble_scanner_bp = Blueprint('ble_scanner', __name__, url_prefix='/ble')
 

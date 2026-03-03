@@ -1,6 +1,6 @@
 """Log Correlator routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 log_correlator_bp = Blueprint('log_correlator', __name__, url_prefix='/logs')
 

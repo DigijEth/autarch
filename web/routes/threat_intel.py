@@ -1,6 +1,6 @@
 """Threat Intelligence routes."""
 from flask import Blueprint, request, jsonify, render_template, Response
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 threat_intel_bp = Blueprint('threat_intel', __name__, url_prefix='/threat-intel')
 

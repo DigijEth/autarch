@@ -1,6 +1,6 @@
 """Cloud Security Scanner routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 cloud_scan_bp = Blueprint('cloud_scan', __name__, url_prefix='/cloud')
 

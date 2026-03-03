@@ -1,6 +1,6 @@
 """API Fuzzer routes."""
 from flask import Blueprint, request, jsonify, render_template
-from web.routes.auth_routes import login_required
+from web.auth import login_required
 
 api_fuzzer_bp = Blueprint('api_fuzzer', __name__, url_prefix='/api-fuzzer')
 
