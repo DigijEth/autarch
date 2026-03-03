@@ -13,8 +13,8 @@
 
 [Setup]
 AppName=AUTARCH
-AppVersion=1.3
-AppVerName=AUTARCH 1.3
+AppVersion=1.5
+AppVerName=AUTARCH 1.5
 AppPublisher=darkHal Security Group
 AppPublisherURL=https://github.com/darkhal
 AppSupportURL=https://github.com/darkhal
@@ -43,9 +43,8 @@ Name: "desktopicon"; Description: "Create a Desktop shortcut"; GroupDescription:
 Name: "startupicon"; Description: "Launch Web Dashboard on Windows startup"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-; GGUF model — store uncompressed (3.9GB, barely compressible, avoids OOM)
-Source: "dist\autarch\_internal\models\Hal_v2.gguf"; DestDir: "{app}\_internal\models"; Flags: ignoreversion nocompression
-; Everything else from PyInstaller output (compressed with lzma2)
+; Everything from PyInstaller output (compressed with lzma2)
+; NOTE: GGUF model excluded — download separately from release page
 Source: "dist\autarch\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "_internal\models\Hal_v2.gguf"
 
 [Icons]
