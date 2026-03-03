@@ -64,6 +64,7 @@ hidden_imports = [
     'core.upnp', 'core.wireshark', 'core.wireguard',
     'core.mcp_server', 'core.discovery',
     'core.osint_db', 'core.nvd',
+    'core.model_router', 'core.rules', 'core.autonomy',
 
     # Web routes (Flask blueprints)
     'web.app', 'web.auth',
@@ -90,6 +91,7 @@ hidden_imports = [
     'web.routes.targets',
     'web.routes.encmodules',
     'web.routes.llm_trainer',
+    'web.routes.autonomy',
 
     # Standard library (sometimes missed on Windows)
     'email.mime.text', 'email.mime.multipart',

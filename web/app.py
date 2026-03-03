@@ -65,6 +65,7 @@ def create_app():
     from web.routes.targets import targets_bp
     from web.routes.encmodules import encmodules_bp
     from web.routes.llm_trainer import llm_trainer_bp
+    from web.routes.autonomy import autonomy_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -89,6 +90,7 @@ def create_app():
     app.register_blueprint(targets_bp)
     app.register_blueprint(encmodules_bp)
     app.register_blueprint(llm_trainer_bp)
+    app.register_blueprint(autonomy_bp)
 
     # Start network discovery advertising (mDNS + Bluetooth)
     try:

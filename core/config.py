@@ -87,7 +87,39 @@ class Config:
             'host': '0.0.0.0',
             'port': '17322',
             'auto_start': 'false',
-        }
+        },
+        'slm': {
+            'enabled': 'true',
+            'backend': 'local',
+            'model_path': '',
+            'n_ctx': '512',
+            'n_gpu_layers': '-1',
+            'n_threads': '2',
+        },
+        'sam': {
+            'enabled': 'true',
+            'backend': 'local',
+            'model_path': '',
+            'n_ctx': '2048',
+            'n_gpu_layers': '-1',
+            'n_threads': '4',
+        },
+        'lam': {
+            'enabled': 'true',
+            'backend': 'local',
+            'model_path': '',
+            'n_ctx': '4096',
+            'n_gpu_layers': '-1',
+            'n_threads': '4',
+        },
+        'autonomy': {
+            'enabled': 'false',
+            'monitor_interval': '3',
+            'rule_eval_interval': '5',
+            'max_concurrent_agents': '3',
+            'threat_threshold_auto_respond': '40',
+            'log_max_entries': '1000',
+        },
     }
 
     def __init__(self, config_path: str = None):
@@ -330,6 +362,40 @@ class Config:
             'host': self.get('revshell', 'host', '0.0.0.0'),
             'port': self.get_int('revshell', 'port', 17322),
             'auto_start': self.get_bool('revshell', 'auto_start', False),
+        }
+
+    def get_tier_settings(self, tier: str) -> dict:
+        """Get settings for a model tier (slm, sam, lam)."""
+        return {
+            'enabled': self.get_bool(tier, 'enabled', True),
+            'backend': self.get(tier, 'backend', 'local'),
+            'model_path': self.get(tier, 'model_path', ''),
+            'n_ctx': self.get_int(tier, 'n_ctx', 2048),
+            'n_gpu_layers': self.get_int(tier, 'n_gpu_layers', -1),
+            'n_threads': self.get_int(tier, 'n_threads', 4),
+        }
+
+    def get_slm_settings(self) -> dict:
+        """Get Small Language Model tier settings."""
+        return self.get_tier_settings('slm')
+
+    def get_sam_settings(self) -> dict:
+        """Get Small Action Model tier settings."""
+        return self.get_tier_settings('sam')
+
+    def get_lam_settings(self) -> dict:
+        """Get Large Action Model tier settings."""
+        return self.get_tier_settings('lam')
+
+    def get_autonomy_settings(self) -> dict:
+        """Get autonomy daemon settings."""
+        return {
+            'enabled': self.get_bool('autonomy', 'enabled', False),
+            'monitor_interval': self.get_int('autonomy', 'monitor_interval', 3),
+            'rule_eval_interval': self.get_int('autonomy', 'rule_eval_interval', 5),
+            'max_concurrent_agents': self.get_int('autonomy', 'max_concurrent_agents', 3),
+            'threat_threshold_auto_respond': self.get_int('autonomy', 'threat_threshold_auto_respond', 40),
+            'log_max_entries': self.get_int('autonomy', 'log_max_entries', 1000),
         }
 
     @staticmethod

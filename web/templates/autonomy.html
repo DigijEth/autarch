@@ -1,0 +1,742 @@
+{% extends "base.html" %}
+{% block title %}Autonomy - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 style="color:var(--accent)">Autonomy</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Multi-model autonomous threat response — SLM / SAM / LAM
+    </p>
+</div>
+
+<!-- Tab Navigation -->
+<div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+    <button class="auto-tab active" onclick="autoTab('dashboard')" id="tab-dashboard">Dashboard</button>
+    <button class="auto-tab" onclick="autoTab('rules')" id="tab-rules">Rules</button>
+    <button class="auto-tab" onclick="autoTab('activity')" id="tab-activity">Activity Log</button>
+    <button class="auto-tab" onclick="autoTab('models')" id="tab-models">Models</button>
+</div>
+
+<!-- ==================== DASHBOARD TAB ==================== -->
+<div id="panel-dashboard" class="auto-panel">
+    <!-- Controls -->
+    <div class="section">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+            <div id="daemon-status-badge" style="padding:6px 16px;border-radius:20px;font-size:0.8rem;font-weight:600;background:var(--bg-input);border:1px solid var(--border)">
+                STOPPED
+            </div>
+            <button class="btn btn-primary" onclick="autoStart()" id="btn-start">Start</button>
+            <button class="btn btn-danger" onclick="autoStop()" id="btn-stop" disabled>Stop</button>
+            <button class="btn" onclick="autoPause()" id="btn-pause" disabled style="background:var(--bg-input);border:1px solid var(--border)">Pause</button>
+            <button class="btn" onclick="autoResume()" id="btn-resume" disabled style="background:var(--bg-input);border:1px solid var(--border)">Resume</button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1.5rem">
+        <div class="tool-card" style="text-align:center">
+            <div style="font-size:2rem;font-weight:700;color:var(--accent)" id="stat-agents">0</div>
+            <div style="font-size:0.8rem;color:var(--text-secondary)">Active Agents</div>
+        </div>
+        <div class="tool-card" style="text-align:center">
+            <div style="font-size:2rem;font-weight:700;color:var(--success)" id="stat-rules">0</div>
+            <div style="font-size:0.8rem;color:var(--text-secondary)">Rules</div>
+        </div>
+        <div class="tool-card" style="text-align:center">
+            <div style="font-size:2rem;font-weight:700;color:var(--warning)" id="stat-activity">0</div>
+            <div style="font-size:0.8rem;color:var(--text-secondary)">Activity Entries</div>
+        </div>
+    </div>
+
+    <!-- Model Tier Cards -->
+    <div class="section">
+        <h2>Model Tiers</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem">
+            <div class="tool-card" id="card-slm">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <h4>SLM <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400">Small Language Model</span></h4>
+                    <span class="tier-dot" id="dot-slm"></span>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin:0.5rem 0">Fast classification, routing, yes/no decisions</p>
+                <div style="font-size:0.75rem;color:var(--text-muted)" id="slm-model">No model configured</div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                    <button class="btn btn-small btn-primary" onclick="autoLoadTier('slm')">Load</button>
+                    <button class="btn btn-small" onclick="autoUnloadTier('slm')" style="background:var(--bg-input);border:1px solid var(--border)">Unload</button>
+                </div>
+            </div>
+            <div class="tool-card" id="card-sam">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <h4>SAM <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400">Small Action Model</span></h4>
+                    <span class="tier-dot" id="dot-sam"></span>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin:0.5rem 0">Quick tool execution, simple automated responses</p>
+                <div style="font-size:0.75rem;color:var(--text-muted)" id="sam-model">No model configured</div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                    <button class="btn btn-small btn-primary" onclick="autoLoadTier('sam')">Load</button>
+                    <button class="btn btn-small" onclick="autoUnloadTier('sam')" style="background:var(--bg-input);border:1px solid var(--border)">Unload</button>
+                </div>
+            </div>
+            <div class="tool-card" id="card-lam">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <h4>LAM <span style="font-size:0.7rem;color:var(--text-muted);font-weight:400">Large Action Model</span></h4>
+                    <span class="tier-dot" id="dot-lam"></span>
+                </div>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin:0.5rem 0">Complex multi-step agent tasks, strategic planning</p>
+                <div style="font-size:0.75rem;color:var(--text-muted)" id="lam-model">No model configured</div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                    <button class="btn btn-small btn-primary" onclick="autoLoadTier('lam')">Load</button>
+                    <button class="btn btn-small" onclick="autoUnloadTier('lam')" style="background:var(--bg-input);border:1px solid var(--border)">Unload</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== RULES TAB ==================== -->
+<div id="panel-rules" class="auto-panel" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+        <h2>Automation Rules</h2>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="autoShowRuleModal()">+ Add Rule</button>
+            <button class="btn" onclick="autoShowTemplates()" style="background:var(--bg-input);border:1px solid var(--border)">Templates</button>
+        </div>
+    </div>
+
+    <table class="data-table" id="rules-table">
+        <thead>
+            <tr>
+                <th style="width:30px"></th>
+                <th>Name</th>
+                <th>Priority</th>
+                <th>Conditions</th>
+                <th>Actions</th>
+                <th>Cooldown</th>
+                <th style="width:100px">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="rules-tbody"></tbody>
+    </table>
+    <div id="rules-empty" style="text-align:center;padding:2rem;color:var(--text-muted);display:none">
+        No rules configured. Add a rule or use a template to get started.
+    </div>
+</div>
+
+<!-- ==================== ACTIVITY TAB ==================== -->
+<div id="panel-activity" class="auto-panel" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2>Activity Log</h2>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+            <span id="activity-live-dot" class="live-dot"></span>
+            <span style="font-size:0.8rem;color:var(--text-secondary)" id="activity-count">0 entries</span>
+        </div>
+    </div>
+    <div id="activity-log" style="max-height:600px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-secondary)">
+        <table class="data-table" style="margin:0">
+            <thead><tr>
+                <th style="width:150px">Time</th>
+                <th style="width:80px">Status</th>
+                <th style="width:100px">Action</th>
+                <th>Detail</th>
+                <th style="width:80px">Rule</th>
+                <th style="width:50px">Tier</th>
+            </tr></thead>
+            <tbody id="activity-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ==================== MODELS TAB ==================== -->
+<div id="panel-models" class="auto-panel" style="display:none">
+    <h2 style="margin-bottom:1rem">Model Configuration</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1.5rem">
+        Configure model tiers in <code>autarch_settings.conf</code> under <code>[slm]</code>, <code>[sam]</code>, and <code>[lam]</code> sections.
+        Each tier supports backends: <code>local</code> (GGUF), <code>transformers</code>, <code>claude</code>, <code>huggingface</code>.
+    </p>
+    <div id="models-detail" style="display:grid;grid-template-columns:1fr;gap:1rem"></div>
+</div>
+
+<!-- ==================== RULE EDITOR MODAL ==================== -->
+<div id="rule-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:none;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:700px;max-height:85vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3 id="rule-modal-title">Add Rule</h3>
+            <button onclick="autoCloseRuleModal()" style="background:none;border:none;color:var(--text-secondary);font-size:1.2rem;cursor:pointer">&#x2715;</button>
+        </div>
+        <input type="hidden" id="rule-edit-id">
+        <div style="display:grid;gap:1rem">
+            <div>
+                <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">Name</label>
+                <input type="text" id="rule-name" class="form-input" placeholder="Rule name">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">Priority (0=highest)</label>
+                    <input type="number" id="rule-priority" class="form-input" value="50" min="0" max="100">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">Cooldown (seconds)</label>
+                    <input type="number" id="rule-cooldown" class="form-input" value="60" min="0">
+                </div>
+            </div>
+            <div>
+                <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">Description</label>
+                <input type="text" id="rule-description" class="form-input" placeholder="Optional description">
+            </div>
+
+            <!-- Conditions -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <label style="font-size:0.8rem;color:var(--text-secondary)">Conditions (AND logic)</label>
+                    <button class="btn btn-small" onclick="autoAddCondition()" style="background:var(--bg-input);border:1px solid var(--border);font-size:0.75rem">+ Condition</button>
+                </div>
+                <div id="conditions-list"></div>
+            </div>
+
+            <!-- Actions -->
+            <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                    <label style="font-size:0.8rem;color:var(--text-secondary)">Actions</label>
+                    <button class="btn btn-small" onclick="autoAddAction()" style="background:var(--bg-input);border:1px solid var(--border);font-size:0.75rem">+ Action</button>
+                </div>
+                <div id="actions-list"></div>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem">
+                <button class="btn" onclick="autoCloseRuleModal()" style="background:var(--bg-input);border:1px solid var(--border)">Cancel</button>
+                <button class="btn btn-primary" onclick="autoSaveRule()">Save Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== TEMPLATES MODAL ==================== -->
+<div id="templates-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:600px;max-height:80vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Rule Templates</h3>
+            <button onclick="autoCloseTemplates()" style="background:none;border:none;color:var(--text-secondary);font-size:1.2rem;cursor:pointer">&#x2715;</button>
+        </div>
+        <div id="templates-list"></div>
+    </div>
+</div>
+
+<style>
+.auto-tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.2s, border-color 0.2s;
+}
+.auto-tab:hover { color: var(--text-primary); }
+.auto-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tier-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text-muted);
+    display: inline-block;
+}
+.tier-dot.loaded { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-muted);
+    display: inline-block;
+}
+.live-dot.active { background: var(--success); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.form-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+.form-input:focus { outline: none; border-color: var(--accent); }
+.cond-row, .action-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 8px;
+    background: var(--bg-input);
+    border-radius: var(--radius);
+}
+.cond-row select, .action-row select {
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+.cond-row input, .action-row input {
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    flex: 1;
+}
+.row-remove {
+    background: none; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; padding: 0 4px;
+}
+.activity-success { color: var(--success); }
+.activity-fail { color: var(--danger); }
+.activity-system { color: var(--text-muted); font-style: italic; }
+.template-card {
+    padding: 1rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.template-card:hover { border-color: var(--accent); }
+</style>
+
+<script>
+// ==================== TAB NAVIGATION ====================
+function autoTab(tab) {
+    document.querySelectorAll('.auto-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.auto-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-' + tab).style.display = 'block';
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'activity') autoLoadActivity();
+    if (tab === 'models') autoLoadModelsDetail();
+}
+
+// ==================== STATUS REFRESH ====================
+let _autoRefreshTimer = null;
+
+function autoRefreshStatus() {
+    fetch('/autonomy/status').then(r => r.json()).then(data => {
+        const d = data.daemon;
+        const badge = document.getElementById('daemon-status-badge');
+        if (d.running && !d.paused) {
+            badge.textContent = 'RUNNING';
+            badge.style.background = 'rgba(34,197,94,0.15)';
+            badge.style.borderColor = 'var(--success)';
+            badge.style.color = 'var(--success)';
+        } else if (d.running && d.paused) {
+            badge.textContent = 'PAUSED';
+            badge.style.background = 'rgba(245,158,11,0.15)';
+            badge.style.borderColor = 'var(--warning)';
+            badge.style.color = 'var(--warning)';
+        } else {
+            badge.textContent = 'STOPPED';
+            badge.style.background = 'var(--bg-input)';
+            badge.style.borderColor = 'var(--border)';
+            badge.style.color = 'var(--text-muted)';
+        }
+
+        document.getElementById('btn-start').disabled = d.running;
+        document.getElementById('btn-stop').disabled = !d.running;
+        document.getElementById('btn-pause').disabled = !d.running || d.paused;
+        document.getElementById('btn-resume').disabled = !d.running || !d.paused;
+
+        document.getElementById('stat-agents').textContent = d.active_agents;
+        document.getElementById('stat-rules').textContent = d.rules_count;
+        document.getElementById('stat-activity').textContent = d.activity_count;
+
+        // Update model dots
+        const models = data.models;
+        for (const tier of ['slm', 'sam', 'lam']) {
+            const dot = document.getElementById('dot-' + tier);
+            const label = document.getElementById(tier + '-model');
+            if (models[tier]) {
+                if (models[tier].loaded) {
+                    dot.classList.add('loaded');
+                    label.textContent = models[tier].model_name || models[tier].model_path || 'Loaded';
+                } else {
+                    dot.classList.remove('loaded');
+                    label.textContent = models[tier].model_path || 'No model configured';
+                }
+            }
+        }
+    }).catch(() => {});
+}
+
+function autoStartRefresh() {
+    autoRefreshStatus();
+    _autoRefreshTimer = setInterval(autoRefreshStatus, 5000);
+}
+
+// ==================== DAEMON CONTROLS ====================
+function autoStart() {
+    fetch('/autonomy/start', {method:'POST'}).then(r => r.json()).then(() => autoRefreshStatus());
+}
+function autoStop() {
+    fetch('/autonomy/stop', {method:'POST'}).then(r => r.json()).then(() => autoRefreshStatus());
+}
+function autoPause() {
+    fetch('/autonomy/pause', {method:'POST'}).then(r => r.json()).then(() => autoRefreshStatus());
+}
+function autoResume() {
+    fetch('/autonomy/resume', {method:'POST'}).then(r => r.json()).then(() => autoRefreshStatus());
+}
+
+// ==================== MODEL CONTROLS ====================
+function autoLoadTier(tier) {
+    fetch('/autonomy/models/load/' + tier, {method:'POST'}).then(r => r.json()).then(data => {
+        autoRefreshStatus();
+        if (data.success === false) alert('Failed to load ' + tier.toUpperCase() + ' tier. Check model configuration.');
+    });
+}
+function autoUnloadTier(tier) {
+    fetch('/autonomy/models/unload/' + tier, {method:'POST'}).then(r => r.json()).then(() => autoRefreshStatus());
+}
+
+function autoLoadModelsDetail() {
+    fetch('/autonomy/models').then(r => r.json()).then(data => {
+        const container = document.getElementById('models-detail');
+        let html = '';
+        for (const [tier, info] of Object.entries(data)) {
+            const status = info.loaded ? '<span style="color:var(--success)">Loaded</span>' : '<span style="color:var(--text-muted)">Not loaded</span>';
+            html += `<div class="tool-card">
+                <h4>${tier.toUpperCase()}</h4>
+                <table class="data-table" style="max-width:100%;margin-top:0.5rem">
+                    <tr><td>Status</td><td>${status}</td></tr>
+                    <tr><td>Backend</td><td><code>${info.backend}</code></td></tr>
+                    <tr><td>Model</td><td style="word-break:break-all">${info.model_name || info.model_path || '<em>Not configured</em>'}</td></tr>
+                    <tr><td>Enabled</td><td>${info.enabled ? 'Yes' : 'No'}</td></tr>
+                </table>
+                <div style="margin-top:0.5rem;display:flex;gap:0.5rem">
+                    <button class="btn btn-small btn-primary" onclick="autoLoadTier('${tier}')">Load</button>
+                    <button class="btn btn-small" onclick="autoUnloadTier('${tier}')" style="background:var(--bg-input);border:1px solid var(--border)">Unload</button>
+                </div>
+            </div>`;
+        }
+        container.innerHTML = html;
+    });
+}
+
+// ==================== RULES ====================
+let _rules = [];
+
+function autoLoadRules() {
+    fetch('/autonomy/rules').then(r => r.json()).then(data => {
+        _rules = data.rules || [];
+        renderRules();
+    });
+}
+
+function renderRules() {
+    const tbody = document.getElementById('rules-tbody');
+    const empty = document.getElementById('rules-empty');
+    if (_rules.length === 0) {
+        tbody.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+    tbody.innerHTML = _rules.map(r => {
+        const enabled = r.enabled ? '<span style="color:var(--success)">&#x25cf;</span>' : '<span style="color:var(--text-muted)">&#x25cb;</span>';
+        const conds = (r.conditions||[]).map(c => c.type).join(', ') || '-';
+        const acts = (r.actions||[]).map(a => a.type).join(', ') || '-';
+        return `<tr>
+            <td>${enabled}</td>
+            <td><strong>${esc(r.name)}</strong></td>
+            <td>${r.priority}</td>
+            <td style="font-size:0.8rem">${esc(conds)}</td>
+            <td style="font-size:0.8rem">${esc(acts)}</td>
+            <td>${r.cooldown_seconds}s</td>
+            <td>
+                <button class="btn btn-small" onclick="autoEditRule('${r.id}')" style="background:var(--bg-input);border:1px solid var(--border);font-size:0.7rem">Edit</button>
+                <button class="btn btn-small" onclick="autoDeleteRule('${r.id}')" style="background:var(--bg-input);border:1px solid var(--danger);color:var(--danger);font-size:0.7rem">Del</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function autoDeleteRule(id) {
+    if (!confirm('Delete this rule?')) return;
+    fetch('/autonomy/rules/' + id, {method:'DELETE'}).then(r => r.json()).then(() => {
+        autoLoadRules();
+        autoRefreshStatus();
+    });
+}
+
+// ==================== RULE EDITOR ====================
+const CONDITION_TYPES = [
+    {value:'threat_score_above', label:'Threat Score Above', hasValue:true, valueType:'number'},
+    {value:'threat_score_below', label:'Threat Score Below', hasValue:true, valueType:'number'},
+    {value:'threat_level_is', label:'Threat Level Is', hasValue:true, valueType:'text'},
+    {value:'port_scan_detected', label:'Port Scan Detected', hasValue:false},
+    {value:'ddos_detected', label:'DDoS Detected', hasValue:false},
+    {value:'ddos_attack_type', label:'DDoS Attack Type', hasValue:true, valueType:'text'},
+    {value:'connection_from_ip', label:'Connection From IP', hasValue:true, valueType:'text'},
+    {value:'connection_count_above', label:'Connection Count Above', hasValue:true, valueType:'number'},
+    {value:'new_listening_port', label:'New Listening Port', hasValue:false},
+    {value:'bandwidth_rx_above_mbps', label:'Bandwidth RX Above (Mbps)', hasValue:true, valueType:'number'},
+    {value:'arp_spoof_detected', label:'ARP Spoof Detected', hasValue:false},
+    {value:'schedule', label:'Schedule (Cron)', hasValue:true, valueType:'text'},
+    {value:'always', label:'Always', hasValue:false},
+];
+
+const ACTION_TYPES = [
+    {value:'block_ip', label:'Block IP', fields:['ip']},
+    {value:'unblock_ip', label:'Unblock IP', fields:['ip']},
+    {value:'rate_limit_ip', label:'Rate Limit IP', fields:['ip','rate']},
+    {value:'block_port', label:'Block Port', fields:['port','direction']},
+    {value:'kill_process', label:'Kill Process', fields:['pid']},
+    {value:'alert', label:'Alert', fields:['message']},
+    {value:'log_event', label:'Log Event', fields:['message']},
+    {value:'run_shell', label:'Run Shell', fields:['command']},
+    {value:'run_module', label:'Run Module (SAM)', fields:['module','args']},
+    {value:'counter_scan', label:'Counter Scan (SAM)', fields:['target']},
+    {value:'escalate_to_lam', label:'Escalate to LAM', fields:['task']},
+];
+
+function autoShowRuleModal(editRule) {
+    const modal = document.getElementById('rule-modal');
+    modal.style.display = 'flex';
+    document.getElementById('rule-modal-title').textContent = editRule ? 'Edit Rule' : 'Add Rule';
+    document.getElementById('rule-edit-id').value = editRule ? editRule.id : '';
+    document.getElementById('rule-name').value = editRule ? editRule.name : '';
+    document.getElementById('rule-priority').value = editRule ? editRule.priority : 50;
+    document.getElementById('rule-cooldown').value = editRule ? editRule.cooldown_seconds : 60;
+    document.getElementById('rule-description').value = editRule ? (editRule.description||'') : '';
+
+    const condList = document.getElementById('conditions-list');
+    const actList = document.getElementById('actions-list');
+    condList.innerHTML = '';
+    actList.innerHTML = '';
+
+    if (editRule) {
+        (editRule.conditions||[]).forEach(c => autoAddCondition(c));
+        (editRule.actions||[]).forEach(a => autoAddAction(a));
+    }
+}
+
+function autoCloseRuleModal() {
+    document.getElementById('rule-modal').style.display = 'none';
+}
+
+function autoEditRule(id) {
+    const rule = _rules.find(r => r.id === id);
+    if (rule) autoShowRuleModal(rule);
+}
+
+function autoAddCondition(existing) {
+    const list = document.getElementById('conditions-list');
+    const row = document.createElement('div');
+    row.className = 'cond-row';
+
+    const sel = document.createElement('select');
+    sel.innerHTML = CONDITION_TYPES.map(c => `<option value="${c.value}">${c.label}</option>`).join('');
+    if (existing) sel.value = existing.type;
+
+    const inp = document.createElement('input');
+    inp.placeholder = 'Value';
+    inp.style.display = 'none';
+    if (existing && existing.value !== undefined) { inp.value = existing.value; inp.style.display = ''; }
+    if (existing && existing.cron) { inp.value = existing.cron; inp.style.display = ''; }
+
+    sel.onchange = () => {
+        const ct = CONDITION_TYPES.find(c => c.value === sel.value);
+        inp.style.display = ct && ct.hasValue ? '' : 'none';
+        inp.placeholder = sel.value === 'schedule' ? 'Cron: */5 * * * *' : 'Value';
+    };
+    sel.onchange();
+
+    const rm = document.createElement('button');
+    rm.className = 'row-remove';
+    rm.textContent = '\u2715';
+    rm.onclick = () => row.remove();
+
+    row.append(sel, inp, rm);
+    list.appendChild(row);
+}
+
+function autoAddAction(existing) {
+    const list = document.getElementById('actions-list');
+    const row = document.createElement('div');
+    row.className = 'action-row';
+    row.style.flexWrap = 'wrap';
+
+    const sel = document.createElement('select');
+    sel.innerHTML = ACTION_TYPES.map(a => `<option value="${a.value}">${a.label}</option>`).join('');
+    if (existing) sel.value = existing.type;
+
+    const fieldsDiv = document.createElement('div');
+    fieldsDiv.style.cssText = 'display:flex;gap:0.5rem;flex:1;min-width:200px';
+
+    function renderFields() {
+        fieldsDiv.innerHTML = '';
+        const at = ACTION_TYPES.find(a => a.value === sel.value);
+        if (at) {
+            at.fields.forEach(f => {
+                const inp = document.createElement('input');
+                inp.placeholder = f;
+                inp.dataset.field = f;
+                if (existing && existing[f]) inp.value = existing[f];
+                fieldsDiv.appendChild(inp);
+            });
+        }
+    }
+    sel.onchange = renderFields;
+    renderFields();
+
+    const rm = document.createElement('button');
+    rm.className = 'row-remove';
+    rm.textContent = '\u2715';
+    rm.onclick = () => row.remove();
+
+    row.append(sel, fieldsDiv, rm);
+    list.appendChild(row);
+}
+
+function autoSaveRule() {
+    const id = document.getElementById('rule-edit-id').value;
+    const name = document.getElementById('rule-name').value.trim();
+    if (!name) { alert('Rule name is required'); return; }
+
+    const conditions = [];
+    document.querySelectorAll('#conditions-list .cond-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        const inp = row.querySelector('input');
+        const cond = {type};
+        if (inp.style.display !== 'none' && inp.value) {
+            if (type === 'schedule') cond.cron = inp.value;
+            else {
+                const num = Number(inp.value);
+                cond.value = isNaN(num) ? inp.value : num;
+            }
+        }
+        conditions.push(cond);
+    });
+
+    const actions = [];
+    document.querySelectorAll('#actions-list .action-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        const action = {type};
+        row.querySelectorAll('input[data-field]').forEach(inp => {
+            if (inp.value) action[inp.dataset.field] = inp.value;
+        });
+        actions.push(action);
+    });
+
+    const rule = {
+        name,
+        priority: parseInt(document.getElementById('rule-priority').value) || 50,
+        cooldown_seconds: parseInt(document.getElementById('rule-cooldown').value) || 60,
+        description: document.getElementById('rule-description').value.trim(),
+        conditions,
+        actions,
+        enabled: true,
+    };
+
+    const url = id ? '/autonomy/rules/' + id : '/autonomy/rules';
+    const method = id ? 'PUT' : 'POST';
+
+    fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(rule)})
+        .then(r => r.json())
+        .then(() => {
+            autoCloseRuleModal();
+            autoLoadRules();
+            autoRefreshStatus();
+        });
+}
+
+// ==================== TEMPLATES ====================
+function autoShowTemplates() {
+    const modal = document.getElementById('templates-modal');
+    modal.style.display = 'flex';
+    fetch('/autonomy/templates').then(r => r.json()).then(data => {
+        const list = document.getElementById('templates-list');
+        list.innerHTML = (data.templates||[]).map(t => `
+            <div class="template-card" onclick='autoApplyTemplate(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
+                <strong>${esc(t.name)}</strong>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin:0.25rem 0">${esc(t.description)}</p>
+                <span style="font-size:0.7rem;color:var(--text-muted)">Priority: ${t.priority} | Cooldown: ${t.cooldown_seconds}s</span>
+            </div>
+        `).join('');
+    });
+}
+
+function autoCloseTemplates() {
+    document.getElementById('templates-modal').style.display = 'none';
+}
+
+function autoApplyTemplate(template) {
+    autoCloseTemplates();
+    fetch('/autonomy/rules', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(template),
+    }).then(r => r.json()).then(() => {
+        autoLoadRules();
+        autoRefreshStatus();
+    });
+}
+
+// ==================== ACTIVITY LOG ====================
+let _activitySSE = null;
+
+function autoLoadActivity() {
+    fetch('/autonomy/activity?limit=100').then(r => r.json()).then(data => {
+        renderActivity(data.entries || []);
+        document.getElementById('activity-count').textContent = (data.total||0) + ' entries';
+    });
+    // Start SSE
+    if (!_activitySSE) {
+        _activitySSE = new EventSource('/autonomy/activity/stream');
+        _activitySSE.onmessage = (e) => {
+            try {
+                const entry = JSON.parse(e.data);
+                if (entry.type === 'keepalive') return;
+                prependActivity(entry);
+                document.getElementById('activity-live-dot').classList.add('active');
+            } catch(ex) {}
+        };
+    }
+}
+
+function renderActivity(entries) {
+    const tbody = document.getElementById('activity-tbody');
+    tbody.innerHTML = entries.map(e => activityRow(e)).join('');
+}
+
+function prependActivity(entry) {
+    const tbody = document.getElementById('activity-tbody');
+    tbody.insertAdjacentHTML('afterbegin', activityRow(entry));
+    // Limit rows
+    while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+}
+
+function activityRow(e) {
+    const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '';
+    const cls = e.action_type === 'system' ? 'activity-system' : (e.success ? 'activity-success' : 'activity-fail');
+    const icon = e.success ? '&#x2713;' : '&#x2717;';
+    return `<tr class="${cls}">
+        <td style="font-size:0.75rem;font-family:monospace">${time}</td>
+        <td>${e.action_type === 'system' ? '-' : icon}</td>
+        <td style="font-size:0.8rem">${esc(e.action_type||'')}</td>
+        <td style="font-size:0.8rem">${esc(e.action_detail||'')}</td>
+        <td style="font-size:0.75rem">${esc(e.rule_name||'')}</td>
+        <td style="font-size:0.75rem">${esc(e.tier||'')}</td>
+    </tr>`;
+}
+
+// ==================== UTILS ====================
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// ==================== INIT ====================
+document.addEventListener('DOMContentLoaded', () => {
+    autoStartRefresh();
+    autoLoadRules();
+});
+</script>
+{% endblock %}
