@@ -130,7 +130,12 @@
     {% if session.get('user') %}
     <div id="hal-panel" class="hal-panel" style="display:none">
         <div class="hal-header">
-            <span>&#x25cf; Agent Hal</span>
+            <span>&#x25cf; Hal</span>
+            <label class="hal-mode-switch" title="Toggle Agent mode (tools) vs Direct chat">
+                <input type="checkbox" id="hal-mode-toggle" onchange="halModeChanged(this)">
+                <span class="hal-mode-slider"></span>
+                <span class="hal-mode-label" id="hal-mode-label">Chat</span>
+            </label>
             <button onclick="halToggle()" class="hal-close" title="Close">&#x2715;</button>
         </div>
         <div id="hal-messages" class="hal-messages"></div>

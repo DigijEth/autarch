@@ -13,8 +13,8 @@
 
 [Setup]
 AppName=AUTARCH
-AppVersion=1.5
-AppVerName=AUTARCH 1.5
+AppVersion=1.5.1
+AppVerName=AUTARCH 1.5.1
 AppPublisher=darkHal Security Group
 AppPublisherURL=https://github.com/darkhal
 AppSupportURL=https://github.com/darkhal
@@ -32,8 +32,8 @@ DisableProgramGroupPage=yes
 WizardStyle=modern
 SetupLogging=yes
 
-; Uncomment and set path if you have a custom icon:
-; SetupIconFile=assets\autarch.ico
+SetupIconFile=autarch.ico
+UninstallDisplayIcon={app}\autarch_web.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -49,12 +49,12 @@ Source: "dist\autarch\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 
 [Icons]
 ; Start Menu
-Name: "{group}\AUTARCH Web Dashboard"; Filename: "{app}\autarch_web.exe"; Comment: "Launch AUTARCH Web Dashboard with system tray"
-Name: "{group}\AUTARCH CLI"; Filename: "{app}\autarch.exe"; Comment: "AUTARCH command-line interface"
+Name: "{group}\AUTARCH Web Dashboard"; Filename: "{app}\autarch_web.exe"; IconFilename: "{app}\autarch.ico"; Comment: "Launch AUTARCH Web Dashboard with system tray"
+Name: "{group}\AUTARCH CLI"; Filename: "{app}\autarch.exe"; IconFilename: "{app}\autarch.ico"; Comment: "AUTARCH command-line interface"
 Name: "{group}\Uninstall AUTARCH"; Filename: "{uninstallexe}"
 
 ; Desktop (optional)
-Name: "{commondesktop}\AUTARCH Web"; Filename: "{app}\autarch_web.exe"; Tasks: desktopicon; Comment: "Launch AUTARCH Web Dashboard"
+Name: "{commondesktop}\AUTARCH Web"; Filename: "{app}\autarch_web.exe"; IconFilename: "{app}\autarch.ico"; Tasks: desktopicon; Comment: "Launch AUTARCH Web Dashboard"
 
 ; Windows Startup (optional)
 Name: "{userstartup}\AUTARCH Web"; Filename: "{app}\autarch_web.exe"; Tasks: startupicon

@@ -53,7 +53,7 @@ build_exe_options = {
         'web.routes.targets', 'web.routes.encmodules',
         'web.routes.llm_trainer',
     ],
-    'excludes': ['torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
+    'excludes': ['torch', 'transformers',
                  'tkinter', 'matplotlib', 'numpy',
                  'bitsandbytes',
                  'huggingface_hub', 'safetensors', 'tokenizers',
@@ -74,7 +74,7 @@ bdist_msi_options = {
 
 setup(
     name='AUTARCH',
-    version='1.5.0',
+    version='1.5.1',
     description='AUTARCH — Autonomous Tactical Agent for Reconnaissance, Counterintelligence, and Hacking',
     author='darkHal Security Group & Setec Security Labs',
     options={

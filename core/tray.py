@@ -9,6 +9,7 @@ Requires: pystray, Pillow
 import sys
 import threading
 import webbrowser
+from pathlib import Path
 
 try:
     import pystray
@@ -18,27 +19,43 @@ except ImportError:
     TRAY_AVAILABLE = False
 
 
+def _get_icon_path():
+    """Find the .ico file — works in both source and frozen (PyInstaller) builds."""
+    if getattr(sys, 'frozen', False):
+        base = Path(sys._MEIPASS)
+    else:
+        base = Path(__file__).parent.parent
+    ico = base / 'autarch.ico'
+    if ico.exists():
+        return ico
+    return None
+
+
 def create_icon_image(size=64):
-    """Create AUTARCH tray icon programmatically — dark circle with cyan 'A'."""
+    """Load tray icon from .ico file, falling back to programmatic generation."""
+    ico_path = _get_icon_path()
+    if ico_path:
+        try:
+            img = Image.open(str(ico_path))
+            img = img.resize((size, size), Image.LANCZOS)
+            return img.convert('RGBA')
+        except Exception:
+            pass
+
+    # Fallback: generate programmatically
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-
-    # Dark background circle with cyan border
     draw.ellipse([1, 1, size - 2, size - 2], fill=(15, 15, 25, 255),
                  outline=(0, 180, 255, 255), width=2)
-
-    # Letter "A" centered
     try:
         font = ImageFont.truetype("arial.ttf", int(size * 0.5))
     except OSError:
         font = ImageFont.load_default()
-
     bbox = draw.textbbox((0, 0), "A", font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
     x = (size - tw) // 2
     y = (size - th) // 2 - bbox[1]
     draw.text((x, y), "A", fill=(0, 200, 255, 255), font=font)
-
     return img
 
 

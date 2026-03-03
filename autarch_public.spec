@@ -29,6 +29,9 @@ _candidate_files = [
     # LLM model
     (SRC / 'models' / 'Hal_v2.gguf', 'models'),
 
+    # Icon
+    (SRC / 'autarch.ico',            '.'),
+
     # Root-level config and docs
     (SRC / 'autarch_settings.conf',  '.'),
     (SRC / 'user_manual.md',         '.'),
@@ -100,7 +103,7 @@ hidden_imports = [
 
 excludes = [
     # Exclude heavy optional deps not needed at runtime
-    'torch', 'transformers', 'llama_cpp', 'llama_cpp_python', 'anthropic',
+    'torch', 'transformers',
     'tkinter', 'matplotlib', 'numpy',
     # CUDA / quantization libraries
     'bitsandbytes',
@@ -171,7 +174,7 @@ exe_cli = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=str(SRC / 'autarch.ico'),
 )
 
 # ── Web executable (NO console window — tray icon only) ─────────────────────
@@ -192,7 +195,7 @@ exe_web = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon=str(SRC / 'autarch.ico'),
 )
 
 # ── Collect everything into one directory ────────────────────────────────────

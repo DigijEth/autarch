@@ -249,6 +249,7 @@ PARAMS: {"question": "Your question"}
         self.conversation.append({"role": "user", "content": f"Task: {task}"})
 
         step_count = 0
+        parse_failures = 0  # Track consecutive format failures
 
         while step_count < self.max_steps:
             step_count += 1
@@ -275,10 +276,34 @@ PARAMS: {"question": "Your question"}
             # Parse response
             try:
                 thought, action, params = self._parse_response(response)
+                parse_failures = 0  # Reset on success
             except ValueError as e:
+                parse_failures += 1
                 self._log(f"Failed to parse response: {e}", "error")
                 self._log(f"Raw response: {response[:200]}...", "warning")
-                # Add error feedback and continue
+
+                # After 2 consecutive parse failures, the model can't follow
+                # the structured format — treat its response as a direct answer
+                if parse_failures >= 2:
+                    # Clean up the raw response for display
+                    answer = response.strip()
+                    # Remove ChatML tokens if present
+                    for tag in ['<|im_end|>', '<|im_start|>', '<|endoftext|>']:
+                        answer = answer.split(tag)[0]
+                    answer = answer.strip()
+                    if not answer:
+                        answer = "I could not process that request in agent mode. Try switching to Chat mode."
+
+                    self._log("Model cannot follow structured format, returning direct answer", "warning")
+                    step = AgentStep(thought="Direct response (model does not support agent format)", tool_name="task_complete", tool_args={"summary": answer})
+                    step.tool_result = answer
+                    self.steps.append(step)
+                    if self.on_step:
+                        self.on_step(step)
+                    self._set_state(AgentState.COMPLETE)
+                    return AgentResult(success=True, summary=answer, steps=self.steps)
+
+                # First failure — give one retry with format correction
                 self.conversation.append({
                     "role": "assistant",
                     "content": response

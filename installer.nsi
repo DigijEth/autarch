@@ -17,7 +17,7 @@
 
 ; ── App metadata ─────────────────────────────────────────────────────────────
 !define APPNAME      "AUTARCH"
-!define APPVERSION   "1.5"
+!define APPVERSION   "1.5.1"
 !define PUBLISHER    "darkHal Security Group"
 !define DESCRIPTION  "Autonomous Tactical Agent for Reconnaissance, Counterintelligence, and Hacking"
 

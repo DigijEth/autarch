@@ -45,14 +45,51 @@ def _ensure_model_loaded():
 @chat_bp.route('/chat', methods=['POST'])
 @login_required
 def chat():
-    """Handle chat messages — uses Agent system for tool-using tasks,
-    direct chat for simple questions. Streams response via SSE."""
+    """Handle chat messages — direct chat or agent mode based on user toggle.
+    Streams response via SSE."""
     data = request.get_json(silent=True) or {}
     message = data.get('message', '').strip()
+    mode = data.get('mode', 'chat')  # 'chat' (default) or 'agent'
     if not message:
         return jsonify({'error': 'No message provided'})
 
-    # Always use agent mode so Hal can use tools including create_module
+    if mode == 'agent':
+        return _handle_agent_chat(message)
+    else:
+        return _handle_direct_chat(message)
+
+
+def _handle_direct_chat(message):
+    """Direct chat mode — streams tokens from the LLM without the Agent system."""
+    def generate():
+        from core.llm import get_llm, LLMError
+
+        llm = get_llm()
+        if not llm.is_loaded:
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Loading model...'})}\n\n"
+            try:
+                llm.load_model(verbose=False)
+            except LLMError as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': f'Failed to load model: {e}'})}\n\n"
+                yield f"data: {json.dumps({'done': True})}\n\n"
+                return
+
+        system_prompt = _get_system_prompt()
+        try:
+            token_gen = llm.chat(message, system_prompt=system_prompt, stream=True)
+            for token in token_gen:
+                yield f"data: {json.dumps({'token': token})}\n\n"
+        except LLMError as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+def _handle_agent_chat(message):
+    """Agent mode — uses the Agent system with tools for complex tasks."""
     run_id = str(uuid.uuid4())
     stop_event = threading.Event()
     steps = []
@@ -86,7 +123,6 @@ def chat():
                 if step.tool_name and step.tool_name not in ('task_complete', 'ask_user'):
                     steps.append({'type': 'action', 'content': f"{step.tool_name}({json.dumps(step.tool_args or {})})"})
                 if step.tool_result:
-                    # Truncate long results for display
                     result = step.tool_result
                     if len(result) > 800:
                         result = result[:800] + '...'

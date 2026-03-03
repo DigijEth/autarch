@@ -5373,3 +5373,182 @@ Added local network discovery so Archon can auto-find AUTARCH servers without ma
 
 ---
 
+## Session 16 — 2026-03-01: Threat Monitor Enhancement, Hal Agent Mode, Windows Defense, LLM Trainer
+
+### Phase 4.17 — Threat Monitor Enhancement (7-tab Threat Monitor)
+
+Expanded the Threat Monitor from 4 tabs to 7, adding Network Intel, Packet Capture, and DDoS Mitigation capabilities.
+
+**Files Changed:**
+- `modules/defender_monitor.py` — Added ~15 new methods + singleton `get_threat_monitor()`
+- `web/routes/defense.py` — Added ~25 new routes under `/defense/monitor/`
+- `web/templates/defense_monitor.html` — 3 new tabs (7 total), drill-down popups
+
+**New ThreatMonitor methods:**
+- `get_bandwidth()` — bytes in/out per interface + deltas (PowerShell / `/proc/net/dev`)
+- `check_arp_spoofing()` — multiple MACs per IP detection (`arp -a` / `ip neigh show`)
+- `check_new_listening_ports()` — alert on new listeners since baseline
+- `geoip_lookup(ip)` — country/ISP/ASN via ipwho.is API
+- `get_connections_with_geoip()` — connection table enriched with geo data
+- `get_connection_rate()` — connections/sec trending
+- `detect_ddos()` — SYN flood / connection flood / bandwidth spike detection
+- `get_top_talkers(limit)` — top IPs by connection count
+- `apply_rate_limit(ip, rate)` / `remove_rate_limit(ip)` — per-IP rate limiting (netsh / iptables)
+- `get_syn_protection_status()` / `enable_syn_protection()` — SYN cookies
+- `get_ddos_config()` / `save_ddos_config()` — auto-mitigation config (data/ddos_config.json)
+- `auto_mitigate()` — auto-block offenders if thresholds exceeded
+- `get_mitigation_history()` / `log_mitigation()` — action log (data/mitigation_log.json)
+
+**New routes (under `/defense/monitor/`):**
+- Monitoring: `bandwidth`, `arp-check`, `new-ports`, `geoip`, `connections-geo`, `connection-rate`
+- Packet Capture: `capture/interfaces`, `capture/start`, `capture/stop`, `capture/stats`, `capture/stream` (SSE), `capture/protocols`, `capture/conversations`
+- DDoS: `ddos/detect`, `ddos/top-talkers`, `ddos/rate-limit`, `ddos/rate-limit/remove`, `ddos/syn-status`, `ddos/syn-enable`, `ddos/syn-disable`, `ddos/config` (GET/POST), `ddos/auto-mitigate`, `ddos/history`, `ddos/history/clear`
+
+**7 tabs in defense_monitor.html:**
+1. **Live Monitor** — enhanced with bandwidth cards, ARP/port/DDoS counters, drill-down popups
+2. **Connections** — existing, with clickable rows for connection details
+3. **Network Intel** — bandwidth table, ARP spoof check, listening port monitor, GeoIP lookup, connections+GeoIP
+4. **Threats** — existing threat list with drill-down
+5. **Packet Capture** — interface selector, BPF filter, duration, start/stop, live packet SSE stream, protocol distribution, top conversations
+6. **DDoS Mitigation** — detection status, top talkers, SYN protection toggle, rate limiting per IP, auto-mitigation config, mitigation history
+7. **Counter-Attack** — existing
+
+**Drill-down popups (`.tmon-overlay` + `.tmon-popup`):**
+- Click any stat in Live Monitor → modal popup with detailed data table
+- Connections popup with clickable rows → individual connection detail card
+- CSS added: `.tmon-overlay`, `.tmon-popup`, `.tmon-popup-header`, `.tmon-popup-body`, `.tmon-stat-clickable`, `.tmon-detail-card`, `.tmon-row-clickable`, `.tmon-back-btn`
+
+### Phase 4.18 — Hal Agent Mode + Module Factory
+
+Wired Hal chat to the Agent system so it can create new AUTARCH modules on demand.
+
+**Files Changed:**
+- `core/tools.py` — added `create_module` tool to ToolRegistry
+- `web/routes/chat.py` — rewritten to use Agent system with system prompt; agent-mode SSE streaming
+- `data/hal_system_prompt.txt` (NEW) — Hal's codebase knowledge (~2000 tokens)
+
+**`create_module` tool:**
+- Validates category (defense/offense/counter/analyze/osint/simulate)
+- Validates code contains required module attributes (NAME, DESCRIPTION, VERSION, CATEGORY, def run())
+- Prevents overwriting existing modules
+- Writes to `modules/{name}.py`
+- Attempts `importlib.util.spec_from_file_location` to verify valid Python
+- If import fails, deletes the file and returns the error
+
+**Chat route rewrite:**
+- Loads system prompt from `data/hal_system_prompt.txt`
+- Detects action requests → Agent mode vs simple chat
+- Agent mode: creates `Agent(llm, tools)`, runs in background thread, streams steps via SSE
+- SSE events: `thought`, `action`, `result`, `token`, `done`, `error`
+
+### Phase 4.19 — Windows Defense Sub-Page
+
+**Files Created:**
+- `modules/defender_windows.py` — Windows security module with firewall, UAC, Defender AV, services, SSH, NTFS, event logs
+- `web/templates/defense_windows.html` — multi-tab Windows defense UI
+
+**Files Changed:**
+- `web/routes/defense.py` — added `defense.windows_index` route + Windows-specific API routes
+- `web/templates/base.html` — added Linux/Windows/Threat Monitor sub-items under Defense sidebar
+
+### Phase 4.20 — LLM Trainer
+
+**Files Created:**
+- `modules/llm_trainer.py` — LLM fine-tuning module (dataset management, training config, adapter listing)
+- `web/routes/llm_trainer.py` — Flask blueprint for LLM Trainer page
+- `web/templates/llm_trainer.html` — LLM Trainer UI
+
+**Features:**
+- Dataset management (create, list, delete JSONL datasets)
+- Training configuration (model, epochs, learning rate, batch size)
+- Adapter listing (LoRA/QLoRA adapters)
+- Training status monitoring
+
+### Refresh Modules Button
+
+**Files Changed:**
+- `web/templates/base.html` — added "Refresh Modules" button in sidebar
+- `web/static/js/app.js` — `reloadModules()` function POSTs to `/settings/reload-modules`
+- `web/routes/settings.py` — `POST /settings/reload-modules` route calls `MenuSystem.reload_modules()`
+
+---
+
+## Session 17 — 2026-03-02: System Tray, Dual-Exe Build, Installer Scripts, v1.5 Release
+
+### Phase 4.21 — System Tray Icon
+
+**Files Created:**
+- `core/tray.py` — `TrayManager` class using pystray + PIL
+
+**Files Changed:**
+- `autarch.py` — added `--no-tray` flag, tray integration in `--web` mode
+
+**TrayManager features:**
+- Auto-generates dark circle icon with cyan "A" using PIL
+- Menu: status line, Start, Stop, Restart, Open Dashboard, Exit
+- Dynamic menu state (Start disabled when running, Stop/Restart disabled when stopped)
+- Uses `werkzeug.serving.make_server` for threaded Flask in background
+- SSL context passthrough for HTTPS
+- `TRAY_AVAILABLE` flag for graceful fallback on systems without pystray
+
+### Phase 4.22 — Dual Executable Build + Frozen Path Support
+
+**Files Created:**
+- `autarch_web.py` — Windowless web launcher entry point (Win32GUI, no console window)
+
+**Files Changed:**
+- `core/paths.py` — Frozen build support with dual-directory pattern
+- `core/menu.py` — Module loading scans both bundled and user module directories
+- `web/app.py` — Template/static paths resolve correctly in frozen (PyInstaller) builds
+
+**Frozen build architecture:**
+- `_FROZEN = getattr(sys, 'frozen', False)` detection
+- `_BUNDLE_DIR` = `Path(sys._MEIPASS)` when frozen (read-only assets)
+- `_APP_DIR` = `Path(sys.executable).parent` when frozen (writable data)
+- New: `is_frozen()`, `get_bundle_dir()`, `get_user_modules_dir()`
+- `get_config_path()` copies bundled config to writable location on first run
+- Module loading: scans both `get_modules_dir()` (bundle) and `get_user_modules_dir()` (user), user overrides bundled
+
+### Phase 4.23 — Installer Scripts
+
+**Files Created:**
+- `installer.iss` — Inno Setup script (lzma2, no solid compression for large files)
+- `installer.nsi` — NSIS script with MUI2, Start Menu, desktop shortcut, uninstaller
+
+**Files Changed:**
+- `autarch_public.spec` — Rewritten for dual-exe build with MERGE/COLLECT, existence-filtered data files
+- `setup_msi.py` — Dual executables, LocalAppData install, model inclusion
+
+**PyInstaller spec details:**
+- Dual Analysis: `a_cli` (autarch.py, console=True) + `a_web` (autarch_web.py, console=False)
+- `MERGE()` for shared library deduplication
+- Single `COLLECT` combining both executables
+- Existence filter: `added_files = [(str(src), dst) for src, dst in _candidate_files if src.exists()]`
+
+**Inno Setup details:**
+- GGUF model stored with `Flags: nocompression` to avoid OOM (3.9GB, barely compressible)
+- `SolidCompression=no` prevents Inno from loading entire archive into memory
+- Model excluded from main recursive glob with `Excludes: "_internal\models\Hal_v2.gguf"`
+- GitHub release version excludes model (34 MB vs 3.9 GB)
+
+### Phase 4.24 — WebUI FOUC Fix
+
+**Files Changed:**
+- `web/templates/base.html` — added inline critical CSS in `<head>`
+
+**Fix:** Inlined dark theme colors, sidebar layout, and flex container styles directly in `<style>` tag before the external stylesheet `<link>`. Prevents flash of unstyled content (white background, unstyled sidebar) when the external CSS is delayed by self-signed cert negotiation or slow loading.
+
+### v1.5 Release
+
+**Release:** https://github.com/DigijEth/autarch/releases/tag/v1.5
+
+**Assets:**
+- `AUTARCH_Setup.exe` (34 MB) — Inno Setup installer, installs to `%LocalAppData%\AUTARCH`
+- `AUTARCH_v1.5_Portable.zip` (39 MB) — Portable build with `autarch.exe` + `autarch_web.exe`
+
+**Note:** Hal AI model (`Hal_v2.gguf`, 3.9 GB) excluded from both downloads due to GitHub's 2 GB per-asset limit.
+
+**All 27+ pages tested** — inline CSS + external stylesheet present, layout/sidebar/content structure verified on every route.
+
+---
+

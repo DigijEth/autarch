@@ -2109,6 +2109,14 @@ async function hwFactoryFlash() {
 
 // ── Agent Hal Global Chat Panel ──────────────────────────────────────────────
 
+var halAgentMode = false;  // false = direct chat, true = agent mode
+
+function halModeChanged(checkbox) {
+    halAgentMode = checkbox.checked;
+    var label = document.getElementById('hal-mode-label');
+    if (label) label.textContent = halAgentMode ? 'Agent' : 'Chat';
+}
+
 function halToggle() {
     var p = document.getElementById('hal-panel');
     if (!p) return;
@@ -2133,7 +2141,7 @@ function halSend() {
     fetch('/api/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: msg})
+        body: JSON.stringify({message: msg, mode: halAgentMode ? 'agent' : 'chat'})
     }).then(function(res) {
         var reader = res.body.getReader();
         var dec = new TextDecoder();

@@ -2262,3 +2262,65 @@ Full Hash Toolkit added as a sub-page under Analyze (sidebar sub-item like Legen
 - **Android Protection Direct mode** — `apDirect()` was passing `HWDirect.adbShell()` result objects (dicts) into `raw` instead of extracting `.stdout` strings; Python `/parse` route then crashed calling `.strip()` on dicts. Fixed by extracting stdout before sending to server
 - **`_serial()` hardened** — now checks `request.form` fallback and wraps in `str()` before `.strip()`
 
+---
+
+## Session 16 — 2026-03-01: Threat Monitor, Hal Agent, Windows Defense, LLM Trainer
+
+### What got done this session:
+- **7-tab Threat Monitor** — expanded from 4 tabs to 7 with Network Intel, Packet Capture, DDoS Mitigation
+- **Drill-down popups** — click any stat in Live Monitor for detailed modal views
+- **Hal Agent Mode** — Chat bubble now uses Agent system with `create_module` tool; can create modules on demand
+- **System prompt** — `data/hal_system_prompt.txt` teaches Hal the codebase
+- **Windows Defense** — `modules/defender_windows.py` + `defense_windows.html` (firewall, UAC, Defender AV, services, SSH, NTFS, event logs)
+- **LLM Trainer** — `modules/llm_trainer.py` + `web/routes/llm_trainer.py` + `llm_trainer.html` (dataset management, training, adapters)
+- **Refresh Modules** — sidebar button for hot-reloading modules without server restart
+
+### Todos from session 14 resolved:
+- System Tray → deferred to session 17
+- Beta Release → deferred to session 17
+
+---
+
+## Session 17 — 2026-03-02: System Tray, Packaging, v1.5 Release
+
+### What got done this session:
+- **System tray** — `core/tray.py` with `TrayManager` (pystray + PIL): Start/Stop/Restart/Open Dashboard/Exit
+- **Dual executables** — `autarch.exe` (CLI, console) + `autarch_web.exe` (Web, no console, tray icon)
+- **PyInstaller frozen build fixes** — dual-directory pattern in `core/paths.py` (_BUNDLE_DIR vs _APP_DIR), module loading scans both bundled and user dirs
+- **Installer scripts** — `installer.iss` (Inno Setup) + `installer.nsi` (NSIS)
+- **Inno Setup OOM fix** — 3.9GB model stored uncompressed, `SolidCompression=no`
+- **Inline critical CSS** — prevents white flash / FOUC on page load
+- **All 27+ pages tested** — verified inline CSS, external stylesheet, layout structure
+- **Version bumped to 1.5**
+- **GitHub Release v1.5** — https://github.com/DigijEth/autarch/releases/tag/v1.5
+  - `AUTARCH_Setup.exe` (34 MB) — installer without model
+  - `AUTARCH_v1.5_Portable.zip` (39 MB) — portable without model
+
+### SESSION SAVE — 2026-03-02 (end of session)
+
+**Phase status:**
+- Phases 0–4.24: DONE
+- Phase 5 (Path portability): DONE (frozen build support complete)
+- Phase 6 (Docker): NOT STARTED
+
+**Key files created/modified this session:**
+- `core/tray.py` (NEW) — TrayManager
+- `autarch_web.py` (NEW) — Windowless web launcher
+- `installer.iss` (NEW) — Inno Setup installer script
+- `installer.nsi` (NEW) — NSIS installer script
+- `core/paths.py` — Frozen build dual-directory pattern
+- `core/menu.py` — Dual module directory scanning
+- `web/app.py` — Frozen template/static path resolution
+- `autarch.py` — --no-tray flag
+- `autarch_public.spec` — Dual-exe MERGE/COLLECT
+- `setup_msi.py` — Dual executables, v1.5
+- `web/templates/base.html` — Inline critical CSS
+
+**Todos from session 14 RESOLVED:**
+- System Tray: DONE (core/tray.py)
+- Beta Release: DONE (v1.5 on GitHub)
+
+**Remaining work from master_plan.md:**
+- Phase 6 (Docker): NOT STARTED
+- Plan file (quizzical-toasting-mccarthy.md) — Threat Monitor + Hal Module Factory: DONE
+
