@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AUTARCH{% endblock %}</title>
+    <!-- Critical inline CSS — prevents white flash / FOUC if external sheet delays -->
+    <style>
+        :root{--bg-primary:#0f1117;--bg-secondary:#1a1d27;--bg-card:#222536;--bg-input:#2a2d3e;--border:#333650;--text-primary:#e4e6f0;--text-secondary:#8b8fa8;--text-muted:#5c6078;--accent:#6366f1;--accent-hover:#818cf8;--danger:#ef4444;--radius:8px}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.6}
+        .layout{display:flex;min-height:100vh}
+        .sidebar{width:240px;background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;height:100vh;overflow-y:auto}
+        .content{flex:1;margin-left:240px;padding:32px;max-width:1200px}
+        .login-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+        a{color:var(--accent);text-decoration:none}
+    </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_head %}{% endblock %}
 </head>
