@@ -100,6 +100,36 @@ class MessagingModule : ArchonModule {
             description = "Toggle SMS interception (intercept_mode:on or intercept_mode:off)",
             privilegeRequired = true,
             rootOnly = false
+        ),
+        ModuleAction(
+            id = "rcs_account",
+            name = "RCS Account Info",
+            description = "Get Google Messages RCS registration, IMS state, and carrier config",
+            privilegeRequired = true
+        ),
+        ModuleAction(
+            id = "extract_bugle_db",
+            name = "Extract bugle_db",
+            description = "Extract encrypted bugle_db + encryption key material from Google Messages",
+            privilegeRequired = true
+        ),
+        ModuleAction(
+            id = "dump_decrypted",
+            name = "Dump Decrypted Messages",
+            description = "Query decrypted RCS/SMS messages from content providers and app context",
+            privilegeRequired = true
+        ),
+        ModuleAction(
+            id = "extract_keys",
+            name = "Extract Encryption Keys",
+            description = "Extract bugle_db encryption key material from shared_prefs",
+            privilegeRequired = true
+        ),
+        ModuleAction(
+            id = "gmsg_info",
+            name = "Google Messages Info",
+            description = "Get Google Messages version, UID, and RCS configuration",
+            privilegeRequired = false
         )
     )
 
@@ -139,6 +169,11 @@ class MessagingModule : ArchonModule {
             actionId == "intercept_mode" -> ModuleResult(false, "Specify: intercept_mode:on or intercept_mode:off")
             actionId == "intercept_mode:on" -> interceptMode(shizuku, true)
             actionId == "intercept_mode:off" -> interceptMode(shizuku, false)
+            actionId == "rcs_account" -> rcsAccountInfo(shizuku)
+            actionId == "extract_bugle_db" -> extractBugleDb(shizuku)
+            actionId == "dump_decrypted" -> dumpDecrypted(shizuku)
+            actionId == "extract_keys" -> extractKeys(shizuku)
+            actionId == "gmsg_info" -> gmsgInfo(shizuku)
             else -> ModuleResult(false, "Unknown action: $actionId")
         }
     }
@@ -357,6 +392,131 @@ class MessagingModule : ArchonModule {
                 }))
         } else {
             ModuleResult(false, "Failed to ${if (enable) "enable" else "disable"} interception")
+        }
+    }
+
+    // ── Google Messages RCS database access ─────────────────────────
+
+    private fun rcsAccountInfo(shizuku: ShizukuManager): ModuleResult {
+        if (!shizuku.isReady()) {
+            return ModuleResult(false, "Elevated access required")
+        }
+        return try {
+            val info = shizuku.getRcsAccountInfo()
+            val details = mutableListOf<String>()
+            details.add("IMS registered: ${info["ims_registered"] ?: "unknown"}")
+            details.add("RCS enabled: ${info["rcs_enabled"] ?: "unknown"}")
+            val gmsg = info["google_messages"] as? Map<*, *>
+            if (gmsg != null) {
+                details.add("Google Messages: v${gmsg["version"] ?: "?"} (UID: ${gmsg["uid"] ?: "?"})")
+            }
+            val rcsConfig = info["carrier_rcs_config"] as? Map<*, *>
+            if (rcsConfig != null && rcsConfig.isNotEmpty()) {
+                details.add("Carrier RCS keys: ${rcsConfig.size}")
+                rcsConfig.entries.take(5).forEach { (k, v) ->
+                    details.add("  $k = $v")
+                }
+            }
+            val gmsgPrefs = info["gmsg_rcs_prefs"] as? Map<*, *>
+            if (gmsgPrefs != null && gmsgPrefs.isNotEmpty()) {
+                details.add("Google Messages RCS prefs: ${gmsgPrefs.size}")
+                gmsgPrefs.entries.take(5).forEach { (k, v) ->
+                    details.add("  $k = $v")
+                }
+            }
+            ModuleResult(true, "RCS account info retrieved", details)
+        } catch (e: Exception) {
+            ModuleResult(false, "Failed: ${e.message}")
+        }
+    }
+
+    private fun extractBugleDb(shizuku: ShizukuManager): ModuleResult {
+        if (!shizuku.isReady()) {
+            return ModuleResult(false, "Elevated access required — bugle_db is encrypted at rest")
+        }
+        return try {
+            val result = shizuku.extractBugleDbRaw()
+            val dbFiles = result["db_files"] as? List<*> ?: emptyList<String>()
+            val details = mutableListOf<String>()
+            details.add("Database files: ${dbFiles.joinToString(", ")}")
+            details.add("Staging dir: ${result["staging_dir"]}")
+            details.add("ENCRYPTED: ${result["encrypted"]}")
+            details.add(result["note"].toString())
+            details.add("")
+            details.add("Use AUTARCH web UI to pull from: ${result["staging_dir"]}")
+            details.add("Key material in shared_prefs/ may enable offline decryption")
+            details.add("Hardware-backed Keystore keys cannot be extracted via ADB")
+            ModuleResult(dbFiles.isNotEmpty(), "Extracted ${dbFiles.size} DB files + key material", details)
+        } catch (e: Exception) {
+            ModuleResult(false, "Extract failed: ${e.message}")
+        }
+    }
+
+    private fun dumpDecrypted(shizuku: ShizukuManager): ModuleResult {
+        if (!shizuku.isReady()) {
+            return ModuleResult(false, "Elevated access required")
+        }
+        return try {
+            val result = shizuku.dumpDecryptedMessages()
+            val count = result["message_count"] as? Int ?: 0
+            val details = mutableListOf<String>()
+            details.add("Messages retrieved: $count")
+            details.add("RCS provider accessible: ${result["rcs_provider_accessible"]}")
+            if (result["json_path"] != null) {
+                details.add("JSON dump: ${result["json_path"]}")
+            }
+            details.add(result["note"].toString())
+            if (count > 0) {
+                details.add("")
+                details.add("Use AUTARCH web UI to pull the decrypted dump")
+            }
+            ModuleResult(count > 0, "$count messages dumped (decrypted)", details)
+        } catch (e: Exception) {
+            ModuleResult(false, "Dump failed: ${e.message}")
+        }
+    }
+
+    private fun extractKeys(shizuku: ShizukuManager): ModuleResult {
+        if (!shizuku.isReady()) {
+            return ModuleResult(false, "Elevated access required")
+        }
+        return try {
+            val result = shizuku.extractEncryptionKeyMaterial()
+            if (result.containsKey("error")) {
+                return ModuleResult(false, result["error"].toString())
+            }
+            val details = mutableListOf<String>()
+            val cryptoCount = result["crypto_prefs_count"] as? Int ?: 0
+            details.add("Crypto-related shared_prefs files: $cryptoCount")
+            val prefFiles = result["shared_prefs_files"] as? List<*>
+            if (prefFiles != null) {
+                details.add("Total shared_prefs files: ${prefFiles.size}")
+            }
+            val filesDir = result["files_dir"] as? List<*>
+            if (filesDir != null) {
+                details.add("Files dir entries: ${filesDir.size}")
+            }
+            details.add("")
+            details.add("NOTE: bugle_db encryption key may be in these files.")
+            details.add("Hardware-backed Android Keystore keys cannot be extracted.")
+            details.add("If key derivation params are in shared_prefs, offline")
+            details.add("decryption may be possible with the right tools.")
+            ModuleResult(cryptoCount > 0, "Extracted $cryptoCount crypto-related files", details)
+        } catch (e: Exception) {
+            ModuleResult(false, "Key extraction failed: ${e.message}")
+        }
+    }
+
+    private fun gmsgInfo(shizuku: ShizukuManager): ModuleResult {
+        return try {
+            val info = shizuku.getGoogleMessagesInfo()
+            if (info.isEmpty()) {
+                return ModuleResult(false, "Google Messages not found or not accessible")
+            }
+            val details = info.map { (k, v) -> "$k: $v" }
+            ModuleResult(true, "Google Messages v${info["version"] ?: "?"}", details)
+        } catch (e: Exception) {
+            ModuleResult(false, "Failed: ${e.message}")
         }
     }
 }

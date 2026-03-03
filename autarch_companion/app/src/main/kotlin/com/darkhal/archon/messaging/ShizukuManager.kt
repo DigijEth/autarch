@@ -577,4 +577,292 @@ class ShizukuManager(private val context: Context) {
             false
         }
     }
+
+    // ── Google Messages bugle_db access (encrypted database) ────────
+
+    // Google Messages paths
+    private val gmsgPkg = "com.google.android.apps.messaging"
+    private val bugleDb = "/data/data/$gmsgPkg/databases/bugle_db"
+    private val bugleWal = "$bugleDb-wal"
+    private val bugleShm = "$bugleDb-shm"
+    private val sharedPrefsDir = "/data/data/$gmsgPkg/shared_prefs/"
+    private val filesDir = "/data/data/$gmsgPkg/files/"
+    private val stagingDir = "/sdcard/Download/autarch_extract"
+
+    /**
+     * Get the Google Messages app UID (needed for run-as or key extraction).
+     */
+    fun getGoogleMessagesUid(): Int? {
+        val output = executeCommand("pm list packages -U $gmsgPkg")
+        val match = Regex("uid:(\\d+)").find(output)
+        return match?.groupValues?.get(1)?.toIntOrNull()
+    }
+
+    /**
+     * Check if Google Messages is installed and get version info.
+     */
+    fun getGoogleMessagesInfo(): Map<String, String> {
+        val info = mutableMapOf<String, String>()
+        val dump = executeCommand("dumpsys package $gmsgPkg | grep -E 'versionName|versionCode|firstInstallTime'")
+        for (line in dump.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.contains("versionName=")) {
+                info["version"] = trimmed.substringAfter("versionName=").trim()
+            }
+            if (trimmed.contains("versionCode=")) {
+                info["versionCode"] = trimmed.substringAfter("versionCode=").substringBefore(" ").trim()
+            }
+        }
+        val uid = getGoogleMessagesUid()
+        if (uid != null) info["uid"] = uid.toString()
+        return info
+    }
+
+    /**
+     * Extract the encryption key material from Google Messages' shared_prefs.
+     *
+     * The bugle_db is encrypted at rest. Key material is stored in:
+     *   - shared_prefs/ XML files (key alias, crypto params)
+     *   - Android Keystore (hardware-backed master key)
+     *
+     * We extract all shared_prefs and files/ contents so offline decryption
+     * can be attempted. The actual Keystore master key cannot be extracted
+     * via ADB (hardware-backed), but the key derivation parameters in
+     * shared_prefs may be enough for some encryption configurations.
+     */
+    fun extractEncryptionKeyMaterial(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+
+        // List shared_prefs files
+        val prefsList = executeCommand("ls -la $sharedPrefsDir 2>/dev/null")
+        if (prefsList.startsWith("ERROR") || prefsList.contains("Permission denied")) {
+            result["error"] = "Cannot access shared_prefs — need root or CVE exploit"
+            return result
+        }
+        result["shared_prefs_files"] = prefsList.lines().filter { it.isNotBlank() }
+
+        // Read each shared_prefs XML for crypto-related keys
+        val cryptoData = mutableMapOf<String, String>()
+        val prefsFiles = executeCommand("ls $sharedPrefsDir 2>/dev/null")
+        for (file in prefsFiles.lines()) {
+            val fname = file.trim()
+            if (fname.isBlank() || !fname.endsWith(".xml")) continue
+            val content = executeCommand("cat ${sharedPrefsDir}$fname 2>/dev/null")
+            // Look for encryption-related entries
+            if (content.contains("encrypt", ignoreCase = true) ||
+                content.contains("cipher", ignoreCase = true) ||
+                content.contains("key", ignoreCase = true) ||
+                content.contains("crypto", ignoreCase = true) ||
+                content.contains("secret", ignoreCase = true)) {
+                cryptoData[fname] = content
+            }
+        }
+        result["crypto_prefs"] = cryptoData
+        result["crypto_prefs_count"] = cryptoData.size
+
+        // List files/ directory (Signal Protocol state, etc.)
+        val filesList = executeCommand("ls -la $filesDir 2>/dev/null")
+        result["files_dir"] = filesList.lines().filter { it.isNotBlank() }
+
+        return result
+    }
+
+    /**
+     * Extract bugle_db + WAL + key material to staging directory.
+     * The database is encrypted — both DB and key files are needed.
+     */
+    fun extractBugleDbRaw(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+
+        executeCommand("mkdir -p $stagingDir/shared_prefs $stagingDir/files")
+
+        // Copy database files
+        val dbFiles = mutableListOf<String>()
+        for (path in listOf(bugleDb, bugleWal, bugleShm)) {
+            val fname = path.substringAfterLast("/")
+            val cp = executeShell("cp $path $stagingDir/$fname 2>/dev/null && chmod 644 $stagingDir/$fname")
+            if (cp.exitCode == 0) dbFiles.add(fname)
+        }
+        result["db_files"] = dbFiles
+
+        // Copy shared_prefs (key material)
+        executeShell("cp -r ${sharedPrefsDir}* $stagingDir/shared_prefs/ 2>/dev/null")
+        executeShell("chmod -R 644 $stagingDir/shared_prefs/ 2>/dev/null")
+
+        // Copy files dir (Signal Protocol keys)
+        executeShell("cp -r ${filesDir}* $stagingDir/files/ 2>/dev/null")
+        executeShell("chmod -R 644 $stagingDir/files/ 2>/dev/null")
+
+        result["staging_dir"] = stagingDir
+        result["encrypted"] = true
+        result["note"] = "Database is encrypted at rest. Key material in shared_prefs/ " +
+                "may allow decryption. Hardware-backed Keystore keys cannot be extracted via ADB."
+
+        return result
+    }
+
+    /**
+     * Dump decrypted messages by querying from within the app context.
+     *
+     * When Google Messages opens its own bugle_db, it has access to the
+     * encryption key. We can intercept the decrypted data by:
+     * 1. Using `am` commands to trigger data export activities
+     * 2. Querying exposed content providers
+     * 3. Reading from the in-memory decrypted state via debug tools
+     *
+     * As a fallback, we use the standard telephony content providers which
+     * have the SMS/MMS data in plaintext (but not RCS).
+     */
+    fun dumpDecryptedMessages(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        val messages = mutableListOf<Map<String, Any>>()
+
+        // Method 1: Query AOSP RCS content provider (content://rcs/)
+        val rcsThreads = executeCommand(
+            "content query --uri content://rcs/thread 2>/dev/null"
+        )
+        if (!rcsThreads.startsWith("ERROR") && rcsThreads.contains("Row:")) {
+            result["rcs_provider_accessible"] = true
+            // Parse thread IDs and query messages from each
+            for (line in rcsThreads.lines()) {
+                if (!line.startsWith("Row:")) continue
+                val tidMatch = Regex("rcs_thread_id=(\\d+)").find(line)
+                val tid = tidMatch?.groupValues?.get(1) ?: continue
+                val msgOutput = executeCommand(
+                    "content query --uri content://rcs/p2p_thread/$tid/incoming_message 2>/dev/null"
+                )
+                for (msgLine in msgOutput.lines()) {
+                    if (!msgLine.startsWith("Row:")) continue
+                    val row = parseContentRow(msgLine)
+                    row["thread_id"] = tid
+                    row["source"] = "rcs_provider"
+                    messages.add(row)
+                }
+            }
+        } else {
+            result["rcs_provider_accessible"] = false
+        }
+
+        // Method 2: Standard SMS/MMS content providers (always decrypted)
+        val smsOutput = executeCommand(
+            "content query --uri content://sms/ --projection _id:thread_id:address:body:date:type:read " +
+                    "--sort \"date DESC\" 2>/dev/null"
+        )
+        for (line in smsOutput.lines()) {
+            if (!line.startsWith("Row:")) continue
+            val row = parseContentRow(line)
+            row["source"] = "sms_provider"
+            row["protocol"] = "SMS"
+            messages.add(row)
+        }
+
+        // Method 3: Try to trigger Google Messages backup/export
+        // Google Messages has an internal export mechanism accessible via intents
+        val backupResult = executeCommand(
+            "am broadcast -a com.google.android.apps.messaging.action.EXPORT_MESSAGES " +
+                    "--es output_path $stagingDir/gmsg_export.json 2>/dev/null"
+        )
+        result["backup_intent_sent"] = !backupResult.startsWith("ERROR")
+
+        result["messages"] = messages
+        result["message_count"] = messages.size
+        result["note"] = if (messages.isEmpty()) {
+            "No messages retrieved. For RCS, ensure Archon is the default SMS app " +
+                    "or use CVE-2024-0044 to access bugle_db from the app's UID."
+        } else {
+            "Retrieved ${messages.size} messages. RCS messages require elevated access."
+        }
+
+        // Write decrypted dump to file
+        if (messages.isNotEmpty()) {
+            try {
+                val json = org.json.JSONArray()
+                for (msg in messages) {
+                    val obj = org.json.JSONObject()
+                    for ((k, v) in msg) obj.put(k, v)
+                    json.put(obj)
+                }
+                executeCommand("mkdir -p $stagingDir")
+                val jsonStr = json.toString(2)
+                // Write via shell since we may not have direct file access
+                val escaped = jsonStr.replace("'", "'\\''").replace("\"", "\\\"")
+                executeCommand("echo '$escaped' > $stagingDir/messages.json 2>/dev/null")
+                result["json_path"] = "$stagingDir/messages.json"
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to write JSON dump", e)
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Get the RCS account/registration info from Google Messages.
+     * This tells us if RCS is active, what phone number is registered, etc.
+     */
+    fun getRcsAccountInfo(): Map<String, Any> {
+        val info = mutableMapOf<String, Any>()
+
+        // IMS registration state
+        val imsOutput = executeCommand("dumpsys telephony_ims 2>/dev/null")
+        if (!imsOutput.startsWith("ERROR")) {
+            info["ims_dump_length"] = imsOutput.length
+            for (line in imsOutput.lines()) {
+                val l = line.trim().lowercase()
+                if ("registered" in l && "ims" in l) info["ims_registered"] = true
+                if ("rcs" in l && ("enabled" in l || "connected" in l)) info["rcs_enabled"] = true
+            }
+        }
+
+        // Carrier config RCS keys
+        val ccOutput = executeCommand("dumpsys carrier_config 2>/dev/null")
+        val rcsConfig = mutableMapOf<String, String>()
+        for (line in ccOutput.lines()) {
+            val l = line.trim().lowercase()
+            if (("rcs" in l || "uce" in l || "single_registration" in l) && "=" in line) {
+                val (k, v) = line.trim().split("=", limit = 2)
+                rcsConfig[k.trim()] = v.trim()
+            }
+        }
+        info["carrier_rcs_config"] = rcsConfig
+
+        // Google Messages specific RCS settings
+        val gmsgPrefs = executeCommand(
+            "cat /data/data/$gmsgPkg/shared_prefs/com.google.android.apps.messaging_preferences.xml 2>/dev/null"
+        )
+        if (!gmsgPrefs.startsWith("ERROR") && gmsgPrefs.isNotBlank()) {
+            // Extract RCS-related prefs
+            val rcsPrefs = mutableMapOf<String, String>()
+            for (match in Regex("<(string|boolean|int|long)\\s+name=\"([^\"]*rcs[^\"]*)\">([^<]*)<").findAll(gmsgPrefs, 0)) {
+                rcsPrefs[match.groupValues[2]] = match.groupValues[3]
+            }
+            info["gmsg_rcs_prefs"] = rcsPrefs
+        }
+
+        // Phone number / MSISDN
+        val phoneOutput = executeCommand("service call iphonesubinfo 15 2>/dev/null")
+        info["phone_service_response"] = phoneOutput.take(200)
+
+        // Google Messages version
+        info["google_messages"] = getGoogleMessagesInfo()
+
+        return info
+    }
+
+    /**
+     * Parse a `content query` output row into a map.
+     */
+    private fun parseContentRow(line: String): MutableMap<String, Any> {
+        val row = mutableMapOf<String, Any>()
+        val payload = line.substringAfter(Regex("Row:\\s*\\d+\\s*").find(line)?.value ?: "")
+        val fields = payload.split(Regex(",\\s+(?=[a-zA-Z_]+=)"))
+        for (field in fields) {
+            val eqPos = field.indexOf('=')
+            if (eqPos == -1) continue
+            val key = field.substring(0, eqPos).trim()
+            val value = field.substring(eqPos + 1).trim()
+            row[key] = if (value == "NULL") "" else value
+        }
+        return row
+    }
 }
