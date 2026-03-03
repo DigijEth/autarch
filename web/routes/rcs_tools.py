@@ -162,6 +162,38 @@ def mms():
     return jsonify({'ok': True, 'messages': msgs, 'count': len(msgs)})
 
 
+@rcs_tools_bp.route('/rcs-via-mms')
+@login_required
+def rcs_via_mms():
+    thread_id = request.args.get('thread_id')
+    tid = int(thread_id) if thread_id else None
+    limit = int(request.args.get('limit', 200))
+    msgs = _get_rcs().read_rcs_via_mms(tid, limit)
+    rcs_count = sum(1 for m in msgs if m.get('is_rcs'))
+    return jsonify({'ok': True, 'messages': msgs, 'count': len(msgs), 'rcs_count': rcs_count})
+
+
+@rcs_tools_bp.route('/rcs-only')
+@login_required
+def rcs_only():
+    limit = int(request.args.get('limit', 200))
+    msgs = _get_rcs().read_rcs_only(limit)
+    return jsonify({'ok': True, 'messages': msgs, 'count': len(msgs)})
+
+
+@rcs_tools_bp.route('/rcs-threads')
+@login_required
+def rcs_threads():
+    threads = _get_rcs().read_rcs_threads()
+    return jsonify({'ok': True, 'threads': threads, 'count': len(threads)})
+
+
+@rcs_tools_bp.route('/backup-rcs-xml', methods=['POST'])
+@login_required
+def backup_rcs_xml():
+    return jsonify(_get_rcs().backup_rcs_to_xml())
+
+
 @rcs_tools_bp.route('/drafts')
 @login_required
 def drafts():
