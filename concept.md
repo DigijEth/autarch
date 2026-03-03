@@ -2,7 +2,7 @@
 
 ## Origin
 
-Project AUTARCH was originally conceived as a proposal for a **Defense Intelligence Agency (D.I.A.) research grant** — an investigation into the feasibility and implications of fully autonomous LLM-driven offensive cyber agents operating within adversarial simulation environments.
+Project AUTARCH was originally conceived as a proposal for a **Defense Intelligence Agency (D.I.A.) research grant** — an investigation into the feasibility and implications of fully autonomous LLM-LAM-LSM-driven offensive cyber agents operating within adversarial simulation environments.
 
 The full version of AUTARCH, including its complete autonomous agent capabilities, operational case studies, and classified research findings, is **not available to the public**. The full case study remains classified at this time.
 
