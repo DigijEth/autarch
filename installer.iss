@@ -13,8 +13,8 @@
 
 [Setup]
 AppName=AUTARCH
-AppVersion=1.5.1
-AppVerName=AUTARCH 1.5.1
+AppVersion=2.0
+AppVerName=AUTARCH 2.0
 AppPublisher=darkHal Security Group
 AppPublisherURL=https://github.com/darkhal
 AppSupportURL=https://github.com/darkhal

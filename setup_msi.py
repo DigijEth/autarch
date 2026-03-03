@@ -16,7 +16,6 @@ include_files = [
     (str(SRC / 'web' / 'static'),    'web/static'),
     (str(SRC / 'data'),              'data'),
     (str(SRC / 'modules'),           'modules'),
-    (str(SRC / 'models' / 'Hal_v2.gguf'), 'models/Hal_v2.gguf'),
     (str(SRC / 'autarch_settings.conf'), 'autarch_settings.conf'),
     (str(SRC / 'user_manual.md'),        'user_manual.md'),
     (str(SRC / 'windows_manual.md'),     'windows_manual.md'),
@@ -52,6 +51,8 @@ build_exe_options = {
         'web.routes.msf', 'web.routes.chat',
         'web.routes.targets', 'web.routes.encmodules',
         'web.routes.llm_trainer',
+        'web.routes.autonomy',
+        'core.model_router', 'core.rules', 'core.autonomy',
     ],
     'excludes': ['torch', 'transformers',
                  'tkinter', 'matplotlib', 'numpy',
@@ -74,7 +75,7 @@ bdist_msi_options = {
 
 setup(
     name='AUTARCH',
-    version='1.5.1',
+    version='2.0',
     description='AUTARCH — Autonomous Tactical Agent for Reconnaissance, Counterintelligence, and Hacking',
     author='darkHal Security Group & Setec Security Labs',
     options={
