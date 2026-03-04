@@ -35,7 +35,7 @@ AUTARCH runs on Windows with most features fully functional. A few Linux-specifi
 - Android/iPhone device management via ADB (USB or WebUSB)
 - Hardware ESP32 flashing
 - Metasploit RPC client (MSF must be started separately)
-- Reverse shell management
+- Reverse usersll management
 - C2 Framework, Load Test, Gone Fishing Mail Server
 - Vulnerability Scanner, Exploit Development, Social Engineering
 - Active Directory Audit, MITM Proxy, WiFi Audit
@@ -99,7 +99,7 @@ If you received AUTARCH as a ZIP file, extract it to a folder like `C:\users\aut
 Open Command Prompt, navigate to your AUTARCH folder, and run:
 
 ```
-cd C:\she\autarch
+cd C:\users\autarch
 pip install -r requirements.txt
 ```
 
@@ -166,14 +166,14 @@ AUTARCH's `--service` commands use Linux `systemd`. On Windows, use **Task Sched
 3. Trigger: "When the computer starts"
 4. Action: Start a program
    - Program: `python`
-   - Arguments: `C:\she\autarch\autarch.py --web`
-   - Start in: `C:\she\autarch`
+   - Arguments: `C:\users\autarch\autarch.py --web`
+   - Start in: `C:\users\autarch`
 5. Run whether user is logged on or not
 
 Alternatively, use **NSSM** (Non-Sucking Service Manager) for a proper Windows service:
 
 ```
-nssm install AUTARCH "python" "C:\she\autarch\autarch.py --web"
+nssm install AUTARCH "python" "C:\users\autarch\autarch.py --web"
 nssm start AUTARCH
 ```
 
@@ -200,7 +200,7 @@ Default credentials are set during first-run setup. Change them in Settings → 
 | Analyze | File forensics, Hash Toolkit, LLM Trainer, Password Toolkit, Net Mapper, Reports, BLE Scanner, Forensics, RFID/NFC, Malware Sandbox, Reverse Eng |
 | OSINT | Intelligence gathering, IP Capture |
 | Simulate | Attack scenarios, Legendary Creator |
-| Tools | Enc Modules, Wireshark, Hardware, Android Exploit (+ SMS Forge), iPhone Exploit, Shield, Reverse Shell, Archon, SDR/RF Tools, Starlink Hack, RCS Tools |
+| Tools | Enc Modules, Wireshark, Hardware, Android Exploit (+ SMS Forge), iPhone Exploit, Shield, Reverse usersll, Archon, SDR/RF Tools, Starlink Hack, RCS Tools |
 | System | UPnP, WireGuard, DNS Server, MSF Console, Chat, Settings |
 
 ### HAL Chat Button
@@ -581,7 +581,7 @@ AUTARCH v2.3 includes 59 web blueprints and 72 CLI modules. Here is a summary of
 | Tool | Description |
 |------|-------------|
 | Vulnerability Scanner | Nuclei/OpenVAS template-based scanning with severity ratings |
-| Exploit Development | Shellcode gen, payload encoding, ROP chains, pattern generator |
+| Exploit Development | usersllcode gen, payload encoding, ROP chains, pattern generator |
 | Social Engineering | Credential harvest, pretexts, QR phishing, campaign tracking |
 | AD Audit | LDAP enumeration, Kerberoasting, AS-REP roast, ACL analysis |
 | MITM Proxy | HTTP(S) interception, SSL strip, request modification |
