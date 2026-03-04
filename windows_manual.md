@@ -115,22 +115,6 @@ If it fails, you can skip it — AUTARCH will detect its absence and load models
 
 ### Step 4 — First Run -- Run in admin powershell
 
-```
-python autarch.py --web
-```
-
-For CLI TUI:
-
----
-python autarch.py
----
-
-A setup wizard will appear asking you to configure an AI backend. If you don't have an AI model yet, choose **Skip Setup** — you can configure it later in Settings → LLM Config.
-
----
-
-## 4. Running AUTARCH on Windows
-
 ### Starting the Terminal Menu
 
 ```
