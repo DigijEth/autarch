@@ -123,7 +123,7 @@ python autarch.py
 
 Navigate with number keys. Type `0` to go back. Type `99` for Settings.
 
-### Starting the Web Dashboard
+### Starting the Web Dashboard (recommended for windows)
 
 ```
 python autarch.py --web
