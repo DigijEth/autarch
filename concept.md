@@ -46,7 +46,7 @@ This is not automation. This is **autonomy**. The difference is that automation 
 
 ## Gaming Scenarios
 
-AUTARCH is designed for use in **controlled simulation and gaming environments** — red team exercises, capture-the-flag competitions, wargames, training scenarios, and security research labs.
+AUTARCH is designed for use in **controlled simulation and gaming environments** — red team exercises, chess competitions, wargames, training scenarios, and security research labs.
 
 In these contexts, AUTARCH acts as:
 
