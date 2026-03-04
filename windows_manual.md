@@ -175,7 +175,7 @@ The dashboard runs on port **8181** by default. Access it at `http://localhost:8
 
 ### Login
 
-Default credentials are set during first-run setup. Change them in Settings → Password.
+Default credentials are admin/admin. Change them in Settings → Password.
 
 ### Sidebar Navigation
 
