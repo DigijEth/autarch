@@ -113,11 +113,17 @@ pip install bitsandbytes --prefer-binary
 
 If it fails, you can skip it — AUTARCH will detect its absence and load models without quantization automatically. No other features are affected.
 
-### Step 4 — First Run
+### Step 4 — First Run -- Run in admin powershell
 
 ```
-python autarch.py
+python autarch.py --web
 ```
+
+For CLI TUI:
+
+---
+python autarch.py
+---
 
 A setup wizard will appear asking you to configure an AI backend. If you don't have an AI model yet, choose **Skip Setup** — you can configure it later in Settings → LLM Config.
 
