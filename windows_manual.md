@@ -92,7 +92,7 @@ Both should print version numbers without errors.
 
 ### Step 2 — Get AUTARCH
 
-If you received AUTARCH as a ZIP file, extract it to a folder like `C:\she\autarch`.
+If you received AUTARCH as a ZIP file, extract it to a folder like `C:\users\autarch`.
 
 ### Step 3 — Install Dependencies
 
