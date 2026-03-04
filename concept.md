@@ -4,7 +4,7 @@
 
 Project AUTARCH was originally conceived as a proposal for a **Defense Intelligence Agency (D.I.A.) research grant** — an investigation into the feasibility and implications of fully autonomous LLM-LAM-SLM-driven offensive cyber agents operating within adversarial simulation environments.
 
-The full version of AUTARCH, including its complete autonomous agent capabilities, operational case studies, and classified research findings, is **not available to the public**. The full case study remains classified at this time.
+The full version of AUTARCH, including its complete autonomous agent capabilities, operational case studies, and classified research findings, is **not available to the public**. The full case study remains restricted to goverment agancies at this time.
 
 What you are looking at is the **public release** — a functional framework that contains the tools, architecture, and foundational systems that make AUTARCH possible. It is made available so that researchers, security professionals, and developers can study the approach, build on it, and construct their own autonomous security agents using the same underlying platform.
 
