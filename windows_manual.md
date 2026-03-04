@@ -129,9 +129,9 @@ Navigate with number keys. Type `0` to go back. Type `99` for Settings.
 python autarch.py --web
 ```
 
-Then open your browser to: `http://localhost:8080`
+Then open your browser to: `http://localhost:8181`
 
-> **Tip:** Use `http://YOUR-IP:8080` (find your IP with `ipconfig`) to access from other devices on your network.
+> **Tip:** Use `http://YOUR-IP:8181` (find your IP with `ipconfig`) to access from other devices on your network.
 
 ### Useful Startup Flags
 
@@ -171,7 +171,7 @@ nssm start AUTARCH
 
 ## 5. Web Dashboard
 
-The dashboard runs on port **8080** by default. Access it at `http://localhost:8080`.
+The dashboard runs on port **8181** by default. Access it at `http://localhost:8181`.
 
 ### Login
 
@@ -433,13 +433,13 @@ Python is not in your PATH. Either:
 
 ### Web dashboard won't start — "Port already in use"
 
-Another process is on port 8080. Use a different port:
+Another process is on port 8181. Use a different port:
 ```
 python autarch.py --web --port 8090
 ```
 Or find and kill the conflicting process:
 ```
-netstat -ano | findstr :8080
+netstat -ano | findstr :8181
 taskkill /PID <PID> /F
 ```
 
@@ -488,14 +488,14 @@ AUTARCH reports "nmap not found" in the Dashboard. Fix it:
 
 ### Firewall blocking the dashboard
 
-Windows Firewall may block port 8080. Allow it:
+Windows Firewall may block port 8181. Allow it:
 1. Windows Defender Firewall → Advanced Settings
 2. Inbound Rules → New Rule
-3. Port → TCP → 8080 → Allow
+3. Port → TCP → 8181 → Allow
 
 Or from Command Prompt (as Administrator):
 ```
-netsh advfirewall firewall add rule name="AUTARCH" dir=in action=allow protocol=TCP localport=8080
+netsh advfirewall firewall add rule name="AUTARCH" dir=in action=allow protocol=TCP localport=8181
 ```
 
 ### "Permission denied" errors
@@ -532,11 +532,11 @@ python autarch.py --setup
 
 | URL | What It Is |
 |-----|-----------|
-| `http://localhost:8080` | Main web dashboard |
-| `http://localhost:8080/targets` | Target management |
-| `http://localhost:8080/settings/llm` | LLM configuration |
-| `http://localhost:8080/msf` | MSF Console terminal |
-| `http://localhost:8080/manual` | Full user manual |
+| `http://localhost:8181` | Main web dashboard |
+| `http://localhost:8181/targets` | Target management |
+| `http://localhost:8181/settings/llm` | LLM configuration |
+| `http://localhost:8181/msf` | MSF Console terminal |
+| `http://localhost:8181/manual` | Full user manual |
 
 ### Important Paths
 
