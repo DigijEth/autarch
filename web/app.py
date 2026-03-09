@@ -102,6 +102,7 @@ def create_app():
     from web.routes.sms_forge import sms_forge_bp
     from web.routes.starlink_hack import starlink_hack_bp
     from web.routes.rcs_tools import rcs_tools_bp
+    from web.routes.port_scanner import port_scanner_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -163,6 +164,7 @@ def create_app():
     app.register_blueprint(sms_forge_bp)
     app.register_blueprint(starlink_hack_bp)
     app.register_blueprint(rcs_tools_bp)
+    app.register_blueprint(port_scanner_bp)
 
     # Start network discovery advertising (mDNS + Bluetooth)
     try:

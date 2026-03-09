@@ -21,41 +21,82 @@ _debug_enabled: bool = False
 _debug_handler_installed: bool = False
 
 
+def _buf_append(level: str, name: str, raw: str, msg: str, exc: str = '') -> None:
+    """Thread-safe append to the debug buffer."""
+    entry: dict = {'ts': time.time(), 'level': level, 'name': name, 'raw': raw, 'msg': msg}
+    if exc:
+        entry['exc'] = exc
+    _debug_buffer.append(entry)
+
+
 class _DebugBufferHandler(logging.Handler):
-    """Captures log records into the in-memory debug buffer."""
+    """Captures ALL log records into the in-memory debug buffer (always active)."""
 
     def emit(self, record: logging.LogRecord) -> None:
-        if not _debug_enabled:
-            return
         try:
-            entry: dict = {
-                'ts': record.created,
-                'level': record.levelname,
-                'name': record.name,
-                'raw': record.getMessage(),
-                'msg': self.format(record),
-            }
+            exc_text = ''
             if record.exc_info:
                 import traceback as _tb
-                entry['exc'] = ''.join(_tb.format_exception(*record.exc_info))
-            _debug_buffer.append(entry)
+                exc_text = ''.join(_tb.format_exception(*record.exc_info))
+            _buf_append(
+                level=record.levelname,
+                name=record.name,
+                raw=record.getMessage(),
+                msg=self.format(record),
+                exc=exc_text,
+            )
         except Exception:
             pass
 
 
+class _PrintCapture:
+    """Wraps sys.stdout or sys.stderr — passes through AND feeds lines to the debug buffer."""
+
+    def __init__(self, original, level: str = 'STDOUT'):
+        self._orig = original
+        self._level = level
+        self._line_buf = ''
+
+    def write(self, text: str) -> int:
+        self._orig.write(text)
+        self._line_buf += text
+        while '\n' in self._line_buf:
+            line, self._line_buf = self._line_buf.split('\n', 1)
+            if line.strip():
+                _buf_append(self._level, 'print', line, line)
+        return len(text)
+
+    def flush(self) -> None:
+        self._orig.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._orig, name)
+
+
 def _ensure_debug_handler() -> None:
+    """Install logging handler + stdout/stderr capture once, at startup."""
     global _debug_handler_installed
     if _debug_handler_installed:
         return
+    # Logging handler
     handler = _DebugBufferHandler()
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(logging.Formatter('%(name)s — %(message)s'))
     root = logging.getLogger()
     root.addHandler(handler)
-    # Lower root level to DEBUG so records reach the handler
     if root.level == logging.NOTSET or root.level > logging.DEBUG:
         root.setLevel(logging.DEBUG)
+    # stdout / stderr capture
+    import sys as _sys
+    if not isinstance(_sys.stdout, _PrintCapture):
+        _sys.stdout = _PrintCapture(_sys.stdout, 'STDOUT')
+    if not isinstance(_sys.stderr, _PrintCapture):
+        _sys.stderr = _PrintCapture(_sys.stderr, 'STDERR')
     _debug_handler_installed = True
+
+
+# Install immediately so we capture from process start, not just after toggle
+_ensure_debug_handler()
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -429,28 +470,42 @@ def discovery_stop():
 @settings_bp.route('/debug/toggle', methods=['POST'])
 @login_required
 def debug_toggle():
-    """Enable or disable the debug log capture."""
+    """Enable or disable the debug console UI (capture always runs)."""
     global _debug_enabled
     data = request.get_json(silent=True) or {}
     _debug_enabled = bool(data.get('enabled', False))
     if _debug_enabled:
-        _ensure_debug_handler()
-        logging.getLogger('autarch.debug').info('Debug console enabled')
+        logging.getLogger('autarch.debug').info('Debug console opened')
     return jsonify({'ok': True, 'enabled': _debug_enabled})
 
 
 @settings_bp.route('/debug/stream')
 @login_required
 def debug_stream():
-    """SSE stream — pushes new log records to the browser as they arrive."""
+    """SSE stream — pushes log records to the browser as they arrive.
+
+    On connect: sends the last 200 buffered entries as history, then streams
+    new entries live.  Handles deque wrap-around correctly.
+    """
     def generate():
-        sent = 0
+        buf = list(_debug_buffer)
+        # Send last 200 entries as catch-up history
+        history_start = max(0, len(buf) - 200)
+        for entry in buf[history_start:]:
+            yield f"data: {json.dumps(entry)}\n\n"
+        sent = len(buf)
+
         while True:
+            time.sleep(0.2)
             buf = list(_debug_buffer)
-            while sent < len(buf):
+            n = len(buf)
+            if sent > n:
+                # deque wrapped; re-orient to current tail
+                sent = n
+            while sent < n:
                 yield f"data: {json.dumps(buf[sent])}\n\n"
                 sent += 1
-            time.sleep(0.25)
+            yield ': keepalive\n\n'
 
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})

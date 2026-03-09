@@ -48,11 +48,7 @@ def index():
 @defense_bp.route('/linux')
 @login_required
 def linux_index():
-    from core.menu import MainMenu
-    menu = MainMenu()
-    menu.load_modules()
-    modules = {k: v for k, v in menu.modules.items() if v.category == 'defense'}
-    return render_template('defense_linux.html', modules=modules)
+    return render_template('defense_linux.html')
 
 
 @defense_bp.route('/linux/audit', methods=['POST'])

@@ -29,6 +29,7 @@
             <div class="nav-section">
                 <ul class="nav-links">
                     <li><a href="{{ url_for('dashboard.index') }}" class="{% if request.endpoint == 'dashboard.index' %}active{% endif %}">Dashboard</a></li>
+                    <li><a href="{{ url_for('port_scanner.index') }}" class="{% if request.blueprint == 'port_scanner' %}active{% endif %}">&#x1F50D; Port Scanner</a></li>
                     <li><a href="{{ url_for('targets.index') }}" class="{% if request.blueprint == 'targets' %}active{% endif %}">Targets</a></li>
                 </ul>
             </div>

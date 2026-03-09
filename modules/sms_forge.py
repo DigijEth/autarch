@@ -11,6 +11,12 @@ AUTHOR = "AUTARCH"
 VERSION = "1.0"
 CATEGORY = "offense"
 
+
+def run():
+    """CLI entry point — this module is used via the web UI."""
+    print("SMS Forge is managed through the AUTARCH web interface.")
+    print("Navigate to Offense → SMS Forge in the dashboard.")
+
 import os
 import csv
 import json

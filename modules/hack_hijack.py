@@ -370,7 +370,9 @@ class HackHijackService:
     def scan_target(self, target: str, scan_type: str = 'quick',
                     custom_ports: List[int] = None,
                     timeout: float = 3.0,
-                    progress_cb=None) -> ScanResult:
+                    progress_cb=None,
+                    port_found_cb=None,
+                    status_cb=None) -> ScanResult:
         """Scan a target for open ports and backdoor indicators.
 
         scan_type: 'quick' (signature ports only), 'full' (signature + extra),
@@ -396,11 +398,16 @@ class HackHijackService:
 
         # Try nmap first if requested and available
         if scan_type == 'nmap':
+            if status_cb:
+                status_cb('Running nmap scan…')
             nmap_result = self._nmap_scan(target, ports, timeout)
             if nmap_result:
                 result.open_ports = nmap_result.get('ports', [])
                 result.os_guess = nmap_result.get('os', '')
                 result.nmap_raw = nmap_result.get('raw', '')
+                if port_found_cb:
+                    for pr in result.open_ports:
+                        port_found_cb(pr)
 
         # Fallback: socket-based scan
         if not result.open_ports:
@@ -408,27 +415,39 @@ class HackHijackService:
             total = len(sorted_ports)
             results_lock = threading.Lock()
             open_ports = []
+            scanned = [0]
 
-            def scan_port(port):
+            if status_cb:
+                status_cb(f'Socket scanning {total} ports on {target}…')
+
+            def scan_port(port, idx):
                 pr = self._check_port(target, port, timeout)
+                with results_lock:
+                    scanned[0] += 1
+                    done = scanned[0]
                 if pr and pr.state == 'open':
                     with results_lock:
                         open_ports.append(pr)
+                    if port_found_cb:
+                        port_found_cb(pr)
+                if progress_cb and done % 10 == 0:
+                    progress_cb(done, total, f'Scanning port {port}…')
 
             # Threaded scan — 50 concurrent threads
             threads = []
             for i, port in enumerate(sorted_ports):
-                t = threading.Thread(target=scan_port, args=(port,), daemon=True)
+                t = threading.Thread(target=scan_port, args=(port, i), daemon=True)
                 threads.append(t)
                 t.start()
                 if len(threads) >= 50:
                     for t in threads:
                         t.join(timeout=timeout + 2)
                     threads.clear()
-                if progress_cb and i % 10 == 0:
-                    progress_cb(i, total)
             for t in threads:
                 t.join(timeout=timeout + 2)
+
+            if progress_cb:
+                progress_cb(total, total, 'Scan complete')
 
             result.open_ports = sorted(open_ports, key=lambda p: p.port)
 

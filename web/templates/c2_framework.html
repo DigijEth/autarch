@@ -97,7 +97,7 @@ let refreshTimer=null;
 function switchTab(name){
     document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['dashboard','agents','generate'][i]===name));
     document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
-    document.getElementById('tab-'+name).style.display='';
+    document.getElementById('tab-'+name).style.display='block';
     if(name==='dashboard'||name==='agents') refreshDashboard();
 }
 

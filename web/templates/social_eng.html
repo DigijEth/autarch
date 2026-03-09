@@ -323,7 +323,7 @@ function switchTab(name){
     document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',
         ['harvest','pretexts','qr','campaigns'][i]===name));
     document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
-    document.getElementById('tab-'+name).style.display='';
+    document.getElementById('tab-'+name).style.display='block';
     if(name==='harvest'){loadPages();loadCaptures();}
     if(name==='pretexts') loadPretexts();
     if(name==='campaigns') loadCampaigns();

@@ -15,29 +15,62 @@
 
 <!-- Scan Tab -->
 <div id="tab-scan" class="tab-content active">
-    <div class="card" style="max-width:700px">
-        <h3>Target Scan</h3>
-        <div class="form-group">
-            <label>Target IP Address</label>
-            <input type="text" id="hh-target" class="form-control" placeholder="192.168.1.100">
+    <div style="display:grid;grid-template-columns:360px 1fr;gap:1.5rem;align-items:start">
+        <!-- Config panel -->
+        <div class="card">
+            <h3>Target Scan</h3>
+            <div class="form-group">
+                <label>Target IP Address</label>
+                <input type="text" id="hh-target" class="form-control" placeholder="192.168.1.100">
+            </div>
+            <div class="form-group">
+                <label>Scan Type</label>
+                <select id="hh-scan-type" class="form-control" onchange="toggleCustomPorts()">
+                    <option value="quick">Quick — Backdoor signature ports only (~30 ports)</option>
+                    <option value="full">Full — All suspicious ports (~70 ports)</option>
+                    <option value="nmap">Nmap Deep — Service version + OS detection (requires nmap)</option>
+                    <option value="custom">Custom — Specify ports</option>
+                </select>
+            </div>
+            <div class="form-group" id="custom-ports-group" style="display:none">
+                <label>Custom Ports (comma-separated)</label>
+                <input type="text" id="hh-custom-ports" class="form-control" placeholder="22,80,443,445,4444,8080">
+            </div>
+            <div style="display:flex;gap:0.5rem">
+                <button id="hh-scan-btn" class="btn btn-primary" onclick="startScan()" style="flex:1">Scan for Compromises</button>
+                <button id="hh-cancel-btn" class="btn" style="display:none;background:var(--danger);color:#fff" onclick="cancelScan()">Cancel</button>
+            </div>
+
+            <!-- Progress bar -->
+            <div id="hh-progress-wrap" style="display:none;margin-top:1rem">
+                <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
+                    <span id="hh-prog-label">Scanning…</span>
+                    <span id="hh-prog-pct">0%</span>
+                </div>
+                <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+                    <div id="hh-prog-bar" style="height:100%;background:var(--accent);transition:width 0.3s;width:0"></div>
+                </div>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Scan Type</label>
-            <select id="hh-scan-type" class="form-control" onchange="toggleCustomPorts()">
-                <option value="quick">Quick — Backdoor signature ports only (~30 ports)</option>
-                <option value="full">Full — All suspicious ports (~70 ports)</option>
-                <option value="nmap">Nmap Deep — Service version + OS detection (requires nmap)</option>
-                <option value="custom">Custom — Specify ports</option>
-            </select>
-        </div>
-        <div class="form-group" id="custom-ports-group" style="display:none">
-            <label>Custom Ports (comma-separated)</label>
-            <input type="text" id="hh-custom-ports" class="form-control" placeholder="22,80,443,445,4444,8080">
-        </div>
-        <button id="hh-scan-btn" class="btn btn-primary" onclick="startScan()">Scan for Compromises</button>
-        <div id="hh-scan-status" style="margin-top:1rem;display:none">
-            <div class="spinner-inline"></div>
-            <span id="hh-scan-msg">Scanning...</span>
+
+        <!-- Live output -->
+        <div class="card" style="display:flex;flex-direction:column">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <h3 style="margin:0">Live Output</h3>
+                <button class="btn btn-sm" onclick="clearOutput()">Clear</button>
+            </div>
+            <pre id="hh-output" style="background:#0d0d14;color:#c9d1d9;font-family:monospace;font-size:0.78rem;
+                padding:12px;border-radius:var(--radius);height:340px;overflow-y:auto;
+                white-space:pre-wrap;word-break:break-all;margin:0;border:1px solid var(--border)">Ready. Enter target and click Scan.</pre>
+
+            <!-- Live found ports mini-table -->
+            <div id="hh-live-ports" style="margin-top:0.75rem;display:none">
+                <h4 style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:6px">Live Discovered Ports</h4>
+                <table class="data-table" style="font-size:0.78rem">
+                    <thead><tr><th>Port</th><th>Service</th><th>Banner</th></tr></thead>
+                    <tbody id="hh-live-ports-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -141,8 +174,6 @@
 .conf-high{color:var(--danger);font-weight:700}
 .conf-medium{color:#f59e0b;font-weight:600}
 .conf-low{color:var(--text-muted)}
-.spinner-inline{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:6px}
-@keyframes spin{to{transform:rotate(360deg)}}
 .cat-eternalblue{color:var(--danger)}
 .cat-rat{color:#f59e0b}
 .cat-shell{color:#6366f1}
@@ -150,18 +181,26 @@
 .cat-proxy{color:#8b5cf6}
 .cat-miner{color:#06b6d4}
 .cat-generic{color:var(--text-secondary)}
+/* output line colors */
+#hh-output .ln-status{color:#7dd3fc}
+#hh-output .ln-open{color:#4ade80;font-weight:700}
+#hh-output .ln-warn{color:#fbbf24}
+#hh-output .ln-error{color:#f87171}
+#hh-output .ln-done{color:#a78bfa;font-weight:700}
+#hh-output .ln-prog{color:#6b7280}
 </style>
 
 <script>
 let currentScanResult = null;
 let currentSessionId = null;
-let pollTimer = null;
+let activeStream = null;
+let currentJobId = null;
 
 function switchTab(name){
     document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',
         ['scan','results','sessions','history'][i]===name));
     document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
-    document.getElementById('tab-'+name).style.display='';
+    document.getElementById('tab-'+name).style.display='block';
     if(name==='sessions') loadSessions();
     if(name==='history') loadHistory();
 }
@@ -171,57 +210,148 @@ function toggleCustomPorts(){
         document.getElementById('hh-scan-type').value==='custom'?'':'none';
 }
 
+function appendOutput(text, cls){
+    const out = document.getElementById('hh-output');
+    const line = document.createElement('span');
+    if(cls) line.className = cls;
+    line.textContent = text + '\n';
+    out.appendChild(line);
+    out.scrollTop = out.scrollHeight;
+}
+
+function clearOutput(){
+    document.getElementById('hh-output').textContent = '';
+}
+
 function startScan(){
-    const target=document.getElementById('hh-target').value.trim();
-    if(!target){alert('Enter a target IP');return}
-    const scanType=document.getElementById('hh-scan-type').value;
-    let customPorts=[];
-    if(scanType==='custom'){
-        customPorts=document.getElementById('hh-custom-ports').value
+    const target = document.getElementById('hh-target').value.trim();
+    if(!target){ alert('Enter a target IP'); return; }
+    const scanType = document.getElementById('hh-scan-type').value;
+    let customPorts = [];
+    if(scanType === 'custom'){
+        customPorts = document.getElementById('hh-custom-ports').value
             .split(',').map(p=>parseInt(p.trim())).filter(p=>p>0&&p<65536);
-        if(!customPorts.length){alert('Enter valid ports');return}
+        if(!customPorts.length){ alert('Enter valid ports'); return; }
     }
-    document.getElementById('hh-scan-btn').disabled=true;
-    document.getElementById('hh-scan-status').style.display='';
-    document.getElementById('hh-scan-msg').textContent='Scanning '+target+'...';
 
-    fetch('/hack-hijack/scan',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({target,scan_type:scanType,custom_ports:customPorts})})
+    // Reset UI
+    clearOutput();
+    document.getElementById('hh-live-ports').style.display = 'none';
+    document.getElementById('hh-live-ports-body').innerHTML = '';
+    document.getElementById('hh-scan-btn').disabled = true;
+    document.getElementById('hh-cancel-btn').style.display = '';
+    document.getElementById('hh-progress-wrap').style.display = '';
+    document.getElementById('hh-prog-bar').style.width = '0';
+    document.getElementById('hh-prog-pct').textContent = '0%';
+    document.getElementById('hh-prog-label').textContent = 'Starting…';
+    appendOutput(`[*] Starting ${scanType} scan on ${target}…`, 'ln-status');
+
+    fetch('/hack-hijack/scan', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({target, scan_type: scanType, custom_ports: customPorts})})
     .then(r=>r.json()).then(d=>{
-        if(!d.ok){showScanError(d.error);return}
-        pollScan(d.job_id);
-    }).catch(e=>showScanError(e.message));
+        if(!d.ok){ scanDone(false, d.error); return; }
+        currentJobId = d.job_id;
+        openStream(d.job_id);
+    }).catch(e=>scanDone(false, e.message));
 }
 
-function pollScan(jobId){
-    if(pollTimer) clearInterval(pollTimer);
-    pollTimer=setInterval(()=>{
-        fetch('/hack-hijack/scan/'+jobId).then(r=>r.json()).then(d=>{
-            if(!d.done) return;
-            clearInterval(pollTimer);pollTimer=null;
-            document.getElementById('hh-scan-btn').disabled=false;
-            document.getElementById('hh-scan-status').style.display='none';
-            if(!d.ok){showScanError(d.error);return}
-            currentScanResult=d.result;
-            renderResults(d.result);
-            switchTab('results');
-        }).catch(()=>{});
-    },1500);
+function openStream(jobId){
+    if(activeStream){ activeStream.close(); activeStream = null; }
+    const es = new EventSource('/hack-hijack/scan/' + jobId + '/stream');
+    activeStream = es;
+
+    es.onmessage = function(e){
+        try{ handleEvent(JSON.parse(e.data)); } catch(ex){}
+    };
+    es.onerror = function(){
+        es.close(); activeStream = null;
+        appendOutput('[!] Stream connection lost', 'ln-error');
+        scanDone(false, 'Stream disconnected');
+    };
 }
 
-function showScanError(msg){
-    document.getElementById('hh-scan-btn').disabled=false;
-    document.getElementById('hh-scan-status').style.display='none';
-    alert('Scan error: '+msg);
+function handleEvent(ev){
+    switch(ev.type){
+        case 'progress': {
+            const pct = ev.pct || 0;
+            document.getElementById('hh-prog-bar').style.width = pct + '%';
+            document.getElementById('hh-prog-pct').textContent = pct + '%';
+            if(ev.msg) document.getElementById('hh-prog-label').textContent = ev.msg;
+            if(ev.msg) appendOutput('[~] ' + ev.msg, 'ln-prog');
+            break;
+        }
+        case 'status':
+            appendOutput('[*] ' + ev.msg, 'ln-status');
+            document.getElementById('hh-prog-label').textContent = ev.msg;
+            break;
+        case 'port_found': {
+            const svc = ev.service ? ` (${ev.service})` : '';
+            const banner = ev.banner ? `  "${ev.banner.slice(0,60)}"` : '';
+            appendOutput(`[+] OPEN  ${ev.port}/tcp${svc}${banner}`, 'ln-open');
+            addLivePort(ev.port, ev.service, ev.banner);
+            break;
+        }
+        case 'error':
+            appendOutput('[!] ' + ev.msg, 'ln-error');
+            break;
+        case 'done':
+            if(activeStream){ activeStream.close(); activeStream = null; }
+            document.getElementById('hh-prog-bar').style.width = '100%';
+            document.getElementById('hh-prog-pct').textContent = '100%';
+            if(ev.ok){
+                appendOutput('[✓] Scan complete — fetching results…', 'ln-done');
+                fetchResult(currentJobId);
+            } else {
+                appendOutput('[!] Scan failed', 'ln-error');
+                scanDone(false, 'Scan failed');
+            }
+            break;
+    }
+}
+
+function addLivePort(port, service, banner){
+    const tbody = document.getElementById('hh-live-ports-body');
+    document.getElementById('hh-live-ports').style.display = '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${port}</td><td>${esc(service||'—')}</td>
+        <td style="font-family:monospace;font-size:0.72rem;max-width:300px;overflow:hidden;text-overflow:ellipsis">${esc((banner||'').slice(0,80))}</td>`;
+    tbody.appendChild(tr);
+}
+
+function fetchResult(jobId){
+    fetch('/hack-hijack/scan/' + jobId)
+    .then(r=>r.json()).then(d=>{
+        if(!d.done){ setTimeout(()=>fetchResult(jobId), 500); return; }
+        if(!d.ok){ scanDone(false, d.error); return; }
+        currentScanResult = d.result;
+        appendOutput(`[✓] Done — ${d.result.open_ports.length} ports, ${d.result.backdoors.length} backdoor indicators`, 'ln-done');
+        scanDone(true);
+        renderResults(d.result);
+        switchTab('results');
+    }).catch(e=>scanDone(false, e.message));
+}
+
+function scanDone(ok, errMsg){
+    document.getElementById('hh-scan-btn').disabled = false;
+    document.getElementById('hh-cancel-btn').style.display = 'none';
+    document.getElementById('hh-progress-wrap').style.display = 'none';
+    if(!ok && errMsg) appendOutput('[!] Error: ' + errMsg, 'ln-error');
+    currentJobId = null;
+}
+
+function cancelScan(){
+    if(activeStream){ activeStream.close(); activeStream = null; }
+    appendOutput('[x] Scan cancelled by user', 'ln-warn');
+    scanDone(false);
 }
 
 function renderResults(r){
     document.getElementById('hh-no-results').style.display='none';
     document.getElementById('hh-results').style.display='';
     document.getElementById('res-target').textContent=r.target;
-    document.getElementById('res-time').textContent=r.scan_time.replace('T',' ').slice(0,19)+' UTC';
-    document.getElementById('res-ports-count').textContent=r.open_ports.length;
-    document.getElementById('res-backdoors-count').textContent=r.backdoors.length;
+    document.getElementById('res-time').textContent=(r.scan_time||'').replace('T',' ').slice(0,19)+' UTC';
+    document.getElementById('res-ports-count').textContent=(r.open_ports||[]).length;
+    document.getElementById('res-backdoors-count').textContent=(r.backdoors||[]).length;
     document.getElementById('res-duration').textContent=r.duration;
     if(r.os_guess){
         document.getElementById('res-os').style.display='';
@@ -231,7 +361,7 @@ function renderResults(r){
     // Ports table
     const pb=document.getElementById('hh-ports-body');
     pb.innerHTML='';
-    r.open_ports.forEach(p=>{
+    (r.open_ports||[]).forEach(p=>{
         const tr=document.createElement('tr');
         tr.innerHTML=`<td>${p.port}</td><td>${p.protocol}</td><td>${p.service||'—'}</td>
             <td style="font-family:monospace;font-size:0.75rem;max-width:400px;overflow:hidden;text-overflow:ellipsis">${esc(p.banner||'')}</td>`;
@@ -241,7 +371,7 @@ function renderResults(r){
     // Backdoors
     const bs=document.getElementById('hh-backdoors-section');
     const bb=document.getElementById('hh-backdoors-body');
-    if(r.backdoors.length){
+    if((r.backdoors||[]).length){
         bs.style.display='';
         bb.innerHTML='';
         r.backdoors.forEach((b,i)=>{
@@ -285,7 +415,6 @@ function tryTakeover(idx){
         } else {
             alert(d.message||d.error||'Takeover result received');
             if(d.msf_command){
-                // Copy MSF command to clipboard
                 navigator.clipboard.writeText(d.msf_command).then(()=>{
                     alert('MSF command copied to clipboard');
                 }).catch(()=>{});
@@ -311,7 +440,7 @@ function loadSessions(){
             onclick="openShell('${esc(s.session_id)}','${esc(s.host)}:${s.port}','')">
             <div style="display:flex;justify-content:space-between;align-items:center">
                 <div><strong>${esc(s.type)}</strong> &rarr; ${esc(s.host)}:${s.port}</div>
-                <div style="font-size:0.75rem;color:var(--text-muted)">${s.connected_at.slice(0,19)}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">${(s.connected_at||'').slice(0,19)}</div>
             </div></div>`).join('');
     });
 }

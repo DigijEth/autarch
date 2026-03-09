@@ -110,7 +110,7 @@ function switchTab(name){
     document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',
         ['quick','dirbust','subdomain','vuln','crawl'][i]===name));
     document.querySelectorAll('.tab-content').forEach(c=>c.style.display='none');
-    document.getElementById('tab-'+name).style.display='';
+    document.getElementById('tab-'+name).style.display='block';
 }
 
 function quickScan(){

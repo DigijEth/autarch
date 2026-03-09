@@ -1,13 +1,16 @@
 """Hack Hijack — web routes for scanning and taking over compromised systems."""
 
+import json
+import queue
 import threading
+import time
 import uuid
 from flask import Blueprint, render_template, request, jsonify, Response
 from web.auth import login_required
 
 hack_hijack_bp = Blueprint('hack_hijack', __name__)
 
-# Running scans keyed by job_id
+# job_id -> {'q': Queue, 'result': dict|None, 'error': str|None, 'done': bool, 'cancel': bool}
 _running_scans: dict = {}
 
 
@@ -37,32 +40,84 @@ def start_scan():
     if not target:
         return jsonify({'ok': False, 'error': 'Target IP required'})
 
-    # Validate scan type
     if scan_type not in ('quick', 'full', 'nmap', 'custom'):
         scan_type = 'quick'
 
     job_id = str(uuid.uuid4())[:8]
-    result_holder = {'result': None, 'error': None, 'done': False}
-    _running_scans[job_id] = result_holder
+    q = queue.Queue()
+    job = {'q': q, 'result': None, 'error': None, 'done': False, 'cancel': False}
+    _running_scans[job_id] = job
+
+    def _push(evt_type, **kw):
+        kw['type'] = evt_type
+        kw['ts'] = time.time()
+        q.put(kw)
 
     def do_scan():
         try:
             svc = _svc()
+            # Build a progress callback that feeds the queue
+            def progress_cb(current, total, message=''):
+                _push('progress', current=current, total=total,
+                      pct=round(current * 100 / total) if total else 0,
+                      msg=message)
+
+            def port_found_cb(port_info):
+                _push('port_found',
+                      port=port_info.get('port') or (port_info.port if hasattr(port_info, 'port') else 0),
+                      service=getattr(port_info, 'service', port_info.get('service', '')),
+                      banner=getattr(port_info, 'banner', port_info.get('banner', ''))[:80])
+
+            def status_cb(msg):
+                _push('status', msg=msg)
+
             r = svc.scan_target(
                 target,
                 scan_type=scan_type,
                 custom_ports=custom_ports,
                 timeout=3.0,
+                progress_cb=progress_cb,
+                port_found_cb=port_found_cb,
+                status_cb=status_cb,
             )
-            result_holder['result'] = r.to_dict()
+            job['result'] = r.to_dict()
         except Exception as e:
-            result_holder['error'] = str(e)
+            job['error'] = str(e)
+            _push('error', msg=str(e))
         finally:
-            result_holder['done'] = True
+            job['done'] = True
+            _push('done', ok=job['error'] is None)
 
     threading.Thread(target=do_scan, daemon=True).start()
     return jsonify({'ok': True, 'job_id': job_id,
                     'message': f'Scan started on {target} ({scan_type})'})
+
+
+@hack_hijack_bp.route('/hack-hijack/scan/<job_id>/stream')
+@login_required
+def scan_stream(job_id):
+    """SSE stream for live scan progress."""
+    job = _running_scans.get(job_id)
+    if not job:
+        def _err():
+            yield f"data: {json.dumps({'type': 'error', 'msg': 'Job not found'})}\n\n"
+        return Response(_err(), mimetype='text/event-stream')
+
+    def generate():
+        q = job['q']
+        while True:
+            try:
+                item = q.get(timeout=0.5)
+                yield f"data: {json.dumps(item)}\n\n"
+                if item.get('type') == 'done':
+                    break
+            except queue.Empty:
+                if job['done']:
+                    break
+                yield ': keepalive\n\n'
+
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
 
 @hack_hijack_bp.route('/hack-hijack/scan/<job_id>', methods=['GET'])
@@ -75,7 +130,6 @@ def scan_status(job_id):
         return jsonify({'ok': True, 'done': False, 'message': 'Scan in progress...'})
     if holder['error']:
         return jsonify({'ok': False, 'error': holder['error'], 'done': True})
-    # Clean up
     _running_scans.pop(job_id, None)
     return jsonify({'ok': True, 'done': True, 'result': holder['result']})
 

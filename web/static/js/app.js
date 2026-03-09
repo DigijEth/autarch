@@ -2256,10 +2256,12 @@ var _DBG_LEVELS = {
     WARNING:  { cls: 'dbg-warn',  sym: '⚠' },
     ERROR:    { cls: 'dbg-err',   sym: '✕' },
     CRITICAL: { cls: 'dbg-crit',  sym: '☠' },
+    STDOUT:   { cls: 'dbg-info',  sym: '»' },
+    STDERR:   { cls: 'dbg-warn',  sym: '»' },
 };
 
 // Output-tagged logger names (treated as operational output in "Output Only" mode)
-var _OUTPUT_LOGGERS = ['msf', 'agent', 'autarch', 'output', 'scanner', 'tools'];
+var _OUTPUT_LOGGERS = ['msf', 'agent', 'autarch', 'output', 'scanner', 'tools', 'print'];
 
 function debugToggle(enabled) {
     fetch('/settings/debug/toggle', {
@@ -2325,6 +2327,8 @@ function _dbgShouldShow(entry) {
         case 'verbose': return lvl !== 'DEBUG' && lvl !== 'NOTSET';
         case 'warn':    return lvl === 'WARNING' || lvl === 'ERROR' || lvl === 'CRITICAL';
         case 'output':
+            var lvlO = (entry.level || '').toUpperCase();
+            if (lvlO === 'STDOUT' || lvlO === 'STDERR') return true;
             var name = (entry.name || '').toLowerCase();
             return _OUTPUT_LOGGERS.some(function(pfx) { return name.indexOf(pfx) >= 0; });
     }
