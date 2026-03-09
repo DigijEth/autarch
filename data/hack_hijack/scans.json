@@ -1,0 +1,29 @@
+[
+  {
+    "target": "67.183.122.213",
+    "scan_time": "2026-03-08T23:37:06.286067+00:00",
+    "duration": 6.04,
+    "open_ports": [],
+    "backdoors": [],
+    "os_guess": "",
+    "smb_info": {}
+  },
+  {
+    "target": "67.183.122.213",
+    "scan_time": "2026-03-08T23:48:58.061607+00:00",
+    "duration": 6.03,
+    "open_ports": [],
+    "backdoors": [],
+    "os_guess": "",
+    "smb_info": {}
+  },
+  {
+    "target": "67.183.122.213",
+    "scan_time": "2026-03-09T00:48:50.872756+00:00",
+    "duration": 3.01,
+    "open_ports": [],
+    "backdoors": [],
+    "os_guess": "",
+    "smb_info": {}
+  }
+]
