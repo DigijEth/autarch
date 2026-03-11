@@ -1,3 +1,7 @@
+Note: To access the web UI, you MUST use https
+
+For support, join the tele channel at https://t.me/project_autarch
+
 ```
       /\
      /  \
