@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=AUTARCH
+Comment=Security Platform by darkHal Security Group
+Exec=/home/snake/autarch/venv/bin/python /home/snake/autarch/launcher.py
+Icon=/home/snake/autarch/icon.svg
+Terminal=false
+Type=Application
+Categories=System;Security;Network;
+Keywords=security;hacking;pentest;network;
+StartupWMClass=autarch

@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_title"
+            android:textColor="@color/terminal_green"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Server Connection -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/server_connection"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="@string/hint_server_ip"
+                    app:boxStrokeColor="@color/terminal_green"
+                    app:hintTextColor="@color/terminal_green">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_server_ip"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="monospace" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="@string/hint_web_port"
+                    app:boxStrokeColor="@color/terminal_green"
+                    app:hintTextColor="@color/terminal_green">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_web_port"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="monospace" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Port Configuration -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/adb_configuration"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="12dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="@string/hint_adb_port"
+                    app:boxStrokeColor="@color/terminal_green"
+                    app:hintTextColor="@color/terminal_green">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_adb_port"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="monospace" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="@string/hint_usbip_port"
+                    app:boxStrokeColor="@color/terminal_green"
+                    app:hintTextColor="@color/terminal_green">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_usbip_port"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="monospace" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switch_settings_auto_restart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/auto_restart_adb"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="monospace"
+                    app:thumbTint="@color/terminal_green"
+                    app:trackTint="@color/terminal_green_dim" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Veilid BBS (Coming Soon) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="8dp"
+            app:strokeColor="@color/terminal_green_dim"
+            app:strokeWidth="1dp"
+            android:alpha="0.6">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/bbs_configuration"
+                        android:textColor="@color/terminal_green"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="COMING SOON"
+                        android:textColor="@color/warning"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Veilid-based decentralized bulletin board for secure anonymous communication. Under development."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/hint_bbs_address"
+                    app:boxStrokeColor="@color/terminal_green"
+                    app:hintTextColor="@color/terminal_green"
+                    android:enabled="false">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/input_bbs_address"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="monospace"
+                        android:enabled="false"
+                        android:hint="Not yet available" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Auto-Detect -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_auto_detect"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/auto_detect"
+            android:textColor="@color/background"
+            android:fontFamily="monospace"
+            app:backgroundTint="@color/terminal_green"
+            app:icon="@android:drawable/ic_menu_search"
+            app:iconTint="@color/background"
+            app:cornerRadius="4dp" />
+
+        <!-- Actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="16dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_test_connection"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="@string/test_connection"
+                android:textColor="@color/background"
+                android:fontFamily="monospace"
+                app:backgroundTint="@color/terminal_green_dim"
+                app:cornerRadius="4dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_save_settings"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/save_settings"
+                android:textColor="@color/background"
+                android:fontFamily="monospace"
+                app:backgroundTint="@color/terminal_green"
+                app:cornerRadius="4dp" />
+
+        </LinearLayout>
+
+        <!-- Status -->
+        <TextView
+            android:id="@+id/settings_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="monospace"
+            android:textSize="12sp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Logout -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_logout"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="LOGOUT"
+            android:textColor="@color/danger"
+            android:fontFamily="monospace"
+            app:strokeColor="@color/danger"
+            app:cornerRadius="4dp" />
+
+    </LinearLayout>
+</ScrollView>

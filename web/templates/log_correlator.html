@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Log Correlator{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Log Correlator</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Ingest, correlate, and alert on security events from multiple log sources.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="logs" data-tab="ingest" onclick="showTab('logs','ingest')">Ingest</button>
+    <button class="tab" data-tab-group="logs" data-tab="alerts" onclick="showTab('logs','alerts')">Alerts</button>
+    <button class="tab" data-tab-group="logs" data-tab="rules" onclick="showTab('logs','rules')">Rules</button>
+    <button class="tab" data-tab-group="logs" data-tab="stats" onclick="showTab('logs','stats')">Stats</button>
+</div>
+
+<!-- ==================== INGEST TAB ==================== -->
+<div class="tab-content active" data-tab-group="logs" data-tab="ingest">
+
+<div class="section">
+    <h2>Ingest from File</h2>
+    <div class="input-row">
+        <input type="text" id="log-ingest-path" placeholder="Log file path (e.g. /var/log/auth.log)">
+        <button id="btn-ingest-file" class="btn btn-primary" onclick="logIngestFile()">Ingest File</button>
+    </div>
+    <pre class="output-panel" id="log-ingest-file-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Paste Log Data</h2>
+    <div class="form-group">
+        <label>Paste raw log entries</label>
+        <textarea id="log-ingest-paste" rows="6" style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);padding:10px;font-family:monospace;font-size:0.85rem;resize:vertical" placeholder="Paste log lines here..."></textarea>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-ingest-paste" class="btn btn-primary" onclick="logIngestPaste()">Ingest Pasted Data</button>
+    </div>
+    <pre class="output-panel" id="log-ingest-paste-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>Sources</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button class="btn btn-small" onclick="logLoadSources()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Source</th><th>Type</th><th>Entries</th><th>Last Ingested</th></tr></thead>
+        <tbody id="log-sources-table">
+            <tr><td colspan="4" class="empty-state">No log sources ingested yet.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Search Logs</h2>
+    <div class="input-row">
+        <input type="text" id="log-search-query" placeholder="Search pattern (regex supported)" onkeydown="if(event.key==='Enter')logSearch()">
+        <button id="btn-log-search" class="btn btn-primary" onclick="logSearch()">Search</button>
+    </div>
+    <span id="log-search-count" style="font-size:0.8rem;color:var(--text-muted)"></span>
+    <table class="data-table" style="margin-top:8px">
+        <thead><tr><th>Timestamp</th><th>Source</th><th>Log Entry</th></tr></thead>
+        <tbody id="log-search-results">
+            <tr><td colspan="3" class="empty-state">Enter a query and click Search.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <div class="tool-actions">
+        <button class="btn btn-danger btn-small" onclick="logClearAll()">Clear All Logs</button>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== ALERTS TAB ==================== -->
+<div class="tab-content" data-tab-group="logs" data-tab="alerts">
+
+<div class="section">
+    <h2>Security Alerts</h2>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <span style="font-size:0.85rem;color:var(--text-secondary)">Severity:</span>
+        <button class="btn btn-small log-sev-btn active" data-severity="all" onclick="logFilterAlerts('all',this)">All</button>
+        <button class="btn btn-small log-sev-btn" data-severity="critical" onclick="logFilterAlerts('critical',this)" style="border-color:var(--danger);color:var(--danger)">Critical</button>
+        <button class="btn btn-small log-sev-btn" data-severity="high" onclick="logFilterAlerts('high',this)" style="border-color:#f97316;color:#f97316">High</button>
+        <button class="btn btn-small log-sev-btn" data-severity="medium" onclick="logFilterAlerts('medium',this)" style="border-color:var(--warning);color:var(--warning)">Medium</button>
+        <button class="btn btn-small log-sev-btn" data-severity="low" onclick="logFilterAlerts('low',this)" style="border-color:var(--accent);color:var(--accent)">Low</button>
+        <button class="btn btn-small" style="margin-left:auto" onclick="logRefreshAlerts()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Timestamp</th><th>Rule</th><th>Severity</th><th>Source</th><th>Log Entry</th></tr></thead>
+        <tbody id="log-alerts-table">
+            <tr><td colspan="5" class="empty-state">No alerts triggered yet.</td></tr>
+        </tbody>
+    </table>
+    <div class="tool-actions" style="margin-top:12px">
+        <button class="btn btn-danger btn-small" onclick="logClearAlerts()">Clear Alerts</button>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== RULES TAB ==================== -->
+<div class="tab-content" data-tab-group="logs" data-tab="rules">
+
+<div class="section">
+    <h2>Detection Rules</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button class="btn btn-small" onclick="logLoadRules()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>ID</th><th>Name</th><th>Pattern</th><th>Severity</th><th>Type</th><th>Action</th></tr></thead>
+        <tbody id="log-rules-table">
+            <tr><td colspan="6" class="empty-state">No rules loaded.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Add Custom Rule</h2>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group">
+            <label>Rule ID</label>
+            <input type="text" id="log-rule-id" placeholder="e.g. CUSTOM-001">
+        </div>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="log-rule-name" placeholder="e.g. SSH Root Login">
+        </div>
+    </div>
+    <div class="form-row" style="margin-bottom:8px">
+        <div class="form-group" style="flex:2">
+            <label>Pattern (regex)</label>
+            <input type="text" id="log-rule-pattern" placeholder="e.g. Failed password for root">
+        </div>
+        <div class="form-group">
+            <label>Severity</label>
+            <select id="log-rule-severity">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+            <label>Threshold (count)</label>
+            <input type="number" id="log-rule-threshold" value="1" min="1" max="10000">
+        </div>
+        <div class="form-group">
+            <label>Window (seconds)</label>
+            <input type="number" id="log-rule-window" value="300" min="1" max="86400">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-add-rule" class="btn btn-primary" onclick="logAddRule()">Add Rule</button>
+    </div>
+    <pre class="output-panel" id="log-rule-output" style="min-height:0"></pre>
+</div>
+
+</div>
+
+<!-- ==================== STATS TAB ==================== -->
+<div class="tab-content" data-tab-group="logs" data-tab="stats">
+
+<div class="section">
+    <h2>Overview</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Logs</div>
+            <div class="stat-value" id="log-stat-total">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Alerts</div>
+            <div class="stat-value" id="log-stat-alerts">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Sources</div>
+            <div class="stat-value" id="log-stat-sources">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Rules</div>
+            <div class="stat-value" id="log-stat-rules">--</div>
+        </div>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button class="btn btn-small" onclick="logLoadStats()">Refresh Stats</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Alerts by Severity</h2>
+    <table class="data-table" style="max-width:400px">
+        <tbody id="log-stats-severity">
+            <tr><td>Critical</td><td id="log-sev-critical">--</td></tr>
+            <tr><td>High</td><td id="log-sev-high">--</td></tr>
+            <tr><td>Medium</td><td id="log-sev-medium">--</td></tr>
+            <tr><td>Low</td><td id="log-sev-low">--</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Top Triggered Rules</h2>
+    <table class="data-table">
+        <thead><tr><th>Rule</th><th>Count</th><th>Last Triggered</th></tr></thead>
+        <tbody id="log-stats-top-rules">
+            <tr><td colspan="3" class="empty-state">No data yet.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Timeline (Hourly Alert Counts)</h2>
+    <div id="log-stats-timeline" style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-height:120px">
+        <div id="log-timeline-bars" style="display:flex;align-items:flex-end;gap:2px;height:100px"></div>
+        <div id="log-timeline-labels" style="display:flex;gap:2px;font-size:0.65rem;color:var(--text-muted);margin-top:4px"></div>
+        <p id="log-timeline-empty" class="empty-state" style="margin:0;padding:24px 0">No timeline data yet. Ingest logs and trigger rules to populate.</p>
+    </div>
+</div>
+
+</div>
+
+<script>
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+var _currentSevFilter = 'all';
+
+/* ── Ingest ── */
+function logIngestFile() {
+    var path = document.getElementById('log-ingest-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-ingest-file');
+    setLoading(btn, true);
+    postJSON('/logs/ingest/file', {path: path}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('log-ingest-file-output', data.message || data.error || 'Done');
+        if (data.success) logLoadSources();
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function logIngestPaste() {
+    var text = document.getElementById('log-ingest-paste').value.trim();
+    if (!text) return;
+    var btn = document.getElementById('btn-ingest-paste');
+    setLoading(btn, true);
+    postJSON('/logs/ingest/paste', {data: text}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('log-ingest-paste-output', data.message || data.error || 'Done');
+        if (data.success) logLoadSources();
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function logLoadSources() {
+    fetchJSON('/logs/sources').then(function(data) {
+        var tb = document.getElementById('log-sources-table');
+        var sources = data.sources || [];
+        if (!sources.length) {
+            tb.innerHTML = '<tr><td colspan="4" class="empty-state">No log sources ingested yet.</td></tr>';
+            return;
+        }
+        var html = '';
+        sources.forEach(function(s) {
+            html += '<tr><td>' + esc(s.name) + '</td><td>' + esc(s.type) + '</td>'
+                + '<td>' + (s.entries || 0) + '</td><td>' + esc(s.last_ingested || '--') + '</td></tr>';
+        });
+        tb.innerHTML = html;
+    });
+}
+
+function logSearch() {
+    var query = document.getElementById('log-search-query').value.trim();
+    if (!query) return;
+    var btn = document.getElementById('btn-log-search');
+    setLoading(btn, true);
+    postJSON('/logs/search', {query: query}).then(function(data) {
+        setLoading(btn, false);
+        var results = data.results || [];
+        document.getElementById('log-search-count').textContent = results.length + ' results';
+        var tb = document.getElementById('log-search-results');
+        if (!results.length) {
+            tb.innerHTML = '<tr><td colspan="3" class="empty-state">No matches found.</td></tr>';
+            return;
+        }
+        var html = '';
+        results.forEach(function(r) {
+            html += '<tr><td style="white-space:nowrap;font-size:0.8rem">' + esc(r.timestamp || '--') + '</td>'
+                + '<td>' + esc(r.source || '--') + '</td>'
+                + '<td style="font-family:monospace;font-size:0.8rem">' + esc(r.entry) + '</td></tr>';
+        });
+        tb.innerHTML = html;
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function logClearAll() {
+    if (!confirm('Clear all ingested logs? This cannot be undone.')) return;
+    postJSON('/logs/clear', {}).then(function(data) {
+        if (data.success) {
+            logLoadSources();
+            document.getElementById('log-search-results').innerHTML = '<tr><td colspan="3" class="empty-state">No matches found.</td></tr>';
+            document.getElementById('log-search-count').textContent = '';
+        }
+    });
+}
+
+/* ── Alerts ── */
+function logRefreshAlerts() {
+    logFilterAlerts(_currentSevFilter);
+}
+
+function logFilterAlerts(severity, btnEl) {
+    _currentSevFilter = severity;
+    document.querySelectorAll('.log-sev-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.severity === severity);
+    });
+    fetchJSON('/logs/alerts?severity=' + severity).then(function(data) {
+        var tb = document.getElementById('log-alerts-table');
+        var alerts = data.alerts || [];
+        if (!alerts.length) {
+            tb.innerHTML = '<tr><td colspan="5" class="empty-state">No alerts' + (severity !== 'all' ? ' with severity "' + severity + '"' : '') + '.</td></tr>';
+            return;
+        }
+        var html = '';
+        alerts.forEach(function(a) {
+            var sev = (a.severity || 'low').toLowerCase();
+            var badgeClass = sev === 'critical' ? 'badge-fail'
+                           : sev === 'high' ? 'badge-high'
+                           : sev === 'medium' ? 'badge-medium' : 'badge-low';
+            html += '<tr><td style="white-space:nowrap;font-size:0.8rem">' + esc(a.timestamp || '--') + '</td>'
+                + '<td>' + esc(a.rule || '--') + '</td>'
+                + '<td><span class="badge ' + badgeClass + '">' + esc(a.severity) + '</span></td>'
+                + '<td>' + esc(a.source || '--') + '</td>'
+                + '<td style="font-family:monospace;font-size:0.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(a.entry || '') + '</td></tr>';
+        });
+        tb.innerHTML = html;
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    });
+}
+
+function logClearAlerts() {
+    if (!confirm('Clear all alerts?')) return;
+    postJSON('/logs/alerts/clear', {}).then(function(data) {
+        if (data.success) logRefreshAlerts();
+    });
+}
+
+/* ── Rules ── */
+function logLoadRules() {
+    fetchJSON('/logs/rules').then(function(data) {
+        var tb = document.getElementById('log-rules-table');
+        var rules = data.rules || [];
+        if (!rules.length) {
+            tb.innerHTML = '<tr><td colspan="6" class="empty-state">No rules loaded.</td></tr>';
+            return;
+        }
+        var html = '';
+        rules.forEach(function(r) {
+            var sev = (r.severity || 'low').toLowerCase();
+            var badgeClass = sev === 'critical' ? 'badge-fail'
+                           : sev === 'high' ? 'badge-high'
+                           : sev === 'medium' ? 'badge-medium' : 'badge-low';
+            var typeBadge = r.builtin ? '<span class="badge badge-info">Built-in</span>' : '<span class="badge badge-medium">Custom</span>';
+            var deleteBtn = r.builtin ? '' : '<button class="btn btn-danger btn-small" onclick="logDeleteRule(\'' + esc(r.id) + '\')">Delete</button>';
+            html += '<tr><td style="font-family:monospace;font-size:0.85rem">' + esc(r.id) + '</td>'
+                + '<td>' + esc(r.name) + '</td>'
+                + '<td style="font-family:monospace;font-size:0.8rem">' + esc(r.pattern) + '</td>'
+                + '<td><span class="badge ' + badgeClass + '">' + esc(r.severity) + '</span></td>'
+                + '<td>' + typeBadge + '</td>'
+                + '<td>' + deleteBtn + '</td></tr>';
+        });
+        tb.innerHTML = html;
+    });
+}
+
+function logAddRule() {
+    var rule = {
+        id: document.getElementById('log-rule-id').value.trim(),
+        name: document.getElementById('log-rule-name').value.trim(),
+        pattern: document.getElementById('log-rule-pattern').value.trim(),
+        severity: document.getElementById('log-rule-severity').value,
+        threshold: parseInt(document.getElementById('log-rule-threshold').value) || 1,
+        window: parseInt(document.getElementById('log-rule-window').value) || 300
+    };
+    if (!rule.id || !rule.name || !rule.pattern) {
+        renderOutput('log-rule-output', 'Rule ID, Name, and Pattern are required.');
+        return;
+    }
+    var btn = document.getElementById('btn-add-rule');
+    setLoading(btn, true);
+    postJSON('/logs/rules/add', rule).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('log-rule-output', data.message || data.error || 'Done');
+        if (data.success) {
+            logLoadRules();
+            document.getElementById('log-rule-id').value = '';
+            document.getElementById('log-rule-name').value = '';
+            document.getElementById('log-rule-pattern').value = '';
+        }
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function logDeleteRule(id) {
+    if (!confirm('Delete rule "' + id + '"?')) return;
+    postJSON('/logs/rules/delete', {id: id}).then(function(data) {
+        if (data.success) logLoadRules();
+    });
+}
+
+/* ── Stats ── */
+function logLoadStats() {
+    fetchJSON('/logs/stats').then(function(data) {
+        document.getElementById('log-stat-total').textContent = data.total_logs || 0;
+        document.getElementById('log-stat-alerts').textContent = data.total_alerts || 0;
+        document.getElementById('log-stat-sources').textContent = data.total_sources || 0;
+        document.getElementById('log-stat-rules').textContent = data.total_rules || 0;
+
+        var bySev = data.alerts_by_severity || {};
+        document.getElementById('log-sev-critical').textContent = bySev.critical || 0;
+        document.getElementById('log-sev-high').textContent = bySev.high || 0;
+        document.getElementById('log-sev-medium').textContent = bySev.medium || 0;
+        document.getElementById('log-sev-low').textContent = bySev.low || 0;
+
+        var topRules = data.top_rules || [];
+        var trTb = document.getElementById('log-stats-top-rules');
+        if (!topRules.length) {
+            trTb.innerHTML = '<tr><td colspan="3" class="empty-state">No data yet.</td></tr>';
+        } else {
+            var html = '';
+            topRules.forEach(function(r) {
+                html += '<tr><td>' + esc(r.name) + '</td><td>' + r.count + '</td><td>' + esc(r.last_triggered || '--') + '</td></tr>';
+            });
+            trTb.innerHTML = html;
+        }
+
+        /* Timeline bars */
+        var timeline = data.timeline || [];
+        var emptyMsg = document.getElementById('log-timeline-empty');
+        var barsEl = document.getElementById('log-timeline-bars');
+        var labelsEl = document.getElementById('log-timeline-labels');
+        if (!timeline.length) {
+            emptyMsg.style.display = 'block';
+            barsEl.innerHTML = '';
+            labelsEl.innerHTML = '';
+        } else {
+            emptyMsg.style.display = 'none';
+            var maxVal = Math.max.apply(null, timeline.map(function(t) { return t.count; })) || 1;
+            var barsHtml = '';
+            var labelsHtml = '';
+            timeline.forEach(function(t) {
+                var pct = Math.max(2, Math.round((t.count / maxVal) * 100));
+                var color = t.count > maxVal * 0.7 ? 'var(--danger)' : t.count > maxVal * 0.4 ? 'var(--warning)' : 'var(--accent)';
+                barsHtml += '<div style="flex:1;height:' + pct + '%;background:' + color + ';border-radius:2px 2px 0 0;min-width:4px" title="' + esc(t.hour) + ': ' + t.count + ' alerts"></div>';
+                labelsHtml += '<div style="flex:1;text-align:center;min-width:4px">' + esc(t.hour || '') + '</div>';
+            });
+            barsEl.innerHTML = barsHtml;
+            labelsEl.innerHTML = labelsHtml;
+        }
+        halAnalyze('Log Correlator', JSON.stringify(data, null, 2), 'log correlation', 'log_analysis');
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    logLoadSources();
+    logLoadRules();
+    logRefreshAlerts();
+    logLoadStats();
+});
+</script>
+{% endblock %}

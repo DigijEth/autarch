@@ -1,0 +1,129 @@
+; ============================================================================
+; GL.iNet Flint 2 (GL-MT6000) — Remote Monitor Station
+; AUTARCH PIAP (Platform Integration & Access Profile)
+; ============================================================================
+;
+; This file defines a remote device for AUTARCH's Remote Monitoring Station.
+; AUTARCH reads this file to build the UI, connect to the device, and control
+; its radios and features.
+;
+; To create your own .piap file, copy template.piap from this folder,
+; fill in your device info, and save it with a name of your choice.
+; It will appear in the dropdown menu automatically.
+;
+; ============================================================================
+
+[device]
+; Name shown in the AUTARCH dropdown menu
+name = Flint 2
+; Device model / description
+model = GL.iNet GL-MT6000
+; Chipset info (for reference)
+chipset = MediaTek MT7986A (Filogic 830)
+; WiFi chipset
+wifi_chipset = MediaTek MT7976C
+; Icon (optional, filename in /web/static/img/)
+icon = router.png
+; Operating system running on the device
+os = OpenWrt 25
+
+[connection]
+; SSH connection details
+host = 192.168.1.1
+port = 22
+user = root
+; Auth method: key or password
+auth = key
+; Path to SSH key (leave blank to use default ~/.ssh/id_ed25519)
+key_path =
+; Password (only used if auth = password, stored in vault if available)
+password =
+; Connection timeout in seconds
+timeout = 10
+
+[radio_0]
+; ── First radio (2.4GHz) ──────────────────────────────────────────────────
+; Radio name shown in UI
+name = 2.4GHz Radio
+; Phy device name on the remote device
+phy = phy0
+; Default interface name
+interface = wlan0
+; Monitor interface name (created when monitor mode is enabled)
+monitor_interface = mon0
+; Supported bands
+band = 2.4GHz
+; Supported channels (comma separated)
+channels = 1,2,3,4,5,6,7,8,9,10,11,12,13,14
+; Default channel for monitor mode
+default_channel = 6
+; Supported modes (comma separated)
+; These become buttons in the UI
+modes = managed,monitor,ap
+; Command to enable monitor mode
+; {phy} and {mon} are replaced with phy and monitor_interface values
+cmd_monitor_on = iw dev {interface} del 2>/dev/null; iw phy {phy} interface add {mon} type monitor && ip link set {mon} up && iw dev {mon} set channel {channel}
+; Command to disable monitor mode
+cmd_monitor_off = ip link set {mon} down 2>/dev/null; iw dev {mon} del 2>/dev/null
+; Command to set channel
+cmd_set_channel = iw dev {mon} set channel {channel}
+; Command to get current status
+cmd_status = iw dev 2>/dev/null | grep -A5 "{mon}\|{interface}"
+; Supports frame injection
+injection = true
+; Supports radiotap headers
+radiotap = true
+
+[radio_1]
+; ── Second radio (5GHz) ───────────────────────────────────────────────────
+name = 5GHz Radio
+phy = phy1
+interface = wlan1
+monitor_interface = mon1
+band = 5GHz
+channels = 36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165
+default_channel = 36
+modes = managed,monitor,ap
+cmd_monitor_on = iw dev {interface} del 2>/dev/null; iw phy {phy} interface add {mon} type monitor && ip link set {mon} up && iw dev {mon} set channel {channel}
+cmd_monitor_off = ip link set {mon} down 2>/dev/null; iw dev {mon} del 2>/dev/null
+cmd_set_channel = iw dev {mon} set channel {channel}
+cmd_status = iw dev 2>/dev/null | grep -A5 "{mon}\|{interface}"
+injection = true
+radiotap = true
+
+[features]
+; ── Available features (become sub-tabs in the UI) ────────────────────────
+; Each feature name maps to a sub-tab. The commands are run over SSH.
+; Additional features can be added — they automatically appear as tabs.
+
+; Packet capture
+capture = true
+cmd_capture_start = tcpdump -i {mon} -w /tmp/capture_{timestamp}.pcap &
+cmd_capture_stop = killall tcpdump 2>/dev/null
+cmd_capture_pull = cat /tmp/capture_*.pcap
+
+; WiFi scanning (passive)
+wifi_scan = true
+cmd_wifi_scan = iw dev {mon} scan passive 2>/dev/null || tcpdump -i {mon} -c 100 -e 2>&1 | grep Beacon
+
+; Aircrack suite
+aircrack = true
+cmd_airodump = airodump-ng {mon}
+cmd_aireplay = aireplay-ng {mon}
+cmd_aircrack = aircrack-ng
+
+; Deauthentication
+deauth = true
+cmd_deauth = aireplay-ng --deauth {count} -a {bssid} {mon}
+
+; Channel hopping
+channel_hop = true
+cmd_channel_hop = while true; do for ch in {channels}; do iw dev {mon} set channel $ch; sleep 0.5; done; done
+
+[info]
+; ── Device info (read-only, displayed in UI) ─────────────────────────────
+cmd_uptime = uptime
+cmd_memory = free -m
+cmd_disk = df -h /
+cmd_kernel = uname -a
+cmd_wifi_info = iw dev

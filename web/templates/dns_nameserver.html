@@ -1,0 +1,1556 @@
+{% extends "base.html" %}
+{% block title %}Nameserver — AUTARCH{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>Nameserver</h1>
+    <p class="text-muted">Recursive resolver, query analytics, cache management, blocklist, benchmarking</p>
+</div>
+
+<!-- Binary Status Card -->
+<div class="card" id="ns-status-card" style="margin-bottom:1.25rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem">
+        <div>
+            <h3 style="margin:0 0 0.25rem 0">autarch-dns</h3>
+            <div id="ns-binary-status" style="font-size:0.85rem;color:var(--text-muted)">Checking...</div>
+        </div>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="nsStart()">Start</button>
+            <button class="btn btn-danger" onclick="nsStop()">Stop</button>
+            <button class="btn" onclick="nsRefresh()">Refresh</button>
+        </div>
+    </div>
+    <div id="ns-details" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;font-size:0.82rem">
+            <div><span style="color:var(--text-muted)">Binary:</span> <code id="ns-path" style="font-size:0.78rem">—</code></div>
+            <div><span style="color:var(--text-muted)">Version:</span> <span id="ns-version">—</span></div>
+            <div><span style="color:var(--text-muted)">PID:</span> <span id="ns-pid">—</span></div>
+            <div><span style="color:var(--text-muted)">DNS Listen:</span> <code id="ns-listen-dns">—</code></div>
+            <div><span style="color:var(--text-muted)">API Listen:</span> <code id="ns-listen-api">—</code></div>
+            <div><span style="color:var(--text-muted)">Upstream:</span> <span id="ns-upstream">—</span></div>
+            <div><span style="color:var(--text-muted)">Config:</span> <code id="ns-config-path" style="font-size:0.72rem">—</code></div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem;flex-wrap:wrap">
+    <button class="ns-tab active" onclick="nsTab('query',this)">Query</button>
+    <button class="ns-tab" onclick="nsTab('querylog',this)">Query Log</button>
+    <button class="ns-tab" onclick="nsTab('analytics',this)">Analytics</button>
+    <button class="ns-tab" onclick="nsTab('cache',this)">Cache</button>
+    <button class="ns-tab" onclick="nsTab('blocklist',this)">Blocklist</button>
+    <button class="ns-tab" onclick="nsTab('forwarding',this)">Forwarding</button>
+    <button class="ns-tab" onclick="nsTab('health',this)">Root Health</button>
+    <button class="ns-tab" onclick="nsTab('benchmark',this)">Benchmark</button>
+    <button class="ns-tab" onclick="nsTab('encryption',this)">Encryption</button>
+    <button class="ns-tab" onclick="nsTab('hosts',this)">Hosts</button>
+    <button class="ns-tab" onclick="nsTab('ezintranet',this)">EZ Intranet</button>
+    <button class="ns-tab" onclick="nsTab('delegation',this)">Delegation</button>
+    <button class="ns-tab" onclick="nsTab('build',this)">Build</button>
+</div>
+
+<!-- ═══════════ Query Tester ═══════════ -->
+<div id="tab-query" class="ns-pane">
+    <div class="card" style="max-width:700px">
+        <h3>DNS Query Tester</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Test resolution against the running nameserver or system resolver.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Hostname / Domain</label>
+                <input type="text" id="q-name" class="form-control" placeholder="example.com" onkeydown="if(event.key==='Enter')nsQuery()">
+            </div>
+            <select id="q-type" class="form-control" style="width:100px">
+                <option>A</option><option>AAAA</option><option>MX</option>
+                <option>TXT</option><option>NS</option><option>CNAME</option>
+                <option>SOA</option><option>SRV</option><option>PTR</option>
+            </select>
+            <label style="font-size:0.82rem;display:flex;align-items:center;gap:0.35rem;white-space:nowrap">
+                <input type="checkbox" id="q-local" checked> Use local NS
+            </label>
+            <button class="btn btn-primary" onclick="nsQuery()">Query</button>
+        </div>
+    </div>
+    <div id="q-results" style="margin-top:1rem"></div>
+</div>
+
+<!-- ═══════════ Query Log ═══════════ -->
+<div id="tab-querylog" class="ns-pane" style="display:none">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <h3>Query Log</h3>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <label style="font-size:0.82rem;display:flex;align-items:center;gap:0.35rem">
+                    <input type="checkbox" id="ql-auto" onchange="toggleAutoRefresh()"> Auto-refresh
+                </label>
+                <select id="ql-limit" class="form-control" style="width:auto;padding:0.3rem 0.5rem;font-size:0.8rem" onchange="loadQueryLog()">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="200" selected>200</option>
+                    <option value="500">500</option>
+                </select>
+                <input id="ql-filter" class="form-control" style="width:180px;padding:0.3rem 0.5rem;font-size:0.8rem" placeholder="Filter domain..." oninput="filterQueryLog()">
+                <button class="btn btn-small" onclick="loadQueryLog()">Refresh</button>
+                <button class="btn btn-small btn-danger" onclick="clearQueryLog()">Clear</button>
+            </div>
+        </div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead>
+                    <tr style="border-bottom:2px solid var(--border);text-align:left">
+                        <th style="padding:5px">Time</th>
+                        <th style="padding:5px">Client</th>
+                        <th style="padding:5px">Domain</th>
+                        <th style="padding:5px">Type</th>
+                        <th style="padding:5px">Result</th>
+                        <th style="padding:5px">Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="ql-table"></tbody>
+            </table>
+        </div>
+        <div id="ql-count" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem"></div>
+    </div>
+</div>
+
+<!-- ═══════════ Analytics ═══════════ -->
+<div id="tab-analytics" class="ns-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Top Domains -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Top Domains</h3>
+                <button class="btn btn-small" onclick="loadTopDomains()">Refresh</button>
+            </div>
+            <div id="an-top-domains" style="font-size:0.82rem">Loading...</div>
+        </div>
+
+        <!-- Query Types -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Query Types</h3>
+                <button class="btn btn-small" onclick="loadQueryTypes()">Refresh</button>
+            </div>
+            <div id="an-query-types" style="font-size:0.82rem">Loading...</div>
+        </div>
+
+        <!-- Client Stats -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Top Clients</h3>
+                <button class="btn btn-small" onclick="loadClientStats()">Refresh</button>
+            </div>
+            <div id="an-clients" style="font-size:0.82rem">Loading...</div>
+        </div>
+
+        <!-- NS Delegation Cache -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>NS Delegation Cache</h3>
+                <div style="display:flex;gap:0.5rem">
+                    <button class="btn btn-small" onclick="loadNSCache()">Refresh</button>
+                    <button class="btn btn-small btn-danger" onclick="flushNSCache()">Flush</button>
+                </div>
+            </div>
+            <div id="an-ns-cache" style="font-size:0.82rem;max-height:300px;overflow-y:auto">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Cache ═══════════ -->
+<div id="tab-cache" class="ns-pane" style="display:none">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <h3>DNS Cache</h3>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input id="cache-search" class="form-control" style="width:200px;padding:0.3rem 0.5rem;font-size:0.8rem" placeholder="Search domain..." oninput="filterCache()">
+                <button class="btn btn-small" onclick="loadCache()">Refresh</button>
+                <button class="btn btn-small btn-danger" onclick="flushAllCache()">Flush All</button>
+            </div>
+        </div>
+        <div id="cache-count" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem"></div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead>
+                    <tr style="border-bottom:2px solid var(--border);text-align:left">
+                        <th style="padding:5px">Domain</th>
+                        <th style="padding:5px">Type</th>
+                        <th style="padding:5px">Value</th>
+                        <th style="padding:5px">TTL</th>
+                        <th style="padding:5px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="cache-table"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Blocklist ═══════════ -->
+<div id="tab-blocklist" class="ns-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <div class="card">
+            <h3 style="margin-bottom:0.75rem">Add to Blocklist</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Blocked domains return NXDOMAIN. Wildcard blocking: adding <code>example.com</code> also blocks all subdomains.
+            </p>
+            <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Domain</label>
+            <input id="bl-domain" class="form-control" placeholder="ads.example.com" onkeydown="if(event.key==='Enter')addBlockEntry()">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="addBlockEntry()">Block Domain</button>
+            <div id="bl-add-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.5rem">Bulk Import</h4>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">
+                One domain per line. Supports hosts-file format (lines starting with 0.0.0.0 or 127.0.0.1).
+            </p>
+            <textarea id="bl-bulk" class="form-control" style="height:120px;font-family:monospace;font-size:0.78rem" placeholder="ads.tracker.com
+0.0.0.0 doubleclick.net
+127.0.0.1 analytics.evil.com
+malware.example.net"></textarea>
+            <button class="btn btn-primary" style="margin-top:0.5rem;width:100%" onclick="bulkImportBlock()">Import Blocklist</button>
+            <div id="bl-import-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Blocked Domains</h3>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                    <input id="bl-search" class="form-control" style="width:160px;padding:0.3rem 0.5rem;font-size:0.8rem" placeholder="Search..." oninput="filterBlocklist()">
+                    <button class="btn btn-small" onclick="loadBlocklist()">Refresh</button>
+                </div>
+            </div>
+            <div id="bl-count" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem"></div>
+            <div id="bl-list" style="max-height:500px;overflow-y:auto;font-size:0.82rem">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Conditional Forwarding ═══════════ -->
+<div id="tab-forwarding" class="ns-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <div class="card">
+            <h3 style="margin-bottom:0.75rem">Add Forwarding Rule</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Forward queries for specific zones to designated upstream servers instead of using recursive resolution.
+                Useful for internal zones, split-horizon DNS, or VPN domains.
+            </p>
+            <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Zone / Domain</label>
+            <input id="fwd-zone" class="form-control" placeholder="corp.internal">
+            <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600;margin-top:0.5rem">Upstream Servers (comma-separated)</label>
+            <input id="fwd-servers" class="form-control" placeholder="10.0.0.1:53,10.0.0.2:53">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="addForwarding()">Add Rule</button>
+            <div id="fwd-add-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Forwarding Rules</h3>
+                <button class="btn btn-small" onclick="loadForwarding()">Refresh</button>
+            </div>
+            <div id="fwd-list" style="font-size:0.82rem">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Root Health ═══════════ -->
+<div id="tab-health" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:700px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Root Server Health Check</h3>
+            <button class="btn btn-primary" onclick="checkRootHealth()">Check All 13 Roots</button>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Ping all 13 IANA root nameservers to verify connectivity. This is the foundation of recursive resolution.
+        </p>
+        <div id="root-results">
+            <div style="color:var(--text-muted);font-size:0.85rem">Click "Check All 13 Roots" to test connectivity.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Benchmark ═══════════ -->
+<div id="tab-benchmark" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:700px">
+        <h3 style="margin-bottom:0.75rem">DNS Benchmark</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Measure resolution latency for multiple domains against the running nameserver.
+        </p>
+        <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Domains (comma-separated)</label>
+        <input id="bm-domains" class="form-control" value="google.com,github.com,cloudflare.com,amazon.com,wikipedia.org,reddit.com,microsoft.com,apple.com">
+        <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600;margin-top:0.5rem">Iterations per domain</label>
+        <input id="bm-iterations" class="form-control" type="number" value="3" min="1" max="20" style="width:100px">
+        <button class="btn btn-primary" style="margin-top:0.75rem" onclick="runBenchmark()">Run Benchmark</button>
+        <div id="bm-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        <div id="bm-results" style="margin-top:1rem"></div>
+    </div>
+</div>
+
+<!-- ═══════════ NS Delegation ═══════════ -->
+<div id="tab-delegation" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:700px">
+        <h3>NS Delegation Reference</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            To make this nameserver authoritative for a domain, set these NS records at your registrar or parent zone.
+        </p>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">Your public IP</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input type="text" id="del-ip" class="form-control" placeholder="Detecting..." style="flex:1">
+                <button class="btn btn-sm" onclick="detectPublicIP()">Detect</button>
+            </div>
+        </div>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">Domain</label>
+            <input type="text" id="del-domain" class="form-control" placeholder="example.com" oninput="updateDelegation()">
+        </div>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">NS hostname</label>
+            <input type="text" id="del-ns" class="form-control" placeholder="ns1.example.com" oninput="updateDelegation()">
+        </div>
+        <div id="del-records" class="card" style="background:var(--bg-input);font-family:monospace;font-size:0.8rem;white-space:pre-wrap;padding:1rem;margin-top:1rem;display:none"></div>
+        <div style="margin-top:1rem">
+            <h4>Glue Records</h4>
+            <p style="font-size:0.82rem;color:var(--text-muted)">
+                If your NS hostname is a subdomain of the zone itself, you need <strong>glue records</strong> at the parent zone.
+            </p>
+            <div id="del-glue" class="card" style="background:var(--bg-input);font-family:monospace;font-size:0.8rem;padding:1rem;margin-top:0.5rem;display:none"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Encryption (DoT / DoH) ═══════════ -->
+<div id="tab-encryption" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:800px">
+        <h3>DNS Encryption</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Encrypt upstream DNS queries using DNS-over-TLS (DoT) or DNS-over-HTTPS (DoH).
+            Iterative resolution from root hints always uses plain DNS (root servers don't support encryption),
+            but upstream forwarder fallback queries can be encrypted.
+        </p>
+
+        <!-- Current Status -->
+        <div id="enc-status" style="margin-bottom:1.25rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <strong style="font-size:0.95rem">DNS-over-TLS (DoT)</strong>
+                            <div style="font-size:0.78rem;color:var(--text-muted)">Port 853 — TLS encrypted transport</div>
+                        </div>
+                        <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer">
+                            <input type="checkbox" id="enc-dot-toggle" onchange="updateEncryption()" style="opacity:0;width:0;height:0">
+                            <span style="position:absolute;inset:0;background:var(--bg-input);border:1px solid var(--border);border-radius:13px;transition:0.3s"></span>
+                            <span id="enc-dot-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;background:var(--text-muted);border-radius:50%;transition:0.3s"></span>
+                        </label>
+                    </div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <strong style="font-size:0.95rem">DNS-over-HTTPS (DoH)</strong>
+                            <div style="font-size:0.78rem;color:var(--text-muted)">RFC 8484 — HTTPS encrypted transport</div>
+                        </div>
+                        <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer">
+                            <input type="checkbox" id="enc-doh-toggle" onchange="updateEncryption()" style="opacity:0;width:0;height:0">
+                            <span style="position:absolute;inset:0;background:var(--bg-input);border:1px solid var(--border);border-radius:13px;transition:0.3s"></span>
+                            <span id="enc-doh-knob" style="position:absolute;top:3px;left:3px;width:20px;height:20px;background:var(--text-muted);border-radius:50%;transition:0.3s"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div id="enc-mode-info" style="margin-top:0.75rem;font-size:0.82rem;padding:0.5rem 0.75rem;border-radius:var(--radius);background:var(--bg-input)">
+                Preferred mode: <strong id="enc-preferred">checking...</strong>
+            </div>
+        </div>
+
+        <!-- Supported Servers -->
+        <h4 style="margin-bottom:0.5rem">Supported Encrypted Servers</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem">
+            <div>
+                <strong style="font-size:0.82rem;color:var(--text-muted)">DoT Servers (TLS on port 853)</strong>
+                <div id="enc-dot-servers" style="font-size:0.78rem;margin-top:0.5rem"></div>
+            </div>
+            <div>
+                <strong style="font-size:0.82rem;color:var(--text-muted)">DoH Endpoints (HTTPS)</strong>
+                <div id="enc-doh-servers" style="font-size:0.78rem;margin-top:0.5rem"></div>
+            </div>
+        </div>
+
+        <!-- Test Panel -->
+        <h4 style="margin-bottom:0.5rem">Encryption Test</h4>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Test encrypted DNS resolution against a specific server.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap;margin-bottom:0.75rem">
+            <div>
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Server</label>
+                <select id="enc-test-server" class="form-control" style="width:auto">
+                    <option value="8.8.8.8:53">Google (8.8.8.8)</option>
+                    <option value="1.1.1.1:53">Cloudflare (1.1.1.1)</option>
+                    <option value="9.9.9.9:53">Quad9 (9.9.9.9)</option>
+                    <option value="208.67.222.222:53">OpenDNS (208.67.222.222)</option>
+                    <option value="94.140.14.14:53">AdGuard (94.140.14.14)</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Mode</label>
+                <select id="enc-test-mode" class="form-control" style="width:auto">
+                    <option value="dot">DoT (TLS)</option>
+                    <option value="doh">DoH (HTTPS)</option>
+                    <option value="plain">Plain DNS</option>
+                </select>
+            </div>
+            <div style="flex:1;min-width:150px">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Domain</label>
+                <input type="text" id="enc-test-domain" class="form-control" value="google.com">
+            </div>
+            <button class="btn btn-primary" onclick="testEncryption()">Test</button>
+        </div>
+        <div id="enc-test-result" style="display:none;font-size:0.82rem;padding:0.75rem;border-radius:var(--radius);background:var(--bg-input);border:1px solid var(--border)"></div>
+    </div>
+</div>
+
+<!-- ═══════════ Hosts ═══════════ -->
+<div id="tab-hosts" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:900px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <div>
+                <h3 style="margin:0">Hosts File</h3>
+                <p style="font-size:0.78rem;color:var(--text-muted);margin:0.25rem 0 0">
+                    Local hostname resolution — like /etc/hosts but served via DNS. Checked before zones.
+                </p>
+            </div>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn" onclick="exportHosts()">Export</button>
+                <button class="btn btn-danger" onclick="clearHosts()" style="font-size:0.78rem">Clear All</button>
+            </div>
+        </div>
+
+        <!-- Add Entry -->
+        <div style="display:flex;gap:0.5rem;align-items:end;flex-wrap:wrap;margin-bottom:1rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input)">
+            <div style="min-width:140px">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">IP Address</label>
+                <input type="text" id="host-ip" class="form-control" placeholder="192.168.1.100">
+            </div>
+            <div style="min-width:180px;flex:1">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Hostname</label>
+                <input type="text" id="host-name" class="form-control" placeholder="myserver.local">
+            </div>
+            <div style="min-width:180px;flex:1">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Aliases (comma-separated)</label>
+                <input type="text" id="host-aliases" class="form-control" placeholder="server, mybox">
+            </div>
+            <div style="min-width:120px">
+                <label style="font-size:0.78rem;color:var(--text-muted);font-weight:600">Comment</label>
+                <input type="text" id="host-comment" class="form-control" placeholder="optional">
+            </div>
+            <button class="btn btn-primary" onclick="addHost()">Add</button>
+        </div>
+
+        <!-- Import -->
+        <details style="margin-bottom:1rem;border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem">
+            <summary style="cursor:pointer;font-weight:600;font-size:0.85rem">Import Hosts File</summary>
+            <div style="margin-top:0.75rem">
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.5rem">
+                    Paste hosts-file format content (IP  hostname  aliases). Lines starting with # are ignored.
+                </p>
+                <textarea id="hosts-import-text" class="form-control" rows="6" style="font-family:var(--font-mono);font-size:0.78rem" placeholder="192.168.1.1  router.local  gateway
+192.168.1.100  myserver.local  server
+192.168.1.101  printer.local"></textarea>
+                <div style="display:flex;gap:0.5rem;margin-top:0.5rem">
+                    <label style="font-size:0.78rem;display:flex;align-items:center;gap:0.25rem">
+                        <input type="checkbox" id="hosts-import-clear"> Clear existing before import
+                    </label>
+                    <div style="flex:1"></div>
+                    <button class="btn" onclick="loadSystemHosts()">Load System Hosts</button>
+                    <button class="btn btn-primary" onclick="importHosts()">Import</button>
+                </div>
+            </div>
+        </details>
+
+        <!-- Hosts Table -->
+        <div style="margin-bottom:0.5rem;display:flex;gap:0.5rem;align-items:center">
+            <input type="text" id="host-search" class="form-control" placeholder="Search hosts..." style="width:250px" oninput="filterHosts()">
+            <span id="host-count" style="font-size:0.78rem;color:var(--text-muted)">0 entries</span>
+        </div>
+        <div style="max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+                <thead style="position:sticky;top:0;background:var(--bg-card)">
+                    <tr style="border-bottom:2px solid var(--border)">
+                        <th style="text-align:left;padding:0.5rem;font-weight:600">IP</th>
+                        <th style="text-align:left;padding:0.5rem;font-weight:600">Hostname</th>
+                        <th style="text-align:left;padding:0.5rem;font-weight:600">Aliases</th>
+                        <th style="text-align:left;padding:0.5rem;font-weight:600">Comment</th>
+                        <th style="width:60px;padding:0.5rem"></th>
+                    </tr>
+                </thead>
+                <tbody id="hosts-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ EZ Intranet Domain ═══════════ -->
+<div id="tab-ezintranet" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:800px">
+        <h3>EZ Intranet Domain</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Create a local domain for your intranet with one click. Auto-detects your network and creates DNS zones,
+            A records, hosts entries, and reverse DNS — everything needed for local name resolution.
+        </p>
+
+        <!-- Domain Config -->
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem;background:var(--bg-input)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div>
+                    <label style="font-size:0.82rem;font-weight:600">Domain Name</label>
+                    <input type="text" id="ez-domain" class="form-control" placeholder="home.lan" value="home.lan">
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.25rem">
+                        Common: .lan, .home, .internal, .local
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size:0.82rem;font-weight:600">Detected Network</label>
+                    <div id="ez-network-info" style="font-size:0.82rem;margin-top:0.5rem">
+                        <div>Local IP: <strong id="ez-local-ip">scanning...</strong></div>
+                        <div>Hostname: <strong id="ez-hostname">scanning...</strong></div>
+                        <div>Gateway: <strong id="ez-gateway">scanning...</strong></div>
+                        <div>Subnet: <strong id="ez-subnet">scanning...</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auto-detected Hosts -->
+        <div style="margin-bottom:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <h4 style="margin:0">Network Hosts</h4>
+                <button class="btn" onclick="ezScanNetwork()" style="font-size:0.78rem">Re-scan Network</button>
+            </div>
+            <div id="ez-hosts-list" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
+                <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+                    <thead style="position:sticky;top:0;background:var(--bg-card)">
+                        <tr style="border-bottom:2px solid var(--border)">
+                            <th style="text-align:center;padding:0.4rem;width:40px">Include</th>
+                            <th style="text-align:left;padding:0.4rem">IP</th>
+                            <th style="text-align:left;padding:0.4rem">Detected Name</th>
+                            <th style="text-align:left;padding:0.4rem">DNS Name (editable)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ez-hosts-tbody">
+                        <tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted)">Scanning network...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Custom Hosts -->
+        <details style="margin-bottom:1rem;border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem">
+            <summary style="cursor:pointer;font-weight:600;font-size:0.85rem">Add Custom Hosts</summary>
+            <div style="margin-top:0.75rem">
+                <div id="ez-custom-hosts">
+                    <div style="display:flex;gap:0.5rem;align-items:end;margin-bottom:0.5rem" class="ez-custom-row">
+                        <input type="text" class="form-control ez-custom-ip" placeholder="192.168.1.200" style="width:140px">
+                        <input type="text" class="form-control ez-custom-name" placeholder="server" style="flex:1">
+                        <button class="btn btn-danger" onclick="this.parentElement.remove()" style="font-size:0.72rem;padding:0.3rem 0.5rem">X</button>
+                    </div>
+                </div>
+                <button class="btn" onclick="ezAddCustomRow()" style="font-size:0.78rem">+ Add Row</button>
+            </div>
+        </details>
+
+        <!-- Options -->
+        <div style="margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:1rem">
+            <label style="font-size:0.82rem;display:flex;align-items:center;gap:0.25rem">
+                <input type="checkbox" id="ez-reverse-zone" checked> Create reverse DNS zone (PTR records)
+            </label>
+            <label style="font-size:0.82rem;display:flex;align-items:center;gap:0.25rem">
+                <input type="checkbox" id="ez-add-hosts" checked> Also add to hosts store (instant resolution)
+            </label>
+        </div>
+
+        <!-- Deploy -->
+        <div style="display:flex;gap:0.5rem;align-items:center">
+            <button class="btn btn-primary" onclick="ezDeploy()" style="font-size:1rem;padding:0.6rem 2rem">
+                Create Intranet Domain
+            </button>
+            <span id="ez-deploy-status" style="font-size:0.82rem"></span>
+        </div>
+
+        <!-- Results -->
+        <div id="ez-results" style="display:none;margin-top:1rem;border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem">
+            <h4 style="margin:0 0 0.5rem">Deployment Log</h4>
+            <div id="ez-results-log" style="font-size:0.82rem"></div>
+        </div>
+
+        <!-- Client Configuration -->
+        <div id="ez-client-config" style="display:none;margin-top:1rem">
+            <div class="card">
+                <h4>Client Configuration</h4>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem">
+                    Point your devices to use this DNS server to resolve your intranet domain.
+                </p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;font-size:0.82rem">
+                    <div>
+                        <strong>Windows</strong>
+                        <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap" id="ez-cmd-windows"></pre>
+                    </div>
+                    <div>
+                        <strong>Linux / macOS</strong>
+                        <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;font-size:0.75rem;margin-top:0.25rem;white-space:pre-wrap" id="ez-cmd-linux"></pre>
+                    </div>
+                </div>
+                <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--text-muted)">
+                    Or configure your router's DHCP to serve <strong id="ez-dns-ip"></strong> as the DNS server to apply to all devices automatically.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════ Build ═══════════ -->
+<div id="tab-build" class="ns-pane" style="display:none">
+    <div class="card" style="max-width:700px">
+        <h3>Build autarch-dns</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+            Compile the Go DNS server binary for your platform.
+        </p>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">Prerequisites</label>
+            <div id="build-prereq" style="font-size:0.85rem;margin-top:0.25rem">Checking...</div>
+        </div>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">Build target</label>
+            <select id="build-target" class="form-control" style="width:auto">
+                <option value="native">Native (this machine)</option>
+                <option value="linux-amd64">Linux amd64</option>
+                <option value="linux-arm64">Linux arm64</option>
+                <option value="windows-amd64">Windows amd64</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:0.5rem">
+            <button class="btn btn-primary" onclick="nsBuild()">Build</button>
+            <button class="btn" onclick="nsCheckGo()">Check Go</button>
+        </div>
+        <div id="build-output" style="display:none;margin-top:1rem">
+            <label style="font-size:0.82rem;color:var(--text-muted);font-weight:600">Output</label>
+            <pre id="build-log" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;font-size:0.78rem;max-height:300px;overflow-y:auto;margin-top:0.25rem;white-space:pre-wrap"></pre>
+        </div>
+    </div>
+    <div class="card" style="max-width:700px;margin-top:1rem">
+        <h3>Manual Build</h3>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.75rem">Or build from the command line:</p>
+        <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;font-size:0.82rem;white-space:pre-wrap">cd services/dns-server
+go mod tidy
+go build -o autarch-dns .    # Linux/macOS
+go build -o autarch-dns.exe . # Windows</pre>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.5rem">
+            Cross-compile: <code>GOOS=linux GOARCH=arm64 go build -o autarch-dns .</code>
+        </p>
+    </div>
+</div>
+
+<style>
+.ns-tab{padding:0.6rem 1rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.ns-tab:hover{color:var(--text-primary)}
+.ns-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.bar-track{background:var(--bg-input);border-radius:3px;height:18px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.root-row{display:grid;grid-template-columns:180px 80px 80px 1fr;gap:0.5rem;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem}
+.bm-row{display:grid;grid-template-columns:200px 80px 80px 80px 1fr;gap:0.5rem;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem}
+</style>
+
+<script>
+let _qlData = [];
+let _blData = [];
+let _cacheData = [];
+let _qlInterval = null;
+
+function nsTab(name, btn) {
+    document.querySelectorAll('.ns-pane').forEach(c => c.style.display = 'none');
+    document.querySelectorAll('.ns-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = '';
+    btn.classList.add('active');
+
+    if (name === 'querylog') loadQueryLog();
+    if (name === 'analytics') { loadTopDomains(); loadQueryTypes(); loadClientStats(); loadNSCache(); }
+    if (name === 'cache') loadCache();
+    if (name === 'blocklist') loadBlocklist();
+    if (name === 'forwarding') loadForwarding();
+    if (name === 'encryption') loadEncryption();
+    if (name === 'hosts') loadHosts();
+    if (name === 'ezintranet') ezScanNetwork();
+}
+
+/* ── Binary status ── */
+function nsRefresh() {
+    fetch('/dns/nameserver/binary-info').then(r => r.json()).then(d => {
+        document.getElementById('ns-details').style.display = '';
+        document.getElementById('ns-path').textContent = d.path || 'Not found';
+        document.getElementById('ns-version').textContent = d.version || '—';
+        document.getElementById('ns-pid').textContent = d.pid || '—';
+        document.getElementById('ns-listen-dns').textContent = d.listen_dns || '—';
+        document.getElementById('ns-listen-api').textContent = d.listen_api || '—';
+        document.getElementById('ns-upstream').textContent = (d.upstream || []).join(', ') || 'None (full recursive)';
+        document.getElementById('ns-config-path').textContent = d.config_path || '—';
+
+        const statusEl = document.getElementById('ns-binary-status');
+        if (!d.found) {
+            statusEl.innerHTML = '<span style="color:var(--danger);font-weight:600">Binary not found</span> — build it in the Build tab';
+        } else if (d.running) {
+            statusEl.innerHTML = '<span style="color:#4ade80;font-weight:600">RUNNING</span> — PID ' + d.pid;
+        } else {
+            statusEl.innerHTML = '<span style="color:var(--text-muted);font-weight:600">STOPPED</span> — binary found at ' + d.path;
+        }
+    }).catch(() => {
+        document.getElementById('ns-binary-status').innerHTML = '<span style="color:var(--danger)">Error checking status</span>';
+    });
+}
+
+function nsStart() {
+    document.getElementById('ns-binary-status').innerHTML = '<span style="color:var(--accent)">Starting...</span>';
+    fetch('/dns/start', {method:'POST'}).then(r => r.json()).then(d => {
+        if (!d.ok) alert(d.error);
+        nsRefresh();
+    });
+}
+
+function nsStop() {
+    fetch('/dns/stop', {method:'POST'}).then(r => r.json()).then(() => nsRefresh());
+}
+
+/* ── Query tester ── */
+function nsQuery() {
+    const name = document.getElementById('q-name').value.trim();
+    if (!name) return;
+    const qtype = document.getElementById('q-type').value;
+    const useLocal = document.getElementById('q-local').checked;
+    const el = document.getElementById('q-results');
+    el.innerHTML = '<div class="card" style="color:var(--text-muted)">Querying...</div>';
+
+    fetch('/dns/nameserver/query', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name, type: qtype, use_local: useLocal})
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { el.innerHTML = `<div class="card" style="color:var(--danger)">${esc(d.error)}</div>`; return; }
+        el.innerHTML = d.results.map(r => `<div class="card" style="margin-bottom:0.75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <strong>${esc(r.method)}</strong>
+                <code style="font-size:0.75rem;color:var(--text-muted)">${esc(r.cmd)}</code>
+            </div>
+            <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;font-size:0.78rem;white-space:pre-wrap;margin:0;max-height:250px;overflow-y:auto">${esc(r.output)}</pre>
+        </div>`).join('');
+    }).catch(e => {
+        el.innerHTML = `<div class="card" style="color:var(--danger)">${esc(e.message)}</div>`;
+    });
+}
+
+/* ── Query Log ── */
+function loadQueryLog() {
+    const limit = document.getElementById('ql-limit').value;
+    fetch(`/dns/querylog?limit=${limit}`).then(r => r.json()).then(d => {
+        _qlData = d.entries || d.log || [];
+        if (Array.isArray(d) && !d.entries) _qlData = d;
+        filterQueryLog();
+    }).catch(() => {
+        document.getElementById('ql-table').innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--text-muted)">Server not running or no data</td></tr>';
+    });
+}
+
+function filterQueryLog() {
+    const filter = document.getElementById('ql-filter').value.toLowerCase();
+    let entries = _qlData;
+    if (filter) entries = entries.filter(e => (e.domain || e.name || '').toLowerCase().includes(filter));
+
+    document.getElementById('ql-count').textContent = `${entries.length} entries`;
+    const el = document.getElementById('ql-table');
+    if (!entries.length) {
+        el.innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--text-muted)">No queries logged</td></tr>';
+        return;
+    }
+    el.innerHTML = entries.slice(0, 500).map(e => {
+        const result = e.blocked ? '<span style="color:var(--danger)">BLOCKED</span>'
+            : e.cached ? '<span style="color:var(--accent)">CACHED</span>'
+            : (e.rcode || e.result || 'OK');
+        const resultColor = e.blocked ? 'var(--danger)' : e.cached ? 'var(--accent)' : '#4ade80';
+        const time = e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : (e.time || '—');
+        const latency = e.latency_ms ? e.latency_ms.toFixed(1) + 'ms' : (e.latency || '—');
+        return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:4px;color:var(--text-muted);white-space:nowrap">${time}</td>
+            <td style="padding:4px;font-family:monospace;font-size:0.78rem">${esc(e.client || e.remote || '—')}</td>
+            <td style="padding:4px;font-family:monospace;font-size:0.78rem">${esc(e.domain || e.name || '—')}</td>
+            <td style="padding:4px"><span style="background:var(--bg-input);padding:1px 5px;border-radius:3px;font-size:0.72rem;font-weight:600">${esc(e.qtype || e.type || '—')}</span></td>
+            <td style="padding:4px;color:${resultColor};font-weight:600;font-size:0.78rem">${result}</td>
+            <td style="padding:4px;color:var(--text-muted)">${latency}</td>
+        </tr>`;
+    }).join('');
+}
+
+function clearQueryLog() {
+    if (!confirm('Clear query log?')) return;
+    fetch('/dns/querylog', {method:'DELETE'}).then(() => { _qlData = []; filterQueryLog(); });
+}
+
+function toggleAutoRefresh() {
+    if (document.getElementById('ql-auto').checked) {
+        _qlInterval = setInterval(loadQueryLog, 3000);
+    } else {
+        clearInterval(_qlInterval);
+        _qlInterval = null;
+    }
+}
+
+/* ── Analytics ── */
+function loadTopDomains() {
+    fetch('/dns/stats/top-domains?limit=30').then(r => r.json()).then(d => {
+        const el = document.getElementById('an-top-domains');
+        const items = d.domains || d.top_domains || [];
+        if (!items.length) { el.textContent = 'No data yet'; return; }
+        const max = items[0]?.count || items[0]?.queries || 1;
+        el.innerHTML = items.map(item => {
+            const name = item.domain || item.name;
+            const count = item.count || item.queries || 0;
+            const pct = Math.round((count / max) * 100);
+            return `<div style="margin-bottom:4px">
+                <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:1px">
+                    <span style="font-family:monospace">${esc(name)}</span><span style="color:var(--text-muted)">${count}</span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('an-top-domains').textContent = 'Server not running';
+    });
+}
+
+function loadQueryTypes() {
+    fetch('/dns/stats/query-types').then(r => r.json()).then(d => {
+        const el = document.getElementById('an-query-types');
+        const types = d.types || d.query_types || d;
+        if (typeof types !== 'object') { el.textContent = 'No data'; return; }
+        const entries = Array.isArray(types) ? types : Object.entries(types).map(([k, v]) => ({type: k, count: v}));
+        if (!entries.length) { el.textContent = 'No data yet'; return; }
+        const total = entries.reduce((s, e) => s + (e.count || 0), 0) || 1;
+        const colors = {A:'#4ade80',AAAA:'#60a5fa',MX:'#f59e0b',TXT:'#a78bfa',NS:'#ec4899',CNAME:'#14b8a6',SOA:'#f97316',SRV:'#6366f1',PTR:'#84cc16'};
+        el.innerHTML = entries.map(e => {
+            const name = e.type || e.name;
+            const count = e.count || 0;
+            const pct = Math.round((count / total) * 100);
+            const color = colors[name] || '#94a3b8';
+            return `<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:6px">
+                <span style="width:50px;font-weight:600;font-size:0.8rem;color:${color}">${esc(name)}</span>
+                <div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+                <span style="font-size:0.78rem;color:var(--text-muted);width:80px;text-align:right">${count} (${pct}%)</span>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('an-query-types').textContent = 'Server not running';
+    });
+}
+
+function loadClientStats() {
+    fetch('/dns/stats/clients').then(r => r.json()).then(d => {
+        const el = document.getElementById('an-clients');
+        const clients = d.clients || [];
+        if (!clients.length) { el.textContent = 'No data yet'; return; }
+        const max = clients[0]?.count || clients[0]?.queries || 1;
+        el.innerHTML = clients.map(c => {
+            const ip = c.client || c.ip || c.address;
+            const count = c.count || c.queries || 0;
+            const pct = Math.round((count / max) * 100);
+            return `<div style="margin-bottom:4px">
+                <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:1px">
+                    <span style="font-family:monospace">${esc(ip)}</span><span style="color:var(--text-muted)">${count} queries</span>
+                </div>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:#60a5fa"></div></div>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('an-clients').textContent = 'Server not running';
+    });
+}
+
+function loadNSCache() {
+    fetch('/dns/resolver/ns-cache').then(r => r.json()).then(d => {
+        const el = document.getElementById('an-ns-cache');
+        const cache = d.cache || d.ns_cache || d;
+        if (typeof cache !== 'object' || !Object.keys(cache).length) { el.textContent = 'Empty'; return; }
+        const entries = Array.isArray(cache) ? cache : Object.entries(cache).map(([zone, servers]) => ({zone, servers}));
+        el.innerHTML = entries.map(e => {
+            const zone = e.zone || e.name;
+            const servers = Array.isArray(e.servers) ? e.servers.join(', ') : (e.servers || '');
+            return `<div style="padding:4px 0;border-bottom:1px solid var(--border)">
+                <strong style="font-size:0.8rem">${esc(zone)}</strong>
+                <div style="font-size:0.75rem;color:var(--text-muted);font-family:monospace">${esc(servers)}</div>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('an-ns-cache').textContent = 'Server not running';
+    });
+}
+
+function flushNSCache() {
+    fetch('/dns/resolver/ns-cache', {method:'DELETE'}).then(r => r.json()).then(() => loadNSCache());
+}
+
+/* ── Cache ── */
+function loadCache() {
+    fetch('/dns/cache').then(r => r.json()).then(d => {
+        _cacheData = d.entries || d.cache || [];
+        if (Array.isArray(d) && !d.entries) _cacheData = d;
+        filterCache();
+    }).catch(() => {
+        document.getElementById('cache-table').innerHTML = '<tr><td colspan="5" style="padding:10px;color:var(--text-muted)">Server not running or no cache data</td></tr>';
+    });
+}
+
+function filterCache() {
+    const search = document.getElementById('cache-search').value.toLowerCase();
+    let entries = _cacheData;
+    if (search) entries = entries.filter(e => (e.domain || e.name || e.key || '').toLowerCase().includes(search));
+
+    document.getElementById('cache-count').textContent = `${entries.length} of ${_cacheData.length} entries`;
+    const el = document.getElementById('cache-table');
+    if (!entries.length) {
+        el.innerHTML = '<tr><td colspan="5" style="padding:10px;color:var(--text-muted)">No cache entries</td></tr>';
+        return;
+    }
+    el.innerHTML = entries.slice(0, 500).map(e => {
+        const domain = e.domain || e.name || e.key || '—';
+        const type = e.type || e.qtype || '—';
+        const value = e.value || e.answer || e.data || '—';
+        const ttl = e.ttl || e.remaining_ttl || '—';
+        return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:4px;font-family:monospace;font-size:0.78rem">${esc(domain)}</td>
+            <td style="padding:4px"><span style="background:var(--bg-input);padding:1px 5px;border-radius:3px;font-size:0.72rem;font-weight:600">${esc(type)}</span></td>
+            <td style="padding:4px;font-family:monospace;font-size:0.78rem;max-width:250px;overflow:hidden;text-overflow:ellipsis" title="${esc(value)}">${esc(value)}</td>
+            <td style="padding:4px">${ttl}s</td>
+            <td style="padding:4px"><button class="btn btn-small" onclick="flushCacheEntry('${esc(e.key || domain)}')" title="Flush this entry">Flush</button></td>
+        </tr>`;
+    }).join('');
+}
+
+function flushCacheEntry(key) {
+    fetch(`/dns/cache?key=${encodeURIComponent(key)}`, {method:'DELETE'}).then(() => loadCache());
+}
+
+function flushAllCache() {
+    if (!confirm('Flush entire DNS cache?')) return;
+    fetch('/dns/cache', {method:'DELETE'}).then(() => loadCache());
+}
+
+/* ── Blocklist ── */
+function loadBlocklist() {
+    fetch('/dns/blocklist').then(r => r.json()).then(d => {
+        _blData = d.domains || d.blocklist || d.entries || [];
+        if (Array.isArray(d) && !d.domains) _blData = d;
+        // Normalize to strings
+        if (_blData.length && typeof _blData[0] === 'object') _blData = _blData.map(e => e.domain || e.name || e);
+        filterBlocklist();
+    }).catch(() => {
+        document.getElementById('bl-list').textContent = 'Server not running';
+    });
+}
+
+function filterBlocklist() {
+    const search = document.getElementById('bl-search').value.toLowerCase();
+    let items = _blData;
+    if (search) items = items.filter(d => d.toLowerCase().includes(search));
+
+    document.getElementById('bl-count').textContent = `${items.length} of ${_blData.length} blocked domains`;
+    const el = document.getElementById('bl-list');
+    if (!items.length) { el.textContent = 'No blocked domains'; return; }
+    el.innerHTML = items.slice(0, 1000).map(d =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+            <span style="font-family:monospace;font-size:0.8rem">${esc(d)}</span>
+            <button class="btn btn-small" onclick="removeBlockEntry('${esc(d)}')" style="font-size:0.7rem;padding:2px 6px">Remove</button>
+        </div>`
+    ).join('');
+}
+
+function addBlockEntry() {
+    const domain = document.getElementById('bl-domain').value.trim();
+    if (!domain) return;
+    const el = document.getElementById('bl-add-status');
+    fetch('/dns/blocklist', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok !== false ? `<span style="color:#4ade80">${domain} blocked</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok !== false) { document.getElementById('bl-domain').value = ''; loadBlocklist(); }
+        });
+}
+
+function removeBlockEntry(domain) {
+    fetch('/dns/blocklist', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain})})
+        .then(r => r.json()).then(() => loadBlocklist())
+        .catch(() => loadBlocklist());
+}
+
+function bulkImportBlock() {
+    const text = document.getElementById('bl-bulk').value.trim();
+    if (!text) return;
+    const el = document.getElementById('bl-import-status');
+    // Parse hosts-file format
+    const domains = text.split('\n').map(line => {
+        line = line.trim();
+        if (!line || line.startsWith('#')) return null;
+        // hosts file: "0.0.0.0 domain" or "127.0.0.1 domain"
+        const parts = line.split(/\s+/);
+        if (parts[0] === '0.0.0.0' || parts[0] === '127.0.0.1') return parts[1];
+        return parts[0];
+    }).filter(Boolean);
+
+    el.innerHTML = `<span style="color:var(--text-muted)">Importing ${domains.length} domains...</span>`;
+    fetch('/dns/blocklist', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domains})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok !== false ? `<span style="color:#4ade80">${domains.length} domains imported</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            loadBlocklist();
+        });
+}
+
+/* ── Conditional Forwarding ── */
+function loadForwarding() {
+    fetch('/dns/forwarding').then(r => r.json()).then(d => {
+        const el = document.getElementById('fwd-list');
+        const rules = d.rules || d.forwarding || d.entries || [];
+        if (!rules.length && typeof d === 'object' && !Array.isArray(d) && !d.rules) {
+            // May be a map {zone: [servers]}
+            const entries = Object.entries(d).filter(([k]) => k !== 'ok' && k !== 'error');
+            if (entries.length) {
+                el.innerHTML = entries.map(([zone, servers]) => {
+                    const srvStr = Array.isArray(servers) ? servers.join(', ') : servers;
+                    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+                        <div>
+                            <strong style="font-size:0.85rem">${esc(zone)}</strong>
+                            <div style="font-size:0.78rem;color:var(--text-muted);font-family:monospace">${esc(srvStr)}</div>
+                        </div>
+                        <button class="btn btn-small btn-danger" onclick="removeForwarding('${esc(zone)}')">Remove</button>
+                    </div>`;
+                }).join('');
+                return;
+            }
+        }
+        if (!rules.length) { el.textContent = 'No forwarding rules'; return; }
+        el.innerHTML = rules.map(r => {
+            const zone = r.zone || r.domain;
+            const servers = Array.isArray(r.servers) ? r.servers.join(', ') : (r.servers || r.upstream || '');
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+                <div>
+                    <strong style="font-size:0.85rem">${esc(zone)}</strong>
+                    <div style="font-size:0.78rem;color:var(--text-muted);font-family:monospace">${esc(servers)}</div>
+                </div>
+                <button class="btn btn-small btn-danger" onclick="removeForwarding('${esc(zone)}')">Remove</button>
+            </div>`;
+        }).join('');
+    }).catch(() => {
+        document.getElementById('fwd-list').textContent = 'Server not running';
+    });
+}
+
+function addForwarding() {
+    const zone = document.getElementById('fwd-zone').value.trim();
+    const servers = document.getElementById('fwd-servers').value.split(',').map(s => s.trim()).filter(Boolean);
+    if (!zone || !servers.length) return;
+    const el = document.getElementById('fwd-add-status');
+    fetch('/dns/forwarding', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zone, servers})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok !== false ? `<span style="color:#4ade80">Rule added</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok !== false) { document.getElementById('fwd-zone').value = ''; document.getElementById('fwd-servers').value = ''; loadForwarding(); }
+        });
+}
+
+function removeForwarding(zone) {
+    fetch('/dns/forwarding', {method:'DELETE', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zone})})
+        .then(r => r.json()).then(() => loadForwarding())
+        .catch(() => loadForwarding());
+}
+
+/* ── Root Health ── */
+function checkRootHealth() {
+    const el = document.getElementById('root-results');
+    el.innerHTML = '<div style="color:var(--text-muted)">Checking 13 root servers...</div>';
+    fetch('/dns/rootcheck').then(r => r.json()).then(d => {
+        const results = d.results || d.servers || d.roots || [];
+        if (!results.length) { el.innerHTML = '<div style="color:var(--danger)">No results — server may not be running</div>'; return; }
+
+        let html = '<div class="root-row" style="font-weight:600;border-bottom:2px solid var(--border)"><span>Server</span><span>Status</span><span>Latency</span><span></span></div>';
+        let okCount = 0;
+        results.forEach(r => {
+            const name = r.name || r.server || r.ip;
+            const ok = r.ok || r.reachable || r.status === 'ok';
+            if (ok) okCount++;
+            const latency = r.latency_ms ? r.latency_ms.toFixed(1) + 'ms' : (r.latency || '—');
+            const color = ok ? '#4ade80' : 'var(--danger)';
+            const barWidth = r.latency_ms ? Math.min(100, r.latency_ms / 5) : 0;
+            html += `<div class="root-row">
+                <span style="font-family:monospace;font-size:0.8rem">${esc(name)}</span>
+                <span style="color:${color};font-weight:600">${ok ? 'OK' : 'FAIL'}</span>
+                <span style="color:var(--text-muted)">${latency}</span>
+                <div class="bar-track"><div class="bar-fill" style="width:${barWidth}%;background:${ok ? '#4ade80' : 'var(--danger)'}"></div></div>
+            </div>`;
+        });
+
+        const summary = `<div style="margin-bottom:1rem;padding:0.75rem;border-radius:var(--radius);background:var(--bg-input);font-size:0.85rem">
+            <strong>${okCount}/${results.length}</strong> root servers reachable
+            ${okCount === results.length ? ' — <span style="color:#4ade80;font-weight:600">All healthy</span>'
+                : okCount > 8 ? ' — <span style="color:#f59e0b;font-weight:600">Mostly healthy</span>'
+                : ' — <span style="color:var(--danger);font-weight:600">Degraded</span>'}
+        </div>`;
+        el.innerHTML = summary + html;
+    }).catch(e => {
+        el.innerHTML = `<div style="color:var(--danger)">Error: ${esc(e.message)}</div>`;
+    });
+}
+
+/* ── Benchmark ── */
+function runBenchmark() {
+    const domains = document.getElementById('bm-domains').value.split(',').map(s => s.trim()).filter(Boolean);
+    const iterations = parseInt(document.getElementById('bm-iterations').value) || 3;
+    if (!domains.length) return;
+
+    const statusEl = document.getElementById('bm-status');
+    const resEl = document.getElementById('bm-results');
+    statusEl.innerHTML = '<span style="color:var(--text-muted)">Running benchmark...</span>';
+    resEl.innerHTML = '';
+
+    fetch('/dns/benchmark', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domains, iterations})})
+        .then(r => r.json()).then(d => {
+            const results = d.results || d.benchmarks || [];
+            if (!results.length) { statusEl.innerHTML = '<span style="color:var(--danger)">No results</span>'; return; }
+
+            const avgAll = results.reduce((s, r) => s + (r.avg_ms || r.avg || 0), 0) / results.length;
+            statusEl.innerHTML = `<span style="color:#4ade80">Complete — Average: ${avgAll.toFixed(1)}ms across ${results.length} domains</span>`;
+
+            let html = '<div class="bm-row" style="font-weight:600;border-bottom:2px solid var(--border)"><span>Domain</span><span>Min</span><span>Avg</span><span>Max</span><span></span></div>';
+            const maxLatency = Math.max(...results.map(r => r.max_ms || r.max || r.avg_ms || 100));
+
+            results.forEach(r => {
+                const domain = r.domain || r.name;
+                const min = (r.min_ms || r.min || 0).toFixed(1);
+                const avg = (r.avg_ms || r.avg || 0).toFixed(1);
+                const max = (r.max_ms || r.max || 0).toFixed(1);
+                const barWidth = Math.round(((r.avg_ms || r.avg || 0) / maxLatency) * 100);
+                const color = (r.avg_ms || r.avg || 0) < 50 ? '#4ade80' : (r.avg_ms || r.avg || 0) < 200 ? '#f59e0b' : 'var(--danger)';
+                const errNote = r.error ? ` <span style="color:var(--danger);font-size:0.72rem">${esc(r.error)}</span>` : '';
+                html += `<div class="bm-row">
+                    <span style="font-family:monospace;font-size:0.8rem">${esc(domain)}${errNote}</span>
+                    <span style="color:var(--text-muted)">${min}ms</span>
+                    <span style="font-weight:600;color:${color}">${avg}ms</span>
+                    <span style="color:var(--text-muted)">${max}ms</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:${barWidth}%;background:${color}"></div></div>
+                </div>`;
+            });
+            resEl.innerHTML = html;
+        }).catch(e => {
+            statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${esc(e.message)}</span>`;
+        });
+}
+
+/* ── NS Delegation ── */
+function detectPublicIP() {
+    const el = document.getElementById('del-ip');
+    el.value = 'Detecting...';
+    fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => {
+        el.value = d.ip || '';
+        updateDelegation();
+    }).catch(() => { el.value = ''; });
+}
+
+function updateDelegation() {
+    const domain = document.getElementById('del-domain').value.trim();
+    const ns = document.getElementById('del-ns').value.trim() || ('ns1.' + domain);
+    const ip = document.getElementById('del-ip').value.trim() || 'YOUR_PUBLIC_IP';
+    const recEl = document.getElementById('del-records');
+    const glueEl = document.getElementById('del-glue');
+
+    if (!domain) { recEl.style.display = 'none'; glueEl.style.display = 'none'; return; }
+
+    recEl.style.display = '';
+    recEl.textContent = `; Set these at your registrar / parent zone:
+${domain}.    IN  NS  ${ns}.
+${domain}.    IN  NS  ${ns.replace('ns1','ns2')}.   ; (optional second NS)`;
+
+    if (ns.endsWith('.' + domain) || ns === domain) {
+        glueEl.style.display = '';
+        glueEl.textContent = `; Glue records (required because ${ns} is under ${domain}):
+${ns}.    IN  A  ${ip}`;
+    } else {
+        glueEl.style.display = '';
+        glueEl.textContent = `; No glue needed — just make sure ${ns} has an A record pointing to ${ip}`;
+    }
+}
+
+/* ── Build ── */
+function nsCheckGo() {
+    const el = document.getElementById('build-prereq');
+    el.textContent = 'Checking...';
+    fetch('/dns/nameserver/binary-info').then(r => r.json()).then(d => {
+        el.innerHTML = `<div>${d.found ? '<span style="color:#4ade80">&#x2714;</span>' : '<span style="color:var(--danger)">&#x2718;</span>'} autarch-dns binary ${d.found ? 'found' : 'not found'}</div>`;
+    });
+}
+
+function nsBuild() {
+    const target = document.getElementById('build-target').value;
+    const outEl = document.getElementById('build-output');
+    const logEl = document.getElementById('build-log');
+    outEl.style.display = '';
+    logEl.textContent = 'Build not yet wired to backend.\n\nRun manually:\n  cd services/dns-server\n  go mod tidy\n  go build -o autarch-dns' + (target.includes('windows') ? '.exe' : '') + ' .';
+}
+
+/* ── Encryption ── */
+let _encData = {};
+
+function loadEncryption() {
+    fetch('/dns/encryption').then(r => r.json()).then(d => {
+        _encData = d;
+        const dotOn = d.dot_enabled !== false;
+        const dohOn = d.doh_enabled !== false;
+        document.getElementById('enc-dot-toggle').checked = dotOn;
+        document.getElementById('enc-doh-toggle').checked = dohOn;
+        styleToggle('enc-dot', dotOn);
+        styleToggle('enc-doh', dohOn);
+        document.getElementById('enc-preferred').textContent = d.preferred_mode || (dohOn ? 'doh' : dotOn ? 'dot' : 'plain');
+
+        // DoT servers
+        const dotServers = d.dot_servers || {};
+        const dotEl = document.getElementById('enc-dot-servers');
+        const dotByName = {};
+        Object.entries(dotServers).forEach(([ip, name]) => {
+            if (!dotByName[name]) dotByName[name] = [];
+            dotByName[name].push(ip);
+        });
+        dotEl.innerHTML = Object.entries(dotByName).map(([name, ips]) =>
+            `<div style="margin-bottom:4px"><strong>${esc(name)}</strong> <span style="color:var(--text-muted)">(${ips.join(', ')})</span></div>`
+        ).join('');
+
+        // DoH servers
+        const dohServers = d.doh_servers || {};
+        const dohEl = document.getElementById('enc-doh-servers');
+        const dohByUrl = {};
+        Object.entries(dohServers).forEach(([ip, url]) => {
+            if (!dohByUrl[url]) dohByUrl[url] = [];
+            dohByUrl[url].push(ip);
+        });
+        dohEl.innerHTML = Object.entries(dohByUrl).map(([url, ips]) =>
+            `<div style="margin-bottom:4px"><code style="font-size:0.72rem">${esc(url)}</code> <span style="color:var(--text-muted)">(${ips.join(', ')})</span></div>`
+        ).join('');
+    }).catch(() => {
+        document.getElementById('enc-preferred').textContent = 'Server not running';
+    });
+}
+
+function styleToggle(prefix, on) {
+    const knob = document.getElementById(prefix + '-knob');
+    if (knob) {
+        knob.style.left = on ? '25px' : '3px';
+        knob.style.background = on ? 'var(--accent)' : 'var(--text-muted)';
+    }
+}
+
+function updateEncryption() {
+    const dot = document.getElementById('enc-dot-toggle').checked;
+    const doh = document.getElementById('enc-doh-toggle').checked;
+    styleToggle('enc-dot', dot);
+    styleToggle('enc-doh', doh);
+    fetch('/dns/encryption', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enable_dot: dot, enable_doh: doh})
+    }).then(r => r.json()).then(d => {
+        document.getElementById('enc-preferred').textContent = doh ? 'doh' : dot ? 'dot' : 'plain';
+    });
+}
+
+function testEncryption() {
+    const server = document.getElementById('enc-test-server').value;
+    const mode = document.getElementById('enc-test-mode').value;
+    const domain = document.getElementById('enc-test-domain').value.trim() || 'google.com';
+    const el = document.getElementById('enc-test-result');
+    el.style.display = '';
+    el.innerHTML = '<span style="color:var(--text-muted)">Testing...</span>';
+
+    fetch('/dns/encryption/test', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({server, mode, domain})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            const ips = (d.ips || []).join(', ');
+            el.innerHTML = `<span style="color:#4ade80;font-weight:600">SUCCESS</span> — <strong>${esc(d.method)}</strong><br>
+                Server: ${esc(d.server)} | Domain: ${esc(d.domain)} | Latency: <strong>${esc(d.latency)}</strong><br>
+                Response: ${esc(d.rcode)} | ${d.answers} answer(s)${ips ? ' | IPs: <code>' + esc(ips) + '</code>' : ''}`;
+        } else {
+            el.innerHTML = `<span style="color:var(--danger);font-weight:600">FAILED</span> — <strong>${esc(d.method || mode)}</strong><br>
+                Server: ${esc(d.server || server)} | Error: ${esc(d.error)}<br>
+                Latency: ${esc(d.latency || '—')}`;
+        }
+    }).catch(e => {
+        el.innerHTML = `<span style="color:var(--danger)">Error: ${esc(e.message)}</span>`;
+    });
+}
+
+/* ── Hosts ── */
+let _hostsData = [];
+
+function loadHosts() {
+    fetch('/dns/hosts').then(r => r.json()).then(d => {
+        _hostsData = d.entries || [];
+        filterHosts();
+    }).catch(() => {
+        document.getElementById('hosts-tbody').innerHTML = '<tr><td colspan="5" style="padding:1rem;color:var(--text-muted)">Server not running</td></tr>';
+    });
+}
+
+function filterHosts() {
+    const search = (document.getElementById('host-search').value || '').toLowerCase();
+    let entries = _hostsData;
+    if (search) entries = entries.filter(e =>
+        (e.ip || '').includes(search) ||
+        (e.hostname || '').toLowerCase().includes(search) ||
+        (e.aliases || []).some(a => a.toLowerCase().includes(search)) ||
+        (e.comment || '').toLowerCase().includes(search)
+    );
+
+    document.getElementById('host-count').textContent = `${entries.length} entries` + (entries.length !== _hostsData.length ? ` (${_hostsData.length} total)` : '');
+
+    const tbody = document.getElementById('hosts-tbody');
+    if (!entries.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--text-muted)">No host entries</td></tr>';
+        return;
+    }
+    tbody.innerHTML = entries.map(e => {
+        const aliases = (e.aliases || []).join(', ');
+        return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:4px 8px;font-family:monospace;font-size:0.78rem">${esc(e.ip)}</td>
+            <td style="padding:4px 8px;font-weight:600;font-size:0.82rem">${esc(e.hostname)}</td>
+            <td style="padding:4px 8px;font-size:0.78rem;color:var(--text-muted)">${esc(aliases)}</td>
+            <td style="padding:4px 8px;font-size:0.78rem;color:var(--text-muted);font-style:italic">${esc(e.comment || '')}</td>
+            <td style="padding:4px 8px"><button class="btn btn-small btn-danger" onclick="removeHost('${esc(e.hostname)}')" style="font-size:0.7rem;padding:2px 6px">Del</button></td>
+        </tr>`;
+    }).join('');
+}
+
+function addHost() {
+    const ip = document.getElementById('host-ip').value.trim();
+    const hostname = document.getElementById('host-name').value.trim();
+    const aliases = document.getElementById('host-aliases').value.split(',').map(s => s.trim()).filter(Boolean);
+    const comment = document.getElementById('host-comment').value.trim();
+    if (!ip || !hostname) { alert('IP and hostname required'); return; }
+
+    fetch('/dns/hosts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip, hostname, aliases, comment})
+    }).then(r => r.json()).then(d => {
+        if (d.ok !== false) {
+            document.getElementById('host-ip').value = '';
+            document.getElementById('host-name').value = '';
+            document.getElementById('host-aliases').value = '';
+            document.getElementById('host-comment').value = '';
+            loadHosts();
+        } else {
+            alert(d.error || 'Failed to add host');
+        }
+    });
+}
+
+function removeHost(hostname) {
+    fetch('/dns/hosts', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({hostname})
+    }).then(r => r.json()).then(() => loadHosts()).catch(() => loadHosts());
+}
+
+function clearHosts() {
+    if (!confirm('Remove ALL host entries?')) return;
+    fetch('/dns/hosts', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({all: true})
+    }).then(r => r.json()).then(() => loadHosts());
+}
+
+function importHosts() {
+    const content = document.getElementById('hosts-import-text').value.trim();
+    if (!content) return;
+    const clear = document.getElementById('hosts-import-clear').checked;
+
+    fetch('/dns/hosts/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({content, clear})
+    }).then(r => r.json()).then(d => {
+        if (d.ok !== false) {
+            document.getElementById('hosts-import-text').value = '';
+            alert(`Imported ${d.imported || 0} entries (${d.total || 0} total)`);
+            loadHosts();
+        } else {
+            alert(d.error || 'Import failed');
+        }
+    });
+}
+
+function loadSystemHosts() {
+    // Try common system hosts file paths
+    const paths = ['/etc/hosts', 'C:\\Windows\\System32\\drivers\\etc\\hosts'];
+    fetch('/dns/hosts/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: paths[1]})  // Windows path (AUTARCH runs on Windows)
+    }).then(r => r.json()).then(d => {
+        if (d.ok !== false) {
+            alert(`Loaded ${d.count || 0} entries from system hosts file`);
+            loadHosts();
+        } else {
+            // Try Linux path
+            fetch('/dns/hosts/import', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({path: paths[0]})
+            }).then(r => r.json()).then(d2 => {
+                if (d2.ok !== false) {
+                    alert(`Loaded ${d2.count || 0} entries from /etc/hosts`);
+                    loadHosts();
+                } else {
+                    alert('Could not load system hosts file: ' + (d2.error || d.error));
+                }
+            });
+        }
+    });
+}
+
+function exportHosts() {
+    fetch('/dns/hosts/export').then(r => r.json()).then(d => {
+        const content = d.content || '';
+        const blob = new Blob([content], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'hosts';
+        a.click();
+    });
+}
+
+/* ── EZ Intranet ── */
+let _ezHosts = [];
+
+function ezScanNetwork() {
+    document.getElementById('ez-hosts-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted)">Scanning network...</td></tr>';
+
+    fetch('/dns/network-info').then(r => r.json()).then(d => {
+        document.getElementById('ez-local-ip').textContent = d.default_ip || '—';
+        document.getElementById('ez-hostname').textContent = d.hostname || '—';
+        document.getElementById('ez-gateway').textContent = d.gateway || '—';
+        document.getElementById('ez-subnet').textContent = d.subnet || '—';
+
+        _ezHosts = d.hosts || [];
+        const tbody = document.getElementById('ez-hosts-tbody');
+
+        if (!_ezHosts.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--text-muted)">No hosts found via ARP scan</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = _ezHosts.map((h, i) => {
+            const detected = h.name || h.hostname || '';
+            const suggested = detected ? detected.split('.')[0].toLowerCase().replace(/[^a-z0-9-]/g, '') : `host-${h.ip.split('.').pop()}`;
+            return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="text-align:center;padding:4px"><input type="checkbox" class="ez-host-check" data-idx="${i}" checked></td>
+                <td style="padding:4px;font-family:monospace;font-size:0.78rem">${esc(h.ip)}</td>
+                <td style="padding:4px;font-size:0.78rem;color:var(--text-muted)">${esc(detected || '(unknown)')}</td>
+                <td style="padding:4px"><input type="text" class="form-control ez-host-dnsname" data-idx="${i}" value="${esc(suggested)}" style="font-size:0.78rem;padding:0.25rem"></td>
+            </tr>`;
+        }).join('');
+    }).catch(e => {
+        document.getElementById('ez-hosts-tbody').innerHTML = `<tr><td colspan="4" style="text-align:center;padding:1rem;color:var(--danger)">Error: ${esc(e.message)}</td></tr>`;
+    });
+}
+
+function ezAddCustomRow() {
+    const container = document.getElementById('ez-custom-hosts');
+    const row = document.createElement('div');
+    row.className = 'ez-custom-row';
+    row.style.cssText = 'display:flex;gap:0.5rem;align-items:end;margin-bottom:0.5rem';
+    row.innerHTML = `<input type="text" class="form-control ez-custom-ip" placeholder="192.168.1.200" style="width:140px">
+        <input type="text" class="form-control ez-custom-name" placeholder="server" style="flex:1">
+        <button class="btn btn-danger" onclick="this.parentElement.remove()" style="font-size:0.72rem;padding:0.3rem 0.5rem">X</button>`;
+    container.appendChild(row);
+}
+
+function ezDeploy() {
+    const domain = document.getElementById('ez-domain').value.trim();
+    if (!domain) { alert('Enter a domain name'); return; }
+
+    const statusEl = document.getElementById('ez-deploy-status');
+    statusEl.innerHTML = '<span style="color:var(--accent)">Creating intranet domain...</span>';
+
+    // Collect hosts
+    const hosts = [];
+
+    // ARP-discovered hosts
+    document.querySelectorAll('.ez-host-check:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        const nameInput = document.querySelector(`.ez-host-dnsname[data-idx="${idx}"]`);
+        if (_ezHosts[idx] && nameInput) {
+            hosts.push({ip: _ezHosts[idx].ip, name: nameInput.value.trim()});
+        }
+    });
+
+    // Custom hosts
+    document.querySelectorAll('.ez-custom-row').forEach(row => {
+        const ip = row.querySelector('.ez-custom-ip').value.trim();
+        const name = row.querySelector('.ez-custom-name').value.trim();
+        if (ip && name) hosts.push({ip, name});
+    });
+
+    const reverseZone = document.getElementById('ez-reverse-zone').checked;
+
+    fetch('/dns/ez-intranet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({domain, hosts, reverse_zone: reverseZone})
+    }).then(r => r.json()).then(d => {
+        const resultsEl = document.getElementById('ez-results');
+        const logEl = document.getElementById('ez-results-log');
+        resultsEl.style.display = '';
+
+        if (d.ok) {
+            statusEl.innerHTML = '<span style="color:#4ade80;font-weight:600">Domain created!</span>';
+            let log = '';
+            (d.steps || []).forEach(s => {
+                const icon = s.ok ? '<span style="color:#4ade80">&#x2714;</span>' : '<span style="color:var(--danger)">&#x2718;</span>';
+                log += `<div style="padding:2px 0">${icon} ${esc(s.step)}${s.error ? ' — <span style="color:var(--danger)">' + esc(s.error) + '</span>' : ''}</div>`;
+            });
+            logEl.innerHTML = log;
+
+            // Show client config
+            const clientEl = document.getElementById('ez-client-config');
+            clientEl.style.display = '';
+            const dnsIp = d.local_ip || '127.0.0.1';
+            document.getElementById('ez-dns-ip').textContent = dnsIp;
+            document.getElementById('ez-cmd-windows').textContent =
+                `netsh interface ip set dns "Ethernet" static ${dnsIp}\nnetsh interface ip add dns "Ethernet" ${dnsIp} index=2\n\nOr: Settings > Network > Change adapter options\n> Properties > IPv4 > Use DNS: ${dnsIp}`;
+            document.getElementById('ez-cmd-linux').textContent =
+                `# /etc/resolv.conf\nnameserver ${dnsIp}\nsearch ${domain}\n\n# Or with systemd-resolved:\nsudo resolvectl dns eth0 ${dnsIp}\nsudo resolvectl domain eth0 ~${domain}`;
+        } else {
+            statusEl.innerHTML = `<span style="color:var(--danger)">${esc(d.error || 'Failed')}</span>`;
+            logEl.innerHTML = `<div style="color:var(--danger)">${esc(d.error || 'Unknown error')}</div>`;
+        }
+    }).catch(e => {
+        statusEl.innerHTML = `<span style="color:var(--danger)">Error: ${esc(e.message)}</span>`;
+    });
+}
+
+function esc(s) {
+    return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+}
+
+/* Init */
+document.addEventListener('DOMContentLoaded', function() {
+    nsRefresh();
+    nsCheckGo();
+    detectPublicIP();
+});
+</script>
+{% endblock %}

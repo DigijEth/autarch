@@ -1,0 +1,54 @@
+#!/system/bin/sh
+# arish — Archon Remote Interactive Shell
+# Like Shizuku's "rish" but for the Archon privileged server.
+#
+# This script finds the Archon APK and launches ArchonRish via app_process,
+# which connects to the running ArchonServer and provides an interactive
+# shell at UID 2000 (shell-level privileges).
+#
+# Installation:
+#   adb push arish /data/local/tmp/arish
+#   adb shell chmod 755 /data/local/tmp/arish
+#
+# Usage:
+#   /data/local/tmp/arish                  — interactive shell
+#   /data/local/tmp/arish ls -la /data     — single command
+#   /data/local/tmp/arish -t <token>       — specify auth token
+#   /data/local/tmp/arish -p <port>        — specify server port
+
+PACKAGE="com.darkhal.archon"
+
+# Find the APK path
+APK_PATH=""
+
+# Method 1: pm path (works if pm is available)
+if command -v pm >/dev/null 2>&1; then
+    APK_PATH=$(pm path "$PACKAGE" 2>/dev/null | head -1 | sed 's/^package://')
+fi
+
+# Method 2: Known install locations
+if [ -z "$APK_PATH" ]; then
+    for dir in /data/app/*"$PACKAGE"*; do
+        if [ -f "$dir/base.apk" ]; then
+            APK_PATH="$dir/base.apk"
+            break
+        fi
+    done
+fi
+
+# Method 3: Check /data/local/tmp for sideloaded APK
+if [ -z "$APK_PATH" ] && [ -f "/data/local/tmp/archon.apk" ]; then
+    APK_PATH="/data/local/tmp/archon.apk"
+fi
+
+if [ -z "$APK_PATH" ]; then
+    echo "arish: cannot find Archon APK ($PACKAGE)"
+    echo "arish: install the Archon app or place archon.apk in /data/local/tmp/"
+    exit 1
+fi
+
+# Launch ArchonRish via app_process
+export CLASSPATH="$APK_PATH"
+exec /system/bin/app_process /system/bin \
+    --nice-name=arish \
+    com.darkhal.archon.server.ArchonRish "$@"

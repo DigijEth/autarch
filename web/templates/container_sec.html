@@ -1,0 +1,688 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Container Security{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Container Security</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Docker auditing, Kubernetes assessment, container image scanning, escape detection, and Dockerfile linting.
+    </p>
+</div>
+
+<!-- Tool Status -->
+<div class="section" style="padding:12px 16px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <span id="cs-docker-status" style="font-size:0.85rem;color:var(--text-muted)">Docker: checking...</span>
+    <span id="cs-kubectl-status" style="font-size:0.85rem;color:var(--text-muted)">kubectl: checking...</span>
+    <button class="btn btn-small" onclick="csCheckStatus()" style="margin-left:auto">Refresh Status</button>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="cs" data-tab="docker" onclick="showTab('cs','docker')">Docker</button>
+    <button class="tab" data-tab-group="cs" data-tab="k8s" onclick="showTab('cs','k8s')">Kubernetes</button>
+    <button class="tab" data-tab-group="cs" data-tab="imgscan" onclick="showTab('cs','imgscan')">Image Scan</button>
+</div>
+
+<!-- ==================== DOCKER TAB ==================== -->
+<div class="tab-content active" data-tab-group="cs" data-tab="docker">
+
+<!-- Docker Host Audit -->
+<div class="section">
+    <h2>Docker Host Audit</h2>
+    <div class="tool-actions">
+        <button id="btn-docker-audit" class="btn btn-primary" onclick="csDockerAudit()">Audit Docker Host</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Check</th><th>Severity</th><th>Status</th><th>Detail</th></tr></thead>
+        <tbody id="cs-docker-audit-results">
+            <tr><td colspan="4" class="empty-state">Click "Audit Docker Host" to check daemon configuration and security.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Containers -->
+<div class="section">
+    <h2>Containers</h2>
+    <div class="tool-actions">
+        <button id="btn-list-containers" class="btn btn-small" onclick="csListContainers()">Refresh Containers</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Name</th><th>Image</th><th>Status</th><th>Ports</th><th style="width:180px">Actions</th></tr></thead>
+        <tbody id="cs-containers-list">
+            <tr><td colspan="5" class="empty-state">Click "Refresh Containers" to list Docker containers.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Container Audit Results -->
+<div class="section" id="cs-container-audit-section" style="display:none">
+    <h2>Container Audit — <span id="cs-container-audit-name"></span></h2>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="score-display">
+            <div class="score-value" id="cs-container-score">--</div>
+            <div class="score-label">Security Score</div>
+        </div>
+        <div style="flex:1;min-width:300px">
+            <table class="data-table">
+                <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+                <tbody id="cs-container-audit-results"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Escape Vector Results -->
+<div class="section" id="cs-escape-section" style="display:none">
+    <h2>Escape Vectors — <span id="cs-escape-name"></span></h2>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px">
+        <div class="score-display">
+            <div class="score-value" id="cs-escape-score" style="color:var(--danger)">--</div>
+            <div class="score-label">Risk Score</div>
+        </div>
+        <div style="font-size:0.85rem;color:var(--text-secondary)">
+            <div>Total vectors: <span id="cs-escape-total">0</span></div>
+            <div>Exploitable: <span id="cs-escape-exploitable" style="color:var(--danger)">0</span></div>
+        </div>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Vector</th><th>Risk</th><th>Exploitable</th><th>Detail</th></tr></thead>
+        <tbody id="cs-escape-results"></tbody>
+    </table>
+</div>
+
+</div><!-- /docker tab -->
+
+
+<!-- ==================== KUBERNETES TAB ==================== -->
+<div class="tab-content" data-tab-group="cs" data-tab="k8s">
+
+<!-- Namespace Selector -->
+<div class="section">
+    <h2>Kubernetes Cluster</h2>
+    <div class="form-row" style="align-items:flex-end;gap:12px;margin-bottom:12px">
+        <div class="form-group" style="min-width:200px">
+            <label>Namespace</label>
+            <select id="cs-k8s-ns" style="width:100%;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary)">
+                <option value="default">default</option>
+            </select>
+        </div>
+        <button class="btn btn-small" onclick="csLoadNamespaces()">Refresh Namespaces</button>
+    </div>
+</div>
+
+<!-- Pods -->
+<div class="section">
+    <h2>Pods</h2>
+    <div class="tool-actions">
+        <button id="btn-k8s-pods" class="btn btn-small" onclick="csK8sPods()">List Pods</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Name</th><th>Status</th><th>Containers</th><th>Node</th><th>Restarts</th><th style="width:100px">Actions</th></tr></thead>
+        <tbody id="cs-k8s-pods-list">
+            <tr><td colspan="6" class="empty-state">Select a namespace and click "List Pods".</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- K8s Audit Tools -->
+<div class="section">
+    <h2>Cluster Security Checks</h2>
+    <div class="tool-grid">
+        <div class="tool-card">
+            <h4>RBAC Audit</h4>
+            <p>Check for overly permissive bindings and wildcard permissions</p>
+            <button id="btn-k8s-rbac" class="btn btn-small" onclick="csK8sRBAC()">Run RBAC Audit</button>
+            <div id="cs-k8s-rbac-results" style="margin-top:8px"></div>
+        </div>
+        <div class="tool-card">
+            <h4>Secrets Check</h4>
+            <p>Find exposed and unencrypted secrets in the namespace</p>
+            <button id="btn-k8s-secrets" class="btn btn-small" onclick="csK8sSecrets()">Check Secrets</button>
+            <div id="cs-k8s-secrets-results" style="margin-top:8px"></div>
+        </div>
+        <div class="tool-card">
+            <h4>Network Policies</h4>
+            <p>Verify NetworkPolicies exist and find unprotected pods</p>
+            <button id="btn-k8s-netpol" class="btn btn-small" onclick="csK8sNetPolicies()">Check Policies</button>
+            <div id="cs-k8s-netpol-results" style="margin-top:8px"></div>
+        </div>
+    </div>
+</div>
+
+<!-- K8s Pod Audit Results -->
+<div class="section" id="cs-k8s-pod-audit-section" style="display:none">
+    <h2>Pod Audit — <span id="cs-k8s-pod-audit-name"></span></h2>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+        <div class="score-display">
+            <div class="score-value" id="cs-k8s-pod-score">--</div>
+            <div class="score-label">Security Score</div>
+        </div>
+        <div style="flex:1;min-width:300px">
+            <table class="data-table">
+                <thead><tr><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+                <tbody id="cs-k8s-pod-audit-results"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</div><!-- /k8s tab -->
+
+
+<!-- ==================== IMAGE SCAN TAB ==================== -->
+<div class="tab-content" data-tab-group="cs" data-tab="imgscan">
+
+<!-- Image Scan -->
+<div class="section">
+    <h2>Image Vulnerability Scan</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Scan container images for known CVEs using Trivy or Grype.
+    </p>
+    <div class="form-row" style="align-items:flex-end;gap:12px;margin-bottom:12px">
+        <div class="form-group" style="flex:1">
+            <label>Image Name</label>
+            <input type="text" id="cs-scan-image" placeholder="e.g., nginx:latest, ubuntu:22.04, myapp:v1.2">
+        </div>
+        <button id="btn-scan-image" class="btn btn-primary" onclick="csScanImage()">Scan Image</button>
+    </div>
+    <!-- Severity Summary -->
+    <div id="cs-scan-summary" style="display:none;margin-bottom:16px">
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <div style="text-align:center;padding:8px 16px;background:var(--bg-card);border-radius:var(--radius);border-left:3px solid #dc2626">
+                <div style="font-size:1.4rem;font-weight:700;color:#dc2626" id="cs-sum-critical">0</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">Critical</div>
+            </div>
+            <div style="text-align:center;padding:8px 16px;background:var(--bg-card);border-radius:var(--radius);border-left:3px solid #f97316">
+                <div style="font-size:1.4rem;font-weight:700;color:#f97316" id="cs-sum-high">0</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">High</div>
+            </div>
+            <div style="text-align:center;padding:8px 16px;background:var(--bg-card);border-radius:var(--radius);border-left:3px solid #eab308">
+                <div style="font-size:1.4rem;font-weight:700;color:#eab308" id="cs-sum-medium">0</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">Medium</div>
+            </div>
+            <div style="text-align:center;padding:8px 16px;background:var(--bg-card);border-radius:var(--radius);border-left:3px solid #3b82f6">
+                <div style="font-size:1.4rem;font-weight:700;color:#3b82f6" id="cs-sum-low">0</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">Low</div>
+            </div>
+            <div style="text-align:center;padding:8px 16px;background:var(--bg-card);border-radius:var(--radius)">
+                <div style="font-size:1.4rem;font-weight:700;color:var(--text-primary)" id="cs-sum-total">0</div>
+                <div style="font-size:0.75rem;color:var(--text-muted)">Total</div>
+            </div>
+        </div>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th></tr></thead>
+        <tbody id="cs-scan-results">
+            <tr><td colspan="5" class="empty-state">Enter an image name and click "Scan Image" to find vulnerabilities.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Local Images -->
+<div class="section">
+    <h2>Local Images</h2>
+    <div class="tool-actions">
+        <button id="btn-list-images" class="btn btn-small" onclick="csListImages()">Refresh Images</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Repository</th><th>Tag</th><th>Size</th><th>Created</th><th style="width:80px">Actions</th></tr></thead>
+        <tbody id="cs-images-list">
+            <tr><td colspan="5" class="empty-state">Click "Refresh Images" to list local Docker images.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Dockerfile Lint -->
+<div class="section">
+    <h2>Dockerfile Lint</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Paste Dockerfile content below to check for security issues.
+    </p>
+    <textarea id="cs-dockerfile-content" rows="12"
+        style="width:100%;font-family:monospace;font-size:0.85rem;padding:12px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);resize:vertical"
+        placeholder="FROM ubuntu:latest
+RUN apt-get update && apt-get install -y curl
+COPY . /app
+CMD [&quot;/app/start.sh&quot;]"></textarea>
+    <div class="tool-actions" style="margin-top:8px">
+        <button id="btn-lint-dockerfile" class="btn btn-primary" onclick="csLintDockerfile()">Lint Dockerfile</button>
+        <span id="cs-lint-count" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+    <table class="data-table" style="margin-top:12px">
+        <thead><tr><th>Rule</th><th>Severity</th><th>Line</th><th>Issue</th><th>Detail</th></tr></thead>
+        <tbody id="cs-lint-results">
+            <tr><td colspan="5" class="empty-state">Paste a Dockerfile and click "Lint Dockerfile" to check for issues.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div><!-- /imgscan tab -->
+
+
+<!-- ==================== EXPORT ==================== -->
+<div class="section" style="margin-top:24px;padding:12px 16px;display:flex;gap:12px;align-items:center">
+    <button class="btn btn-small" onclick="csExport()">Export Results (JSON)</button>
+    <span id="cs-export-msg" style="font-size:0.8rem;color:var(--text-muted)"></span>
+</div>
+
+<script>
+/* ── Container Security JS ─────────────────────────────────────────────── */
+
+var csPrefix = '/container-sec';
+
+/* ── Status ── */
+function csCheckStatus() {
+    fetchJSON(csPrefix + '/status').then(function(data) {
+        var dk = data.docker || {};
+        var kc = data.kubectl || {};
+        var dkEl = document.getElementById('cs-docker-status');
+        var kcEl = document.getElementById('cs-kubectl-status');
+        if (dk.installed) {
+            dkEl.innerHTML = '<span style="color:var(--success)">Docker: ' + escapeHtml(dk.version || 'installed') + '</span>';
+        } else {
+            dkEl.innerHTML = '<span style="color:var(--danger)">Docker: not found</span>';
+        }
+        if (kc.installed) {
+            var ctx = kc.context ? ' (' + escapeHtml(kc.context) + ')' : '';
+            kcEl.innerHTML = '<span style="color:var(--success)">kubectl: installed' + ctx + '</span>';
+        } else {
+            kcEl.innerHTML = '<span style="color:var(--danger)">kubectl: not found</span>';
+        }
+    });
+}
+csCheckStatus();
+
+/* ── Severity badge helper ── */
+function csSevBadge(sev) {
+    var colors = {
+        'critical': '#dc2626', 'high': '#f97316', 'medium': '#eab308',
+        'low': '#3b82f6', 'info': '#22c55e'
+    };
+    var s = (sev || 'info').toLowerCase();
+    var c = colors[s] || '#6b7280';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600;background:' + c + '22;color:' + c + ';border:1px solid ' + c + '44">' + escapeHtml(s.toUpperCase()) + '</span>';
+}
+
+function csStatusBadge(status) {
+    if (status === 'pass') return '<span class="badge badge-pass">PASS</span>';
+    if (status === 'fail') return '<span class="badge badge-fail">FAIL</span>';
+    return '<span class="badge">' + escapeHtml(status || 'INFO') + '</span>';
+}
+
+/* ── Docker Host Audit ── */
+function csDockerAudit() {
+    var btn = document.getElementById('btn-docker-audit');
+    setLoading(btn, true);
+    postJSON(csPrefix + '/docker/audit', {}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { document.getElementById('cs-docker-audit-results').innerHTML = '<tr><td colspan="4">' + escapeHtml(data.error) + '</td></tr>'; return; }
+        var html = '';
+        (data.findings || []).forEach(function(f) {
+            html += '<tr><td>' + escapeHtml(f.check) + '</td><td>' + csSevBadge(f.severity)
+                + '</td><td>' + csStatusBadge(f.status) + '</td><td style="font-size:0.85rem">'
+                + escapeHtml(f.detail || '') + '</td></tr>';
+        });
+        document.getElementById('cs-docker-audit-results').innerHTML = html || '<tr><td colspan="4">No findings.</td></tr>';
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Containers ── */
+function csListContainers() {
+    var btn = document.getElementById('btn-list-containers');
+    setLoading(btn, true);
+    fetchJSON(csPrefix + '/docker/containers').then(function(data) {
+        setLoading(btn, false);
+        var html = '';
+        (data.containers || []).forEach(function(c) {
+            html += '<tr><td>' + escapeHtml(c.name) + '</td><td style="font-size:0.85rem">'
+                + escapeHtml(c.image) + '</td><td>' + escapeHtml(c.status) + '</td><td style="font-size:0.8rem">'
+                + escapeHtml(c.ports || 'none') + '</td><td>'
+                + '<button class="btn btn-small" style="margin-right:4px" onclick="csAuditContainer(\'' + escapeHtml(c.id) + '\',\'' + escapeHtml(c.name) + '\')">Audit</button>'
+                + '<button class="btn btn-small btn-danger" onclick="csEscapeCheck(\'' + escapeHtml(c.id) + '\',\'' + escapeHtml(c.name) + '\')">Escape</button>'
+                + '</td></tr>';
+        });
+        document.getElementById('cs-containers-list').innerHTML = html || '<tr><td colspan="5" class="empty-state">No containers found.</td></tr>';
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Container Audit ── */
+function csAuditContainer(id, name) {
+    document.getElementById('cs-container-audit-section').style.display = '';
+    document.getElementById('cs-container-audit-name').textContent = name || id;
+    document.getElementById('cs-container-score').textContent = '...';
+    document.getElementById('cs-container-audit-results').innerHTML = '<tr><td colspan="3">Auditing...</td></tr>';
+
+    postJSON(csPrefix + '/docker/containers/' + encodeURIComponent(id) + '/audit', {}).then(function(data) {
+        if (data.error) {
+            document.getElementById('cs-container-audit-results').innerHTML = '<tr><td colspan="3">' + escapeHtml(data.error) + '</td></tr>';
+            return;
+        }
+        var scoreEl = document.getElementById('cs-container-score');
+        scoreEl.textContent = data.score + '%';
+        scoreEl.style.color = data.score >= 80 ? 'var(--success)' : data.score >= 50 ? 'var(--warning)' : 'var(--danger)';
+
+        var html = '';
+        (data.findings || []).forEach(function(f) {
+            html += '<tr><td>' + escapeHtml(f.check) + '</td><td>'
+                + csStatusBadge(f.status) + '</td><td style="font-size:0.85rem">'
+                + escapeHtml(f.detail || '') + '</td></tr>';
+        });
+        document.getElementById('cs-container-audit-results').innerHTML = html || '<tr><td colspan="3">No findings.</td></tr>';
+        document.getElementById('cs-container-audit-section').scrollIntoView({behavior: 'smooth'});
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    });
+}
+
+/* ── Escape Check ── */
+function csEscapeCheck(id, name) {
+    document.getElementById('cs-escape-section').style.display = '';
+    document.getElementById('cs-escape-name').textContent = name || id;
+    document.getElementById('cs-escape-score').textContent = '...';
+    document.getElementById('cs-escape-results').innerHTML = '<tr><td colspan="4">Checking...</td></tr>';
+
+    postJSON(csPrefix + '/docker/containers/' + encodeURIComponent(id) + '/escape', {}).then(function(data) {
+        if (data.error) {
+            document.getElementById('cs-escape-results').innerHTML = '<tr><td colspan="4">' + escapeHtml(data.error) + '</td></tr>';
+            return;
+        }
+        document.getElementById('cs-escape-score').textContent = data.risk_score;
+        document.getElementById('cs-escape-total').textContent = data.total_vectors;
+        document.getElementById('cs-escape-exploitable').textContent = data.exploitable;
+
+        var html = '';
+        if (!data.vectors || data.vectors.length === 0) {
+            html = '<tr><td colspan="4" class="empty-state">No escape vectors detected. Container appears well-configured.</td></tr>';
+        } else {
+            data.vectors.forEach(function(v) {
+                html += '<tr><td>' + escapeHtml(v.vector) + '</td><td>'
+                    + csSevBadge(v.risk) + '</td><td>'
+                    + (v.exploitable ? '<span style="color:var(--danger);font-weight:600">YES</span>' : '<span style="color:var(--text-muted)">No</span>')
+                    + '</td><td style="font-size:0.85rem">' + escapeHtml(v.detail) + '</td></tr>';
+            });
+        }
+        document.getElementById('cs-escape-results').innerHTML = html;
+        document.getElementById('cs-escape-section').scrollIntoView({behavior: 'smooth'});
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    });
+}
+
+/* ── Kubernetes: Namespaces ── */
+function csLoadNamespaces() {
+    fetchJSON(csPrefix + '/k8s/namespaces').then(function(data) {
+        var sel = document.getElementById('cs-k8s-ns');
+        var current = sel.value;
+        sel.innerHTML = '';
+        (data.namespaces || []).forEach(function(ns) {
+            var opt = document.createElement('option');
+            opt.value = ns.name;
+            opt.textContent = ns.name;
+            if (ns.name === current) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        if (sel.options.length === 0) {
+            var opt = document.createElement('option');
+            opt.value = 'default';
+            opt.textContent = 'default';
+            sel.appendChild(opt);
+        }
+    });
+}
+
+function csGetNS() {
+    return document.getElementById('cs-k8s-ns').value || 'default';
+}
+
+/* ── Kubernetes: Pods ── */
+function csK8sPods() {
+    var btn = document.getElementById('btn-k8s-pods');
+    setLoading(btn, true);
+    fetchJSON(csPrefix + '/k8s/pods?namespace=' + encodeURIComponent(csGetNS())).then(function(data) {
+        setLoading(btn, false);
+        var html = '';
+        (data.pods || []).forEach(function(p) {
+            var statusColor = p.status === 'Running' ? 'var(--success)' : p.status === 'Pending' ? 'var(--warning)' : 'var(--danger)';
+            html += '<tr><td>' + escapeHtml(p.name) + '</td>'
+                + '<td><span style="color:' + statusColor + '">' + escapeHtml(p.status) + '</span></td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml((p.containers || []).join(', ')) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(p.node || '-') + '</td>'
+                + '<td>' + (p.restart_count || 0) + '</td>'
+                + '<td><button class="btn btn-small" onclick="csK8sPodAudit(\'' + escapeHtml(p.name) + '\')">Audit</button></td>'
+                + '</tr>';
+        });
+        document.getElementById('cs-k8s-pods-list').innerHTML = html || '<tr><td colspan="6" class="empty-state">No pods found in this namespace.</td></tr>';
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Kubernetes: Pod Audit ── */
+function csK8sPodAudit(podName) {
+    var sec = document.getElementById('cs-k8s-pod-audit-section');
+    sec.style.display = '';
+    document.getElementById('cs-k8s-pod-audit-name').textContent = podName;
+    document.getElementById('cs-k8s-pod-score').textContent = '...';
+    document.getElementById('cs-k8s-pod-audit-results').innerHTML = '<tr><td colspan="3">Auditing...</td></tr>';
+
+    postJSON(csPrefix + '/k8s/pods/' + encodeURIComponent(podName) + '/audit', {namespace: csGetNS()}).then(function(data) {
+        if (data.error) {
+            document.getElementById('cs-k8s-pod-audit-results').innerHTML = '<tr><td colspan="3">' + escapeHtml(data.error) + '</td></tr>';
+            return;
+        }
+        var scoreEl = document.getElementById('cs-k8s-pod-score');
+        scoreEl.textContent = data.score + '%';
+        scoreEl.style.color = data.score >= 80 ? 'var(--success)' : data.score >= 50 ? 'var(--warning)' : 'var(--danger)';
+
+        var html = '';
+        (data.findings || []).forEach(function(f) {
+            html += '<tr><td>' + escapeHtml(f.check) + '</td><td>'
+                + csStatusBadge(f.status) + '</td><td style="font-size:0.85rem">'
+                + escapeHtml(f.detail || '') + '</td></tr>';
+        });
+        document.getElementById('cs-k8s-pod-audit-results').innerHTML = html || '<tr><td colspan="3">No findings.</td></tr>';
+        sec.scrollIntoView({behavior: 'smooth'});
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    });
+}
+
+/* ── Kubernetes: RBAC ── */
+function csK8sRBAC() {
+    var btn = document.getElementById('btn-k8s-rbac');
+    setLoading(btn, true);
+    postJSON(csPrefix + '/k8s/rbac', {namespace: csGetNS()}).then(function(data) {
+        setLoading(btn, false);
+        var el = document.getElementById('cs-k8s-rbac-results');
+        if (data.error) { el.innerHTML = '<pre class="output-panel">' + escapeHtml(data.error) + '</pre>'; return; }
+        if (!data.findings || data.findings.length === 0) {
+            el.innerHTML = '<pre class="output-panel" style="color:var(--success)">No RBAC issues found.</pre>';
+            return;
+        }
+        var html = '<div style="max-height:300px;overflow-y:auto">';
+        data.findings.forEach(function(f) {
+            html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">'
+                + csSevBadge(f.severity) + ' <strong>' + escapeHtml(f.type) + '</strong>'
+                + (f.binding ? ' &mdash; ' + escapeHtml(f.binding) : '')
+                + '<div style="color:var(--text-secondary);margin-top:2px">' + escapeHtml(f.detail) + '</div>'
+                + '</div>';
+        });
+        html += '</div>';
+        el.innerHTML = html;
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Kubernetes: Secrets ── */
+function csK8sSecrets() {
+    var btn = document.getElementById('btn-k8s-secrets');
+    setLoading(btn, true);
+    postJSON(csPrefix + '/k8s/secrets', {namespace: csGetNS()}).then(function(data) {
+        setLoading(btn, false);
+        var el = document.getElementById('cs-k8s-secrets-results');
+        if (data.error) { el.innerHTML = '<pre class="output-panel">' + escapeHtml(data.error) + '</pre>'; return; }
+        if (!data.findings || data.findings.length === 0) {
+            el.innerHTML = '<pre class="output-panel" style="color:var(--success)">No secrets issues found.</pre>';
+            return;
+        }
+        var html = '<div style="max-height:300px;overflow-y:auto">';
+        data.findings.forEach(function(f) {
+            html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">'
+                + csSevBadge(f.severity) + ' <strong>' + escapeHtml(f.name) + '</strong>'
+                + ' <span style="color:var(--text-muted)">(' + escapeHtml(f.type) + ')</span>'
+                + '<div style="color:var(--text-secondary);margin-top:2px">' + escapeHtml(f.detail) + '</div>'
+                + '</div>';
+        });
+        html += '</div>';
+        el.innerHTML = html;
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Kubernetes: Network Policies ── */
+function csK8sNetPolicies() {
+    var btn = document.getElementById('btn-k8s-netpol');
+    setLoading(btn, true);
+    postJSON(csPrefix + '/k8s/network', {namespace: csGetNS()}).then(function(data) {
+        setLoading(btn, false);
+        var el = document.getElementById('cs-k8s-netpol-results');
+        if (data.error) { el.innerHTML = '<pre class="output-panel">' + escapeHtml(data.error) + '</pre>'; return; }
+        var html = '<div style="font-size:0.85rem">';
+        html += '<div style="margin-bottom:6px">Policies: <strong>' + (data.policy_count || 0) + '</strong></div>';
+        if (data.unprotected_pods && data.unprotected_pods.length > 0) {
+            html += '<div style="color:var(--warning);margin-bottom:6px">Unprotected pods: ' + escapeHtml(data.unprotected_pods.join(', ')) + '</div>';
+        }
+        if (data.findings) {
+            data.findings.forEach(function(f) {
+                html += '<div style="padding:4px 0">' + csSevBadge(f.severity) + ' ' + escapeHtml(f.detail) + '</div>';
+            });
+        }
+        if (!data.findings || data.findings.length === 0) {
+            html += '<div style="color:var(--success)">All pods covered by NetworkPolicies.</div>';
+        }
+        html += '</div>';
+        el.innerHTML = html;
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Image Scan ── */
+function csScanImage() {
+    var input = document.getElementById('cs-scan-image');
+    var name = input.value.trim();
+    if (!name) return;
+    var btn = document.getElementById('btn-scan-image');
+    setLoading(btn, true);
+    document.getElementById('cs-scan-results').innerHTML = '<tr><td colspan="5">Scanning ' + escapeHtml(name) + '... (this may take a minute)</td></tr>';
+    document.getElementById('cs-scan-summary').style.display = 'none';
+
+    postJSON(csPrefix + '/docker/images/scan', {image_name: name}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('cs-scan-results').innerHTML = '<tr><td colspan="5">' + escapeHtml(data.error) + '</td></tr>';
+            return;
+        }
+        // Summary
+        var s = data.summary || {};
+        document.getElementById('cs-sum-critical').textContent = s.CRITICAL || 0;
+        document.getElementById('cs-sum-high').textContent = s.HIGH || 0;
+        document.getElementById('cs-sum-medium').textContent = s.MEDIUM || 0;
+        document.getElementById('cs-sum-low').textContent = s.LOW || 0;
+        document.getElementById('cs-sum-total').textContent = data.total || 0;
+        document.getElementById('cs-scan-summary').style.display = '';
+
+        // Vulnerabilities table
+        var vulns = data.vulnerabilities || [];
+        if (vulns.length === 0) {
+            document.getElementById('cs-scan-results').innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--success)">No vulnerabilities found.</td></tr>';
+            return;
+        }
+        var html = '';
+        vulns.forEach(function(v) {
+            html += '<tr><td>' + csSevBadge(v.severity) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(v.cve) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(v.package) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(v.installed_version) + '</td>'
+                + '<td style="font-size:0.85rem;color:var(--success)">' + escapeHtml(v.fixed_version || 'n/a') + '</td>'
+                + '</tr>';
+        });
+        document.getElementById('cs-scan-results').innerHTML = html;
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Local Images ── */
+function csListImages() {
+    var btn = document.getElementById('btn-list-images');
+    setLoading(btn, true);
+    fetchJSON(csPrefix + '/docker/images').then(function(data) {
+        setLoading(btn, false);
+        var html = '';
+        (data.images || []).forEach(function(img) {
+            var fullName = img.repo + ':' + img.tag;
+            html += '<tr><td>' + escapeHtml(img.repo) + '</td>'
+                + '<td>' + escapeHtml(img.tag) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(img.size) + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(img.created) + '</td>'
+                + '<td><button class="btn btn-small" onclick="csScanFromList(\'' + escapeHtml(fullName) + '\')">Scan</button></td>'
+                + '</tr>';
+        });
+        document.getElementById('cs-images-list').innerHTML = html || '<tr><td colspan="5" class="empty-state">No local images found.</td></tr>';
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function csScanFromList(name) {
+    document.getElementById('cs-scan-image').value = name;
+    csScanImage();
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+/* ── Dockerfile Lint ── */
+function csLintDockerfile() {
+    var content = document.getElementById('cs-dockerfile-content').value;
+    if (!content.trim()) return;
+    var btn = document.getElementById('btn-lint-dockerfile');
+    setLoading(btn, true);
+    postJSON(csPrefix + '/docker/lint', {content: content}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('cs-lint-results').innerHTML = '<tr><td colspan="5">' + escapeHtml(data.error) + '</td></tr>';
+            return;
+        }
+        var count = data.total || 0;
+        document.getElementById('cs-lint-count').textContent = count + ' issue' + (count !== 1 ? 's' : '') + ' found';
+        document.getElementById('cs-lint-count').style.color = count === 0 ? 'var(--success)' : 'var(--warning)';
+
+        var findings = data.findings || [];
+        if (findings.length === 0) {
+            document.getElementById('cs-lint-results').innerHTML = '<tr><td colspan="5" class="empty-state" style="color:var(--success)">No issues found. Dockerfile looks good.</td></tr>';
+            return;
+        }
+        var html = '';
+        findings.forEach(function(f) {
+            html += '<tr><td style="font-family:monospace;font-size:0.8rem">' + escapeHtml(f.rule || '') + '</td>'
+                + '<td>' + csSevBadge(f.severity) + '</td>'
+                + '<td>' + (f.line ? f.line : '-') + '</td>'
+                + '<td>' + escapeHtml(f.title || '') + '</td>'
+                + '<td style="font-size:0.85rem">' + escapeHtml(f.detail || '') + '</td>'
+                + '</tr>';
+        });
+        document.getElementById('cs-lint-results').innerHTML = html;
+        halAnalyze('Container Security', JSON.stringify(data, null, 2), 'docker/k8s', 'defense');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Export ── */
+function csExport() {
+    fetchJSON(csPrefix + '/export?format=json').then(function(data) {
+        var msg = document.getElementById('cs-export-msg');
+        if (data.success) {
+            msg.textContent = 'Exported to: ' + (data.path || 'file');
+            msg.style.color = 'var(--success)';
+        } else {
+            msg.textContent = data.error || 'Export failed';
+            msg.style.color = 'var(--danger)';
+        }
+    });
+}
+</script>
+{% endblock %}

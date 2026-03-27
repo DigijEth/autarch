@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Module Creator - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Module Creator</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Create, edit, validate, and manage AUTARCH modules
+    </p>
+</div>
+
+<style>
+#module-code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    width: 100%;
+    min-height: 500px;
+    resize: vertical;
+    tab-size: 4;
+    line-height: 1.5;
+}
+#module-code:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.mc-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+@media (max-width: 960px) {
+    .mc-layout { grid-template-columns: 1fr; }
+}
+.mc-editor, .mc-list {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+.mc-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1rem;
+    margin-bottom: 0.75rem;
+}
+.mc-form-grid .form-group { margin-bottom: 0; }
+.mc-form-grid label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+.mc-form-grid input, .mc-form-grid select {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+}
+.mc-btn-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+.mc-btn-row .btn { font-size: 0.82rem; padding: 0.4rem 0.9rem; }
+.mc-status {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    display: none;
+    white-space: pre-wrap;
+}
+.mc-status.success { display: block; background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+.mc-status.error { display: block; background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.mc-status.info { display: block; background: rgba(99,102,241,0.12); color: var(--accent-hover); border: 1px solid rgba(99,102,241,0.25); }
+.mc-list h2 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.mc-modules-scroll {
+    max-height: 620px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+.mc-cat-group { margin-bottom: 0.75rem; }
+.mc-cat-group h3 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid var(--border);
+}
+.mc-mod-item {
+    padding: 0.4rem 0.5rem;
+    border-radius: calc(var(--radius) - 2px);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+}
+.mc-mod-item:hover { background: var(--bg-input); }
+.mc-mod-item .mod-name { font-weight: 600; color: var(--text-primary); }
+.mc-mod-item .mod-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mc-mod-item .mod-meta {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+</style>
+
+<div class="mc-layout">
+    <!-- Left column: editor -->
+    <div class="mc-editor">
+        <div class="mc-form-grid">
+            <div class="form-group">
+                <label for="mod-name">Module Name</label>
+                <input type="text" id="mod-name" placeholder="my_module" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="mod-category">Category</label>
+                <select id="mod-category">
+                    <option value="defense">defense</option>
+                    <option value="offense">offense</option>
+                    <option value="counter">counter</option>
+                    <option value="analyze">analyze</option>
+                    <option value="osint">osint</option>
+                    <option value="simulate">simulate</option>
+                    <option value="core">core</option>
+                    <option value="hardware">hardware</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="mod-desc">Description</label>
+                <input type="text" id="mod-desc" placeholder="Short description of the module">
+            </div>
+            <div class="form-group">
+                <label for="mod-author">Author</label>
+                <input type="text" id="mod-author" value="darkHal">
+            </div>
+        </div>
+
+        <div style="margin-bottom:0.5rem">
+            <button class="btn btn-sm" onclick="loadTemplate()" style="font-size:0.78rem">Load Template</button>
+        </div>
+
+        <textarea id="module-code" rows="25" placeholder="# Module code will appear here...&#10;# Click 'Load Template' or select a module from the list." spellcheck="false"></textarea>
+
+        <div class="mc-btn-row">
+            <button class="btn" onclick="validateCode()">Validate</button>
+            <button class="btn" onclick="createModule()" style="background:var(--accent);color:#fff">Create Module</button>
+            <button class="btn" onclick="saveModule()">Save Changes</button>
+        </div>
+
+        <div id="mc-status" class="mc-status"></div>
+    </div>
+
+    <!-- Right column: module list -->
+    <div class="mc-list">
+        <h2>
+            Modules
+            <button class="btn btn-sm" onclick="refreshModuleList()" style="font-size:0.72rem;padding:0.25rem 0.6rem">Refresh</button>
+        </h2>
+        <div id="module-list" class="mc-modules-scroll">
+            <p style="color:var(--text-muted);font-size:0.8rem">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const API = '/module-creator';
+const statusEl = document.getElementById('mc-status');
+const codeEl = document.getElementById('module-code');
+let currentEditName = null;
+
+function showStatus(msg, type) {
+    statusEl.className = 'mc-status ' + type;
+    statusEl.textContent = msg;
+}
+
+function clearStatus() {
+    statusEl.className = 'mc-status';
+    statusEl.textContent = '';
+}
+
+/* Tab key support in textarea */
+codeEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+    }
+});
+
+/* Load template skeleton for selected category */
+function loadTemplate() {
+    const cat = document.getElementById('mod-category').value;
+    fetch(API + '/templates')
+        .then(r => r.json())
+        .then(templates => {
+            const t = templates.find(x => x.category === cat);
+            if (t) {
+                codeEl.value = t.code;
+                if (!document.getElementById('mod-desc').value) {
+                    document.getElementById('mod-desc').value = t.description;
+                }
+                currentEditName = null;
+                showStatus('Template loaded for category: ' + cat, 'info');
+            }
+        })
+        .catch(err => showStatus('Failed to load templates: ' + err, 'error'));
+}
+
+/* Validate code syntax */
+function validateCode() {
+    const code = codeEl.value.trim();
+    if (!code) { showStatus('No code to validate', 'error'); return; }
+    fetch(API + '/validate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({code: code})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.valid) {
+            showStatus('Validation passed. ' + (data.warnings || []).join('; '), 'success');
+        } else {
+            showStatus('Validation failed:\n' + (data.errors || []).join('\n'), 'error');
+        }
+    })
+    .catch(err => showStatus('Validation request failed: ' + err, 'error'));
+}
+
+/* Create new module */
+function createModule() {
+    const name = document.getElementById('mod-name').value.trim();
+    const category = document.getElementById('mod-category').value;
+    const description = document.getElementById('mod-desc').value.trim();
+    const author = document.getElementById('mod-author').value.trim() || 'darkHal';
+    const code = codeEl.value;
+
+    if (!name) { showStatus('Module name is required', 'error'); return; }
+    if (!code.trim()) { showStatus('Module code is empty', 'error'); return; }
+
+    fetch(API + '/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, category, description, author, code})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showStatus(data.message, 'success');
+            currentEditName = name;
+            refreshModuleList();
+        } else {
+            showStatus(data.error || 'Creation failed', 'error');
+        }
+    })
+    .catch(err => showStatus('Request failed: ' + err, 'error'));
+}
+
+/* Save changes to existing module */
+function saveModule() {
+    const name = currentEditName || document.getElementById('mod-name').value.trim();
+    const code = codeEl.value;
+
+    if (!name) { showStatus('No module selected to save. Enter a name or click a module from the list.', 'error'); return; }
+    if (!code.trim()) { showStatus('Module code is empty', 'error'); return; }
+
+    fetch(API + '/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, code})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showStatus(data.message, 'success');
+            refreshModuleList();
+        } else {
+            showStatus(data.error || 'Save failed', 'error');
+        }
+    })
+    .catch(err => showStatus('Request failed: ' + err, 'error'));
+}
+
+/* Load a module into the editor */
+function loadModule(name) {
+    fetch(API + '/preview', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            codeEl.value = data.code;
+            currentEditName = name;
+            const m = data.metadata || {};
+            document.getElementById('mod-name').value = name;
+            if (m.category) document.getElementById('mod-category').value = m.category;
+            if (m.description) document.getElementById('mod-desc').value = m.description;
+            if (m.author) document.getElementById('mod-author').value = m.author;
+            showStatus('Loaded module: ' + name, 'info');
+        } else {
+            showStatus(data.error || 'Failed to load module', 'error');
+        }
+    })
+    .catch(err => showStatus('Failed to load module: ' + err, 'error'));
+}
+
+/* Refresh the module list */
+function refreshModuleList() {
+    const container = document.getElementById('module-list');
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem">Loading...</p>';
+
+    fetch(API + '/list')
+        .then(r => r.json())
+        .then(modules => {
+            if (!modules.length) {
+                container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem">No modules found.</p>';
+                return;
+            }
+            /* Group by category */
+            const groups = {};
+            modules.forEach(m => {
+                const cat = m.category || 'unknown';
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push(m);
+            });
+
+            let html = '';
+            const catOrder = ['defense','offense','counter','analyze','osint','simulate','core','hardware','unknown'];
+            catOrder.forEach(cat => {
+                if (!groups[cat]) return;
+                html += '<div class="mc-cat-group">';
+                html += '<h3>' + cat + ' (' + groups[cat].length + ')</h3>';
+                groups[cat].forEach(m => {
+                    const desc = m.description ? m.description.substring(0, 60) : '';
+                    const ver = m.version ? 'v' + m.version : '';
+                    html += '<div class="mc-mod-item" onclick="loadModule(\'' + m.name.replace(/'/g, "\\'") + '\')">';
+                    html += '<div class="mod-name">' + m.name + '</div>';
+                    if (desc) html += '<div class="mod-desc">' + desc + '</div>';
+                    html += '<div class="mod-meta">' + [ver, m.last_modified].filter(Boolean).join(' &middot; ') + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            });
+
+            /* Any categories not in catOrder */
+            Object.keys(groups).forEach(cat => {
+                if (catOrder.includes(cat)) return;
+                html += '<div class="mc-cat-group">';
+                html += '<h3>' + cat + ' (' + groups[cat].length + ')</h3>';
+                groups[cat].forEach(m => {
+                    const desc = m.description ? m.description.substring(0, 60) : '';
+                    const ver = m.version ? 'v' + m.version : '';
+                    html += '<div class="mc-mod-item" onclick="loadModule(\'' + m.name.replace(/'/g, "\\'") + '\')">';
+                    html += '<div class="mod-name">' + m.name + '</div>';
+                    if (desc) html += '<div class="mod-desc">' + desc + '</div>';
+                    html += '<div class="mod-meta">' + [ver, m.last_modified].filter(Boolean).join(' &middot; ') + '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        })
+        .catch(err => {
+            container.innerHTML = '<p style="color:var(--danger);font-size:0.8rem">Failed to load modules</p>';
+        });
+}
+
+/* Initial load */
+refreshModuleList();
+</script>
+{% endblock %}

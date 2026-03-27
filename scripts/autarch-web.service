@@ -1,0 +1,34 @@
+[Unit]
+Description=AUTARCH Web Dashboard
+Documentation=file:///home/snake/autarch/GUIDE.md
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/snake/autarch
+
+# Use venv python if available, fall back to system python
+ExecStart=/bin/bash -c 'if [ -x /home/snake/autarch/venv/bin/python ]; then exec /home/snake/autarch/venv/bin/python /home/snake/autarch/autarch.py --web --no-banner; else exec /usr/bin/python3 /home/snake/autarch/autarch.py --web --no-banner; fi'
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autarch-web
+
+# Security — run as root for raw sockets, iptables, hardware access
+NoNewPrivileges=false
+ProtectHome=false
+PrivateTmp=true
+
+# Capabilities needed when not running as root (future: drop root)
+# AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN CAP_NET_BIND_SERVICE
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

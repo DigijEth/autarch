@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — API Fuzzer{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>API Fuzzer</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Discover endpoints, fuzz parameters, and detect API vulnerabilities.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="apifuzz" data-tab="endpoints" onclick="showTab('apifuzz','endpoints')">Endpoints</button>
+    <button class="tab" data-tab-group="apifuzz" data-tab="fuzzer" onclick="showTab('apifuzz','fuzzer')">Fuzzer</button>
+    <button class="tab" data-tab-group="apifuzz" data-tab="results" onclick="showTab('apifuzz','results')">Results</button>
+</div>
+
+<!-- ══ Endpoints Tab ══ -->
+<div class="tab-content active" data-tab-group="apifuzz" data-tab="endpoints">
+
+    <!-- Discover Endpoints -->
+    <div class="section">
+        <h2>Discover Endpoints</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Base URL</label>
+                <input type="text" id="af-discover-url" placeholder="https://api.example.com">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-discover" class="btn btn-primary" onclick="afDiscover()">Discover</button>
+        </div>
+        <div id="af-discover-status" class="progress-text"></div>
+    </div>
+
+    <!-- OpenAPI Spec Parser -->
+    <div class="section">
+        <h2>OpenAPI / Swagger Parser</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>OpenAPI Spec URL</label>
+                <input type="text" id="af-openapi-url" placeholder="https://api.example.com/openapi.json">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-openapi" class="btn btn-primary" onclick="afParseOpenAPI()">Parse Spec</button>
+        </div>
+        <div id="af-openapi-status" class="progress-text"></div>
+    </div>
+
+    <!-- Discovered Endpoints Table -->
+    <div class="section">
+        <h2>Discovered Endpoints</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="afClearEndpoints()">Clear</button>
+            <button class="btn btn-small" onclick="afExportEndpoints()">Export JSON</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Status</th>
+                    <th>Methods</th>
+                    <th>Content Type</th>
+                </tr>
+            </thead>
+            <tbody id="af-endpoints-body">
+                <tr><td colspan="4" class="empty-state">No endpoints discovered yet. Run discovery or parse an OpenAPI spec.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ══ Fuzzer Tab ══ -->
+<div class="tab-content" data-tab-group="apifuzz" data-tab="fuzzer">
+
+    <!-- Target Config -->
+    <div class="section">
+        <h2>Fuzz Target</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Target URL</label>
+                <input type="text" id="af-fuzz-url" placeholder="https://api.example.com/users">
+            </div>
+            <div class="form-group">
+                <label>Method</label>
+                <select id="af-fuzz-method">
+                    <option value="GET">GET</option>
+                    <option value="POST" selected>POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Parameters (key=value, one per line)</label>
+            <textarea id="af-fuzz-params" rows="4" style="font-family:monospace;width:100%;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:0.9rem;resize:vertical" placeholder="username=admin&#10;password=test&#10;id=1"></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Payload Type</label>
+                <select id="af-fuzz-payload">
+                    <option value="sqli">SQL Injection</option>
+                    <option value="xss">Cross-Site Scripting (XSS)</option>
+                    <option value="traversal">Path Traversal</option>
+                    <option value="type_confusion">Type Confusion</option>
+                </select>
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-fuzz" class="btn btn-primary" onclick="afStartFuzz()">Fuzz</button>
+            <button id="btn-af-fuzz-stop" class="btn btn-stop btn-small" onclick="afStopFuzz()" style="display:none">Stop</button>
+        </div>
+        <div id="af-fuzz-status" class="progress-text"></div>
+        <pre class="output-panel scrollable" id="af-fuzz-output" style="max-height:300px;display:none"></pre>
+    </div>
+
+    <!-- Auth Config -->
+    <div class="section">
+        <h2>Authentication</h2>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Auth Type</label>
+                <select id="af-auth-type" onchange="afAuthTypeChanged()">
+                    <option value="none">None</option>
+                    <option value="bearer">Bearer Token</option>
+                    <option value="api_key">API Key</option>
+                    <option value="basic">Basic Auth</option>
+                </select>
+            </div>
+            <div class="form-group" id="af-auth-value-group" style="display:none">
+                <label id="af-auth-value-label">Token</label>
+                <input type="text" id="af-auth-value" placeholder="Enter token or credentials">
+            </div>
+            <div class="form-group" id="af-auth-header-group" style="display:none">
+                <label>Header Name (API Key)</label>
+                <input type="text" id="af-auth-header" placeholder="X-API-Key" value="X-API-Key">
+            </div>
+        </div>
+    </div>
+
+    <!-- GraphQL Section -->
+    <div class="section">
+        <h2>GraphQL Testing</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>GraphQL Introspection URL</label>
+                <input type="text" id="af-gql-url" placeholder="https://api.example.com/graphql">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-gql-intro" class="btn btn-primary" onclick="afGqlIntrospect()">Introspect</button>
+            <button id="btn-af-gql-depth" class="btn btn-small" onclick="afGqlDepthTest()">Depth Test</button>
+        </div>
+        <div id="af-gql-status" class="progress-text"></div>
+        <pre class="output-panel scrollable" id="af-gql-output" style="max-height:300px;display:none"></pre>
+    </div>
+</div>
+
+<!-- ══ Results Tab ══ -->
+<div class="tab-content" data-tab-group="apifuzz" data-tab="results">
+
+    <!-- Findings Table -->
+    <div class="section">
+        <h2>Findings</h2>
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="afClearFindings()">Clear</button>
+            <button class="btn btn-small" onclick="afExportFindings()">Export JSON</button>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Payload</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="af-findings-body">
+                <tr><td colspan="5" class="empty-state">No findings yet. Run the fuzzer first.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Auth Bypass Results -->
+    <div class="section">
+        <h2>Auth Bypass Results</h2>
+        <div class="tool-actions">
+            <button id="btn-af-authbypass" class="btn btn-primary" onclick="afAuthBypassTest()">Test Auth Bypass</button>
+        </div>
+        <pre class="output-panel scrollable" id="af-authbypass-output" style="max-height:250px"></pre>
+    </div>
+
+    <!-- Rate Limit Test -->
+    <div class="section">
+        <h2>Rate Limit Test</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Target URL</label>
+                <input type="text" id="af-ratelimit-url" placeholder="https://api.example.com/login">
+            </div>
+            <div class="form-group">
+                <label>Request Count</label>
+                <input type="number" id="af-ratelimit-count" value="50" min="10" max="500">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-ratelimit" class="btn btn-primary" onclick="afRateLimitTest()">Test Rate Limit</button>
+        </div>
+        <pre class="output-panel scrollable" id="af-ratelimit-output" style="max-height:250px"></pre>
+    </div>
+
+    <!-- Response Analysis -->
+    <div class="section">
+        <h2>Response Analysis</h2>
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>URL to Analyze</label>
+                <input type="text" id="af-analyze-url" placeholder="https://api.example.com/endpoint">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="btn-af-analyze" class="btn btn-primary" onclick="afAnalyzeResponse()">Analyze</button>
+        </div>
+        <pre class="output-panel scrollable" id="af-analyze-output" style="max-height:300px"></pre>
+    </div>
+</div>
+
+<script>
+/* ── API Fuzzer ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+var afEndpoints = [];
+var afFindings = [];
+var afFuzzAbort = null;
+
+/* ── Endpoints Tab ── */
+function afDiscover() {
+    var url = document.getElementById('af-discover-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-discover');
+    setLoading(btn, true);
+    document.getElementById('af-discover-status').textContent = 'Discovering endpoints...';
+    postJSON('/api-fuzzer/discover', {url: url}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('af-discover-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('af-discover-status').textContent = 'Found ' + (data.endpoints || []).length + ' endpoints';
+        (data.endpoints || []).forEach(function(ep) {
+            afEndpoints.push(ep);
+        });
+        afRenderEndpoints();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afParseOpenAPI() {
+    var url = document.getElementById('af-openapi-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-openapi');
+    setLoading(btn, true);
+    document.getElementById('af-openapi-status').textContent = 'Parsing OpenAPI spec...';
+    postJSON('/api-fuzzer/parse-openapi', {url: url}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('af-openapi-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        document.getElementById('af-openapi-status').textContent = 'Parsed ' + (data.endpoints || []).length + ' endpoints from spec';
+        (data.endpoints || []).forEach(function(ep) {
+            afEndpoints.push(ep);
+        });
+        afRenderEndpoints();
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afRenderEndpoints() {
+    var tbody = document.getElementById('af-endpoints-body');
+    if (!afEndpoints.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No endpoints discovered yet.</td></tr>';
+        return;
+    }
+    var html = '';
+    afEndpoints.forEach(function(ep, i) {
+        var methods = (ep.methods || []).join(', ');
+        var statusCls = '';
+        var st = ep.status || 0;
+        if (st >= 200 && st < 300) statusCls = 'badge-pass';
+        else if (st >= 400) statusCls = 'badge-fail';
+        html += '<tr>'
+            + '<td><a href="#" onclick="afSelectEndpoint(' + i + ');return false">' + esc(ep.path || '') + '</a></td>'
+            + '<td><span class="badge ' + statusCls + '">' + esc(String(st || '—')) + '</span></td>'
+            + '<td>' + esc(methods || '—') + '</td>'
+            + '<td>' + esc(ep.content_type || '—') + '</td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function afSelectEndpoint(idx) {
+    var ep = afEndpoints[idx];
+    if (!ep) return;
+    var base = document.getElementById('af-discover-url').value.trim() || '';
+    document.getElementById('af-fuzz-url').value = base.replace(/\/+$/, '') + ep.path;
+    if (ep.methods && ep.methods.length) {
+        document.getElementById('af-fuzz-method').value = ep.methods[0];
+    }
+    showTab('apifuzz', 'fuzzer');
+}
+
+function afClearEndpoints() {
+    afEndpoints = [];
+    afRenderEndpoints();
+}
+
+function afExportEndpoints() {
+    var blob = new Blob([JSON.stringify(afEndpoints, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'api_endpoints.json';
+    a.click();
+}
+
+/* ── Fuzzer Tab ── */
+function afGetAuth() {
+    var type = document.getElementById('af-auth-type').value;
+    if (type === 'none') return {};
+    return {
+        type: type,
+        value: document.getElementById('af-auth-value').value.trim(),
+        header: document.getElementById('af-auth-header').value.trim()
+    };
+}
+
+function afParseParams() {
+    var text = document.getElementById('af-fuzz-params').value.trim();
+    if (!text) return {};
+    var params = {};
+    text.split('\n').forEach(function(line) {
+        line = line.trim();
+        if (!line) return;
+        var idx = line.indexOf('=');
+        if (idx > 0) {
+            params[line.substring(0, idx).trim()] = line.substring(idx + 1).trim();
+        }
+    });
+    return params;
+}
+
+function afStartFuzz() {
+    var url = document.getElementById('af-fuzz-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-fuzz');
+    var stopBtn = document.getElementById('btn-af-fuzz-stop');
+    var output = document.getElementById('af-fuzz-output');
+    setLoading(btn, true);
+    stopBtn.style.display = '';
+    output.style.display = 'block';
+    output.textContent = '';
+    document.getElementById('af-fuzz-status').textContent = 'Fuzzing in progress...';
+
+    var payload = {
+        url: url,
+        method: document.getElementById('af-fuzz-method').value,
+        params: afParseParams(),
+        payload_type: document.getElementById('af-fuzz-payload').value,
+        auth: afGetAuth()
+    };
+
+    afFuzzAbort = new AbortController();
+    fetchJSON('/api-fuzzer/fuzz', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+        signal: afFuzzAbort.signal
+    }).then(function(data) {
+        setLoading(btn, false);
+        stopBtn.style.display = 'none';
+        if (data.error) {
+            document.getElementById('af-fuzz-status').textContent = 'Error: ' + data.error;
+            return;
+        }
+        var count = (data.findings || []).length;
+        document.getElementById('af-fuzz-status').textContent = 'Complete — ' + count + ' finding(s)';
+        (data.findings || []).forEach(function(f) {
+            afFindings.push(f);
+            output.textContent += '[' + (f.severity || 'info').toUpperCase() + '] '
+                + (f.param || '?') + ' = ' + (f.payload || '') + ' (' + (f.type || '') + ') -> ' + (f.status || '') + '\n';
+        });
+        afRenderFindings();
+    }).catch(function(e) {
+        setLoading(btn, false);
+        stopBtn.style.display = 'none';
+        if (e.name !== 'AbortError') {
+            document.getElementById('af-fuzz-status').textContent = 'Request failed';
+        }
+    });
+}
+
+function afStopFuzz() {
+    if (afFuzzAbort) { afFuzzAbort.abort(); afFuzzAbort = null; }
+    document.getElementById('af-fuzz-status').textContent = 'Stopped by user';
+    document.getElementById('btn-af-fuzz-stop').style.display = 'none';
+    var btn = document.getElementById('btn-af-fuzz');
+    setLoading(btn, false);
+}
+
+function afAuthTypeChanged() {
+    var type = document.getElementById('af-auth-type').value;
+    var valGroup = document.getElementById('af-auth-value-group');
+    var hdrGroup = document.getElementById('af-auth-header-group');
+    var label = document.getElementById('af-auth-value-label');
+    if (type === 'none') {
+        valGroup.style.display = 'none';
+        hdrGroup.style.display = 'none';
+    } else if (type === 'bearer') {
+        valGroup.style.display = '';
+        hdrGroup.style.display = 'none';
+        label.textContent = 'Bearer Token';
+        document.getElementById('af-auth-value').placeholder = 'eyJhbGciOi...';
+    } else if (type === 'api_key') {
+        valGroup.style.display = '';
+        hdrGroup.style.display = '';
+        label.textContent = 'API Key Value';
+        document.getElementById('af-auth-value').placeholder = 'your-api-key';
+    } else if (type === 'basic') {
+        valGroup.style.display = '';
+        hdrGroup.style.display = 'none';
+        label.textContent = 'Credentials (user:pass)';
+        document.getElementById('af-auth-value').placeholder = 'admin:password';
+    }
+}
+
+/* ── GraphQL ── */
+function afGqlIntrospect() {
+    var url = document.getElementById('af-gql-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-gql-intro');
+    var output = document.getElementById('af-gql-output');
+    setLoading(btn, true);
+    output.style.display = 'block';
+    document.getElementById('af-gql-status').textContent = 'Running introspection query...';
+    postJSON('/api-fuzzer/graphql/introspect', {url: url, auth: afGetAuth()}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('af-gql-status').textContent = 'Error: ' + data.error;
+            output.textContent = data.error;
+            return;
+        }
+        document.getElementById('af-gql-status').textContent = 'Introspection complete — ' + (data.types || []).length + ' types found';
+        output.textContent = JSON.stringify(data.schema || data, null, 2);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afGqlDepthTest() {
+    var url = document.getElementById('af-gql-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-gql-depth');
+    var output = document.getElementById('af-gql-output');
+    setLoading(btn, true);
+    output.style.display = 'block';
+    document.getElementById('af-gql-status').textContent = 'Testing query depth limits...';
+    postJSON('/api-fuzzer/graphql/depth-test', {url: url, auth: afGetAuth()}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) {
+            document.getElementById('af-gql-status').textContent = 'Error: ' + data.error;
+            output.textContent = data.error;
+            return;
+        }
+        document.getElementById('af-gql-status').textContent = 'Depth test complete — max depth: ' + (data.max_depth || '?');
+        var lines = [];
+        (data.results || []).forEach(function(r) {
+            lines.push('Depth ' + r.depth + ': ' + (r.accepted ? 'ACCEPTED' : 'REJECTED') + ' (' + r.status + ')');
+        });
+        output.textContent = lines.join('\n') || JSON.stringify(data, null, 2);
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Results Tab ── */
+function afRenderFindings() {
+    var tbody = document.getElementById('af-findings-body');
+    if (!afFindings.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No findings yet.</td></tr>';
+        return;
+    }
+    var html = '';
+    afFindings.forEach(function(f) {
+        var sevCls = 'badge-low';
+        var sev = (f.severity || 'info').toLowerCase();
+        if (sev === 'critical' || sev === 'high') sevCls = 'badge-high';
+        else if (sev === 'medium') sevCls = 'badge-medium';
+        else if (sev === 'low') sevCls = 'badge-low';
+        html += '<tr>'
+            + '<td>' + esc(f.param || '—') + '</td>'
+            + '<td style="font-family:monospace;font-size:0.8rem;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.payload || '—') + '</td>'
+            + '<td>' + esc(f.type || '—') + '</td>'
+            + '<td><span class="badge ' + sevCls + '">' + esc(sev.toUpperCase()) + '</span></td>'
+            + '<td>' + esc(String(f.status || '—')) + '</td>'
+            + '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function afClearFindings() {
+    afFindings = [];
+    afRenderFindings();
+}
+
+function afExportFindings() {
+    var blob = new Blob([JSON.stringify(afFindings, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'api_fuzzer_findings.json';
+    a.click();
+}
+
+function afAuthBypassTest() {
+    var url = document.getElementById('af-fuzz-url').value.trim();
+    if (!url) {
+        renderOutput('af-authbypass-output', 'Set a target URL in the Fuzzer tab first.');
+        return;
+    }
+    var btn = document.getElementById('btn-af-authbypass');
+    setLoading(btn, true);
+    postJSON('/api-fuzzer/auth-bypass', {url: url, auth: afGetAuth()}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('af-authbypass-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        (data.results || []).forEach(function(r) {
+            lines.push('[' + (r.bypassed ? 'BYPASS' : 'BLOCKED') + '] ' + r.technique + ' -> HTTP ' + r.status);
+        });
+        renderOutput('af-authbypass-output', lines.join('\n') || 'No results.');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afRateLimitTest() {
+    var url = document.getElementById('af-ratelimit-url').value.trim();
+    var count = parseInt(document.getElementById('af-ratelimit-count').value) || 50;
+    if (!url) return;
+    var btn = document.getElementById('btn-af-ratelimit');
+    setLoading(btn, true);
+    renderOutput('af-ratelimit-output', 'Sending ' + count + ' requests...');
+    postJSON('/api-fuzzer/rate-limit', {url: url, count: count, auth: afGetAuth()}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('af-ratelimit-output', 'Error: ' + data.error); return; }
+        var lines = [
+            'Requests sent: ' + (data.total || count),
+            'Successful (2xx): ' + (data.success || 0),
+            'Rate limited (429): ' + (data.rate_limited || 0),
+            'Other errors: ' + (data.errors || 0),
+            'Rate limit detected: ' + (data.has_rate_limit ? 'YES' : 'NO'),
+        ];
+        if (data.limit_header) lines.push('Limit header: ' + data.limit_header);
+        if (data.avg_response_ms) lines.push('Avg response time: ' + data.avg_response_ms + ' ms');
+        renderOutput('af-ratelimit-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function afAnalyzeResponse() {
+    var url = document.getElementById('af-analyze-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-af-analyze');
+    setLoading(btn, true);
+    postJSON('/api-fuzzer/analyze', {url: url, auth: afGetAuth()}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('af-analyze-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        lines.push('=== Response Headers ===');
+        if (data.headers) {
+            Object.keys(data.headers).forEach(function(k) {
+                lines.push(k + ': ' + data.headers[k]);
+            });
+        }
+        lines.push('\n=== Security Headers ===');
+        (data.security_headers || []).forEach(function(h) {
+            lines.push((h.present ? '[OK] ' : '[MISSING] ') + h.name + (h.value ? ' = ' + h.value : ''));
+        });
+        if (data.cors) {
+            lines.push('\n=== CORS ===');
+            lines.push('Allow-Origin: ' + (data.cors.origin || 'not set'));
+            lines.push('Allow-Methods: ' + (data.cors.methods || 'not set'));
+            lines.push('Allow-Credentials: ' + (data.cors.credentials || 'not set'));
+        }
+        if (data.info_leak && data.info_leak.length) {
+            lines.push('\n=== Information Leakage ===');
+            data.info_leak.forEach(function(l) { lines.push('[!] ' + l); });
+        }
+        renderOutput('af-analyze-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+</script>
+{% endblock %}

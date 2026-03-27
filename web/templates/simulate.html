@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Attack Simulation - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Attack Simulation</h1>
+</div>
+
+<!-- Password Audit -->
+<div class="section">
+    <h2>Password Audit</h2>
+    <div class="input-row">
+        <input type="text" id="sim-password" placeholder="Enter password to test" autocomplete="off">
+        <button id="btn-password" class="btn btn-primary" onclick="auditPassword()">Analyze</button>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-top:12px">
+        <div class="score-display">
+            <div class="score-value" id="pw-score">--</div>
+            <div class="score-label" id="pw-strength">Score</div>
+        </div>
+        <div style="flex:1;min-width:250px">
+            <pre class="output-panel" id="password-output"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Port Scanner -->
+<div class="section">
+    <h2>Port Scanner</h2>
+    <div class="input-row">
+        <input type="text" id="scan-target" placeholder="Target IP or hostname">
+        <input type="text" id="scan-ports" placeholder="Port range (e.g., 1-1024)" value="1-1024" style="max-width:180px">
+        <button id="btn-portscan" class="btn btn-primary" onclick="scanPorts()">Scan</button>
+    </div>
+    <pre class="output-panel scrollable" id="portscan-output"></pre>
+</div>
+
+<!-- Banner Grabber -->
+<div class="section">
+    <h2>Banner Grabber</h2>
+    <div class="input-row">
+        <input type="text" id="banner-target" placeholder="Target IP or hostname">
+        <input type="number" id="banner-port" placeholder="Port" value="80" style="max-width:100px">
+        <button id="btn-banner" class="btn btn-primary" onclick="grabBanner()">Grab</button>
+    </div>
+    <pre class="output-panel scrollable" id="banner-output"></pre>
+</div>
+
+<!-- Payload Generator -->
+<div class="section">
+    <h2>Payload Generator</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">Generate test payloads for security testing</p>
+    <div class="input-row">
+        <select id="payload-type">
+            <option value="xss">XSS</option>
+            <option value="sqli">SQL Injection</option>
+            <option value="cmdi">Command Injection</option>
+            <option value="traversal">Path Traversal</option>
+            <option value="ssti">SSTI</option>
+        </select>
+        <button id="btn-payloads" class="btn btn-primary" onclick="generatePayloads()">Generate</button>
+    </div>
+    <div id="payload-list"></div>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Simulate Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

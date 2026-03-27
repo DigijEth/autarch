@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — RFID/NFC Tools{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>RFID/NFC Tools</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Proxmark3 interface for RFID/NFC scanning, cloning, and card management.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="rfid" data-tab="scan" onclick="showTab('rfid','scan')">Scan</button>
+    <button class="tab" data-tab-group="rfid" data-tab="clone" onclick="showTab('rfid','clone')">Clone</button>
+    <button class="tab" data-tab-group="rfid" data-tab="cards" onclick="showTab('rfid','cards')">Cards</button>
+</div>
+
+<!-- ==================== SCAN TAB ==================== -->
+<div class="tab-content active" data-tab-group="rfid" data-tab="scan">
+
+<div class="section">
+    <h2>Tools Status</h2>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+        <div class="stat-card">
+            <div class="stat-label">Proxmark3</div>
+            <div class="stat-value small">
+                <span class="status-dot" id="rfid-pm3-dot"></span>
+                <span id="rfid-pm3-status">Checking...</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">libnfc</div>
+            <div class="stat-value small">
+                <span class="status-dot" id="rfid-libnfc-dot"></span>
+                <span id="rfid-libnfc-status">Checking...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Scan for Cards</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-lf-search" class="btn btn-primary" onclick="rfidLFSearch()">LF Search (125kHz)</button>
+        <button id="btn-hf-search" class="btn btn-primary" onclick="rfidHFSearch()">HF Search (13.56MHz)</button>
+        <button id="btn-nfc-scan" class="btn btn-primary" onclick="rfidNFCScan()">NFC Scan</button>
+    </div>
+    <pre class="output-panel scrollable" id="rfid-scan-output" style="max-height:250px"></pre>
+</div>
+
+<div class="section">
+    <h2>Last Read Card</h2>
+    <table class="data-table" style="max-width:500px">
+        <tbody>
+            <tr><td>Type</td><td id="rfid-last-type">--</td></tr>
+            <tr><td>ID / UID</td><td id="rfid-last-id" style="font-family:monospace">--</td></tr>
+            <tr><td>Frequency</td><td id="rfid-last-freq">--</td></tr>
+            <tr><td>Technology</td><td id="rfid-last-tech">--</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== CLONE TAB ==================== -->
+<div class="tab-content" data-tab-group="rfid" data-tab="clone">
+
+<div class="section">
+    <h2>EM410x Clone</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Clone an EM410x LF card by writing a known card ID to a T55x7 blank.
+    </p>
+    <div class="input-row">
+        <input type="text" id="rfid-em-id" placeholder="Card ID (hex, e.g. 0102030405)" maxlength="10">
+        <button id="btn-em-clone" class="btn btn-primary" onclick="rfidEMClone()">Clone EM410x</button>
+    </div>
+    <pre class="output-panel" id="rfid-em-output" style="min-height:0"></pre>
+</div>
+
+<div class="section">
+    <h2>MIFARE Classic</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-mf-dump" class="btn btn-primary" onclick="rfidMFDump()">Dump MIFARE Card</button>
+    </div>
+    <pre class="output-panel" id="rfid-mf-dump-output" style="min-height:0"></pre>
+
+    <h3 style="margin-top:16px">Clone from Dump</h3>
+    <div class="input-row">
+        <input type="text" id="rfid-mf-dump-path" placeholder="Path to dump file (e.g. /tmp/card.mfd)">
+        <button id="btn-mf-clone" class="btn btn-primary" onclick="rfidMFClone()">Clone from Dump</button>
+    </div>
+    <pre class="output-panel" id="rfid-mf-clone-output" style="min-height:0"></pre>
+
+    <h3 style="margin-top:16px">Default Keys</h3>
+    <div class="output-panel" id="rfid-default-keys" style="font-family:monospace;font-size:0.8rem">
+        FFFFFFFFFFFF (factory default)<br>
+        A0A1A2A3A4A5 (MAD key)<br>
+        D3F7D3F7D3F7 (NFC NDEF)<br>
+        000000000000 (null key)<br>
+        B0B1B2B3B4B5 (common transport)<br>
+        4D3A99C351DD (Mifare Application Directory)
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== CARDS TAB ==================== -->
+<div class="tab-content" data-tab-group="rfid" data-tab="cards">
+
+<div class="section">
+    <h2>Saved Cards</h2>
+    <table class="data-table">
+        <thead><tr><th>Name</th><th>Type</th><th>ID / UID</th><th>Saved</th><th>Action</th></tr></thead>
+        <tbody id="rfid-cards-table">
+            <tr><td colspan="5" class="empty-state">No saved cards yet. Scan and save cards from the Scan tab.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Card Dumps</h2>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button class="btn btn-small" onclick="rfidRefreshDumps()">Refresh</button>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Filename</th><th>Size</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody id="rfid-dumps-table">
+            <tr><td colspan="4" class="empty-state">No dumps found.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<script>
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+/* ── Status ── */
+function rfidCheckStatus() {
+    fetchJSON('/rfid/status').then(function(data) {
+        var pm3Dot = document.getElementById('rfid-pm3-dot');
+        var pm3Txt = document.getElementById('rfid-pm3-status');
+        var nfcDot = document.getElementById('rfid-libnfc-dot');
+        var nfcTxt = document.getElementById('rfid-libnfc-status');
+        if (pm3Dot) pm3Dot.className = 'status-dot ' + (data.proxmark3 ? 'active' : 'inactive');
+        if (pm3Txt) pm3Txt.textContent = data.proxmark3 ? 'Connected' : 'Not found';
+        if (nfcDot) nfcDot.className = 'status-dot ' + (data.libnfc ? 'active' : 'inactive');
+        if (nfcTxt) nfcTxt.textContent = data.libnfc ? 'Available' : 'Not installed';
+    }).catch(function() {
+        document.getElementById('rfid-pm3-status').textContent = 'Error';
+        document.getElementById('rfid-libnfc-status').textContent = 'Error';
+    });
+}
+
+/* ── Scan ── */
+function rfidLFSearch() {
+    var btn = document.getElementById('btn-lf-search');
+    setLoading(btn, true);
+    postJSON('/rfid/scan', {mode: 'lf'}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('rfid-scan-output', 'Error: ' + data.error); return; }
+        renderOutput('rfid-scan-output', data.output || 'No card detected.');
+        if (data.card) rfidUpdateLastCard(data.card);
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function rfidHFSearch() {
+    var btn = document.getElementById('btn-hf-search');
+    setLoading(btn, true);
+    postJSON('/rfid/scan', {mode: 'hf'}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('rfid-scan-output', 'Error: ' + data.error); return; }
+        renderOutput('rfid-scan-output', data.output || 'No card detected.');
+        if (data.card) rfidUpdateLastCard(data.card);
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function rfidNFCScan() {
+    var btn = document.getElementById('btn-nfc-scan');
+    setLoading(btn, true);
+    postJSON('/rfid/scan', {mode: 'nfc'}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('rfid-scan-output', 'Error: ' + data.error); return; }
+        renderOutput('rfid-scan-output', data.output || 'No NFC tag detected.');
+        if (data.card) rfidUpdateLastCard(data.card);
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function rfidUpdateLastCard(card) {
+    document.getElementById('rfid-last-type').textContent = card.type || '--';
+    document.getElementById('rfid-last-id').textContent = card.id || '--';
+    document.getElementById('rfid-last-freq').textContent = card.frequency || '--';
+    document.getElementById('rfid-last-tech').textContent = card.technology || '--';
+}
+
+/* ── Clone ── */
+function rfidEMClone() {
+    var id = document.getElementById('rfid-em-id').value.trim();
+    if (!id) return;
+    var btn = document.getElementById('btn-em-clone');
+    setLoading(btn, true);
+    postJSON('/rfid/clone/em410x', {card_id: id}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('rfid-em-output', data.message || data.error || 'Done');
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function rfidMFDump() {
+    var btn = document.getElementById('btn-mf-dump');
+    setLoading(btn, true);
+    postJSON('/rfid/dump/mifare', {}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('rfid-mf-dump-output', data.output || data.error || 'No output');
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function rfidMFClone() {
+    var path = document.getElementById('rfid-mf-dump-path').value.trim();
+    if (!path) return;
+    var btn = document.getElementById('btn-mf-clone');
+    setLoading(btn, true);
+    postJSON('/rfid/clone/mifare', {dump_path: path}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('rfid-mf-clone-output', data.message || data.error || 'Done');
+        halAnalyze('RFID/NFC', JSON.stringify(data, null, 2), 'rfid', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Cards ── */
+function rfidLoadCards() {
+    fetchJSON('/rfid/cards').then(function(data) {
+        var tb = document.getElementById('rfid-cards-table');
+        if (!data.cards || !data.cards.length) {
+            tb.innerHTML = '<tr><td colspan="5" class="empty-state">No saved cards yet.</td></tr>';
+            return;
+        }
+        var html = '';
+        data.cards.forEach(function(c) {
+            html += '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.type) + '</td>'
+                + '<td style="font-family:monospace">' + esc(c.id) + '</td>'
+                + '<td>' + esc(c.saved_date) + '</td>'
+                + '<td><button class="btn btn-danger btn-small" onclick="rfidDeleteCard(\'' + esc(c.id) + '\')">Delete</button></td></tr>';
+        });
+        tb.innerHTML = html;
+    });
+}
+
+function rfidDeleteCard(id) {
+    if (!confirm('Delete this saved card?')) return;
+    postJSON('/rfid/cards/delete', {id: id}).then(function(data) {
+        if (data.success) rfidLoadCards();
+    });
+}
+
+function rfidRefreshDumps() {
+    fetchJSON('/rfid/dumps').then(function(data) {
+        var tb = document.getElementById('rfid-dumps-table');
+        if (!data.dumps || !data.dumps.length) {
+            tb.innerHTML = '<tr><td colspan="4" class="empty-state">No dumps found.</td></tr>';
+            return;
+        }
+        var html = '';
+        data.dumps.forEach(function(d) {
+            html += '<tr><td>' + esc(d.filename) + '</td><td>' + esc(d.size) + '</td>'
+                + '<td>' + esc(d.date) + '</td>'
+                + '<td><button class="btn btn-danger btn-small" onclick="rfidDeleteDump(\'' + esc(d.filename) + '\')">Delete</button></td></tr>';
+        });
+        tb.innerHTML = html;
+    });
+}
+
+function rfidDeleteDump(filename) {
+    if (!confirm('Delete dump file "' + filename + '"?')) return;
+    postJSON('/rfid/dumps/delete', {filename: filename}).then(function(data) {
+        if (data.success) rfidRefreshDumps();
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    rfidCheckStatus();
+    rfidLoadCards();
+    rfidRefreshDumps();
+});
+</script>
+{% endblock %}

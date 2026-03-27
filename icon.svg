@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Neon cyan glow -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <!-- Heavy outer glow -->
+    <filter id="glowHeavy">
+      <feGaussianBlur stdDeviation="12" result="blur1"/>
+      <feGaussianBlur stdDeviation="24" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Scanlines pattern -->
+    <pattern id="scanlines" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="rgba(0,255,255,0.03)"/>
+      <rect y="2" width="4" height="2" fill="rgba(0,0,0,0.15)"/>
+    </pattern>
+    <!-- Grid pattern -->
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(0,255,255,0.06)" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="512" height="512" fill="#05080f"/>
+  <!-- Grid overlay -->
+  <rect width="512" height="512" fill="url(#grid)"/>
+
+  <!-- Faint radial ambiance -->
+  <circle cx="256" cy="256" r="240" fill="none" stroke="rgba(255,0,80,0.04)" stroke-width="180"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(0,255,255,0.03)" stroke-width="120"/>
+
+  <!-- Glitch offset layers (red/blue chromatic aberration) -->
+  <g opacity="0.35">
+    <!-- Red offset -->
+    <circle cx="259" cy="254" r="200" fill="none" stroke="#ff0040" stroke-width="20"/>
+    <line x1="259" y1="54" x2="123" y2="428" stroke="#ff0040" stroke-width="20" stroke-linecap="round"/>
+    <line x1="259" y1="54" x2="395" y2="428" stroke="#ff0040" stroke-width="20" stroke-linecap="round"/>
+    <line x1="103" y1="318" x2="415" y2="318" stroke="#ff0040" stroke-width="20" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.35">
+    <!-- Blue offset -->
+    <circle cx="253" cy="258" r="200" fill="none" stroke="#00d4ff" stroke-width="20"/>
+    <line x1="253" y1="58" x2="117" y2="432" stroke="#00d4ff" stroke-width="20" stroke-linecap="round"/>
+    <line x1="253" y1="58" x2="389" y2="432" stroke="#00d4ff" stroke-width="20" stroke-linecap="round"/>
+    <line x1="97" y1="322" x2="409" y2="322" stroke="#00d4ff" stroke-width="20" stroke-linecap="round"/>
+  </g>
+
+  <!-- Main symbol with neon glow -->
+  <g filter="url(#glowHeavy)">
+    <circle cx="256" cy="256" r="200" fill="none" stroke="#00ffcc" stroke-width="18"/>
+    <line x1="256" y1="56" x2="120" y2="430" stroke="#00ffcc" stroke-width="18" stroke-linecap="round"/>
+    <line x1="256" y1="56" x2="392" y2="430" stroke="#00ffcc" stroke-width="18" stroke-linecap="round"/>
+    <line x1="100" y1="320" x2="412" y2="320" stroke="#00ffcc" stroke-width="18" stroke-linecap="round"/>
+  </g>
+
+  <!-- Bright core layer -->
+  <g filter="url(#glow)">
+    <circle cx="256" cy="256" r="200" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.6"/>
+    <line x1="256" y1="56" x2="120" y2="430" stroke="#ffffff" stroke-width="4" opacity="0.6" stroke-linecap="round"/>
+    <line x1="256" y1="56" x2="392" y2="430" stroke="#ffffff" stroke-width="4" opacity="0.6" stroke-linecap="round"/>
+    <line x1="100" y1="320" x2="412" y2="320" stroke="#ffffff" stroke-width="4" opacity="0.6" stroke-linecap="round"/>
+  </g>
+
+  <!-- Glitch bars -->
+  <rect x="0" y="170" width="512" height="3" fill="#00ffcc" opacity="0.15"/>
+  <rect x="0" y="340" width="512" height="2" fill="#ff0040" opacity="0.12"/>
+  <rect x="0" y="405" width="512" height="1.5" fill="#00ffcc" opacity="0.1"/>
+  <rect x="180" y="168" width="90" height="6" fill="#05080f" opacity="0.8"/>
+  <rect x="300" y="338" width="60" height="5" fill="#05080f" opacity="0.8"/>
+
+  <!-- Scanlines overlay -->
+  <rect width="512" height="512" fill="url(#scanlines)"/>
+
+  <!-- Corner accents -->
+  <g stroke="#00ffcc" stroke-width="2" opacity="0.4">
+    <polyline points="10,40 10,10 40,10" fill="none"/>
+    <polyline points="472,10 502,10 502,40" fill="none"/>
+    <polyline points="10,472 10,502 40,502" fill="none"/>
+    <polyline points="472,502 502,502 502,472" fill="none"/>
+  </g>
+</svg>

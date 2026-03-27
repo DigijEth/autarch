@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+{% block title %}Dependencies - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>System Dependencies</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Check and install Python packages required by AUTARCH modules.
+        </p>
+    </div>
+</div>
+
+<!-- System Info -->
+<div class="section" id="sys-info-section" style="display:none">
+    <h2>System Info</h2>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="stat-card">
+            <div class="stat-label">Python</div>
+            <div class="stat-value small" id="sys-python">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Platform</div>
+            <div class="stat-value small" id="sys-platform">--</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">CUDA GPU</div>
+            <div class="stat-value small" id="sys-gpu">--</div>
+        </div>
+    </div>
+</div>
+
+<!-- Dependency Groups -->
+<div class="section">
+    <div class="tool-actions">
+        <button id="btn-check-all" class="btn btn-primary" onclick="depsCheckAll()">Check All Dependencies</button>
+        <span id="deps-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+
+    <div id="deps-groups" style="margin-top:16px">
+        <p class="empty-state">Click "Check All Dependencies" to scan installed packages.</p>
+    </div>
+</div>
+
+<!-- System (non-Python) Dependencies -->
+<div class="section">
+    <h2>System Dependencies</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        These tools must be installed separately — AUTARCH cannot install them for you.
+    </p>
+    <div id="sys-deps-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0.75rem;font-size:0.82rem">
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Nmap</strong>
+                <span id="dep-nmap" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Network scanner used by OSINT, port scanning, and IDS modules.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install nmap</code><br>
+                <strong>Windows:</strong> <a href="https://nmap.org/download.html" target="_blank" rel="noopener">nmap.org/download</a><br>
+                <strong>macOS:</strong> <code>brew install nmap</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Wireshark / tshark</strong>
+                <span id="dep-tshark" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Packet capture and protocol analysis.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install tshark wireshark</code><br>
+                <strong>Windows:</strong> <a href="https://www.wireshark.org/download.html" target="_blank" rel="noopener">wireshark.org/download</a> (includes Npcap)<br>
+                <strong>macOS:</strong> <code>brew install wireshark</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>tcpdump</strong>
+                <span id="dep-tcpdump" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Low-level packet capture used by MCP tools and network module.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install tcpdump</code><br>
+                <strong>Windows:</strong> Included with Npcap/Wireshark<br>
+                <strong>macOS:</strong> Pre-installed
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Metasploit Framework</strong>
+                <span id="dep-msfconsole" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Penetration testing framework for offense modules.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <a href="https://docs.metasploit.com/docs/using-metasploit/getting-started/nightly-installers.html" target="_blank" rel="noopener">Metasploit nightly installer</a><br>
+                <strong>Windows:</strong> <a href="https://www.metasploit.com/download" target="_blank" rel="noopener">metasploit.com/download</a>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>WireGuard</strong>
+                <span id="dep-wg" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">VPN tunnel management.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install wireguard wireguard-tools</code><br>
+                <strong>Windows:</strong> <a href="https://www.wireguard.com/install/" target="_blank" rel="noopener">wireguard.com/install</a><br>
+                <strong>macOS:</strong> <code>brew install wireguard-tools</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Node.js / npm</strong>
+                <span id="dep-node" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Required for building WebUSB hardware bundles (ADB, Fastboot, ESP32).</div>
+            <div style="font-size:0.72rem">
+                <strong>All platforms:</strong> <a href="https://nodejs.org/en/download" target="_blank" rel="noopener">nodejs.org/download</a><br>
+                <strong>Linux:</strong> <code>sudo apt install nodejs npm</code><br>
+                <strong>macOS:</strong> <code>brew install node</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Go</strong>
+                <span id="dep-go" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Required for the DNS server and Setec Manager services.</div>
+            <div style="font-size:0.72rem">
+                <strong>All platforms:</strong> <a href="https://go.dev/dl/" target="_blank" rel="noopener">go.dev/dl</a><br>
+                <strong>Linux:</strong> <code>sudo apt install golang-go</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>ADB / Fastboot</strong>
+                <span id="dep-adb" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Android device management. Bundled in android/ for Linux ARM64.</div>
+            <div style="font-size:0.72rem">
+                <strong>All platforms:</strong> <a href="https://developer.android.com/tools/releases/platform-tools" target="_blank" rel="noopener">Android Platform Tools</a><br>
+                <strong>Linux:</strong> <code>sudo apt install android-tools-adb</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>miniupnpc</strong>
+                <span id="dep-upnpc" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">UPnP port forwarding client.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install miniupnpc</code><br>
+                <strong>macOS:</strong> <code>brew install miniupnpc</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>whois</strong>
+                <span id="dep-whois" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Domain/IP registration lookups for OSINT and MCP.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install whois</code><br>
+                <strong>macOS:</strong> Pre-installed
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>aircrack-ng</strong>
+                <span id="dep-aircrack" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">WiFi auditing, deauth attacks, handshake capture.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install aircrack-ng</code><br>
+                <strong>Website:</strong> <a href="https://www.aircrack-ng.org/" target="_blank" rel="noopener">aircrack-ng.org</a>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>mdk3 / mdk4</strong>
+                <span id="dep-mdk4" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Advanced WiFi deauthentication and beacon flooding. Used by the Deauth Attack module.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install mdk4</code><br>
+                <strong>Note:</strong> mdk3 is legacy; mdk4 is the maintained fork.
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>sslstrip</strong>
+                <span id="dep-sslstrip" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">HTTPS downgrade tool for MITM testing. Used by the Pineapple module.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>pip install sslstrip</code> or <code>sudo apt install sslstrip</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>Monitor Mode WiFi Adapter</strong>
+                <span id="dep-monitor" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">—</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Required for WiFi Audit, Deauth, and Pineapple. The built-in Pi WiFi does NOT support monitor mode. You need a USB adapter.</div>
+            <div style="font-size:0.72rem">
+                <strong>Recommended:</strong> Alfa AWUS036ACH (dual-band, widely supported)<br>
+                <strong>Budget:</strong> Alfa AWUS036NHA (2.4GHz only, ~$20)<br>
+                <strong>Check yours:</strong> <code>iw phy | grep -A5 "Supported interface modes"</code> — look for "monitor"
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>PyTorch (GPU)</strong>
+                <span id="dep-torch" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Required for local Transformers models and LoRA training. Install the correct version for your GPU.</div>
+            <div style="font-size:0.72rem">
+                <strong>All platforms:</strong> <a href="https://pytorch.org/get-started/locally/" target="_blank" rel="noopener">pytorch.org/get-started</a><br>
+                <strong>CPU only:</strong> <code>pip install torch --index-url https://download.pytorch.org/whl/cpu</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>iw / wireless-tools</strong>
+                <span id="dep-iw" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">WiFi interface management for scanning, monitor mode, and channel control.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install iw wireless-tools</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>NetworkManager (nmcli)</strong>
+                <span id="dep-nmcli" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">WiFi scanning and connection management. Used by Network Security WiFi Scanner.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install network-manager</code> (usually pre-installed)
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>hostapd</strong>
+                <span id="dep-hostapd" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Access point daemon for Pineapple/Evil Twin and rogue AP pentesting.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install hostapd</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>dnsmasq</strong>
+                <span id="dep-dnsmasq" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">DHCP/DNS server for captive portals and rogue AP pentesting.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install dnsmasq</code>
+            </div>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;background:var(--bg-card)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem">
+                <strong>nftables / iptables</strong>
+                <span id="dep-nft" style="font-size:0.72rem;padding:2px 6px;border-radius:3px;background:var(--bg-main)">checking…</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:0.75rem;margin-bottom:0.4rem">Firewall and packet filtering. Used by Network Security IP blocking and NAT.</div>
+            <div style="font-size:0.72rem">
+                <strong>Linux:</strong> <code>sudo apt install nftables</code> (usually pre-installed)
+            </div>
+        </div>
+
+    </div>
+    <button class="btn btn-sm" onclick="checkSystemDeps()" style="margin-top:0.75rem" id="btn-sys-check">Check System Tools</button>
+</div>
+
+<!-- Quick Install -->
+<div class="section">
+    <h2>Python Packages</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Install individual packages or preset groups.
+    </p>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group" style="flex:2">
+            <div class="input-row">
+                <input type="text" id="install-pkg" placeholder="Package name (e.g., scapy, torch, peft)">
+                <button class="btn btn-primary btn-small" onclick="depsInstallOne()">Install</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-small" onclick="depsInstallGroup('core')">Install Core</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('llm')">Install LLM</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('training')">Install Training</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('network')">Install Network</button>
+        <button class="btn btn-small" onclick="depsInstallGroup('hardware')">Install Hardware</button>
+    </div>
+
+    <pre class="output-panel" id="install-result" style="margin-top:12px;min-height:0;display:none"></pre>
+</div>
+
+<script>
+var _depsGroupPkgs = {
+    core: ['flask', 'jinja2', 'requests', 'cryptography'],
+    llm: ['llama-cpp-python', 'transformers', 'anthropic'],
+    training: ['torch', 'peft', 'datasets', 'trl', 'accelerate', 'bitsandbytes'],
+    network: ['scapy', 'pyshark', 'miniupnpc', 'msgpack', 'paramiko'],
+    hardware: ['pyserial', 'esptool', 'adb-shell'],
+};
+
+var _depsGroupLabels = {
+    core: 'Core Framework',
+    llm: 'LLM Inference',
+    training: 'LLM Training (LoRA)',
+    network: 'Network & Packet Capture',
+    hardware: 'Hardware & Serial',
+};
+
+function depsCheckAll() {
+    var btn = document.getElementById('btn-check-all');
+    setLoading(btn, true);
+    document.getElementById('deps-status').textContent = 'Scanning...';
+    postJSON('/settings/deps/check', {}).then(function(data) {
+        setLoading(btn, false);
+        document.getElementById('deps-status').textContent = '';
+
+        // System info
+        if (data.python) {
+            document.getElementById('sys-python').textContent = data.python.version || '--';
+            document.getElementById('sys-platform').textContent = data.python.platform || '--';
+            document.getElementById('sys-info-section').style.display = '';
+        }
+        if (data.gpu) {
+            document.getElementById('sys-gpu').textContent = data.gpu.cuda_available
+                ? (data.gpu.device || 'Available') + ' (CUDA ' + (data.gpu.cuda_version || '') + ')'
+                : 'Not available';
+            document.getElementById('sys-gpu').style.color = data.gpu.cuda_available ? 'var(--success)' : 'var(--text-muted)';
+        }
+
+        // Render groups
+        var html = '';
+        var groupOrder = ['core', 'llm', 'training', 'network', 'hardware'];
+        groupOrder.forEach(function(group) {
+            var pkgs = data[group];
+            if (!pkgs) return;
+            var installed = 0, total = 0;
+            for (var k in pkgs) { total++; if (pkgs[k].installed) installed++; }
+
+            var statusColor = installed === total ? 'var(--success)' : installed > 0 ? 'var(--warning)' : 'var(--danger)';
+            html += '<div style="margin-bottom:16px">';
+            html += '<h3 style="margin-bottom:6px">' + (_depsGroupLabels[group] || group)
+                + ' <span style="font-size:0.75rem;font-weight:normal;color:' + statusColor + '">'
+                + installed + '/' + total + ' installed</span></h3>';
+            html += '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+                + '<th>Package</th><th>Status</th><th>Version</th><th>Action</th></tr></thead><tbody>';
+            for (var name in pkgs) {
+                var info = pkgs[name];
+                html += '<tr><td>' + escapeHtml(name) + '</td>'
+                    + '<td><span class="status-dot ' + (info.installed ? 'active' : 'inactive') + '"></span>'
+                    + (info.installed ? 'Installed' : 'Missing') + '</td>'
+                    + '<td>' + (info.version || '—') + '</td>'
+                    + '<td>' + (info.installed ? '' : '<button class="btn btn-small" style="font-size:0.65rem;padding:2px 6px" '
+                    + 'onclick="depsInstallPkg(\'' + escapeHtml(name) + '\',this)">Install</button>') + '</td></tr>';
+            }
+            html += '</tbody></table></div>';
+        });
+
+        document.getElementById('deps-groups').innerHTML = html;
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('deps-status').textContent = 'Error checking dependencies';
+    });
+}
+
+function depsInstallPkg(pkg, btn) {
+    if (btn) setLoading(btn, true);
+    var out = document.getElementById('install-result');
+    out.style.display = '';
+    renderOutput('install-result', 'Installing ' + pkg + '...');
+    postJSON('/settings/deps/install', {packages: [pkg]}).then(function(data) {
+        if (btn) setLoading(btn, false);
+        var results = data.results || [];
+        var lines = results.map(function(r) {
+            return r.package + ': ' + (r.success ? 'OK' : 'FAILED — ' + r.output);
+        });
+        renderOutput('install-result', lines.join('\n'));
+        // Refresh deps list
+        depsCheckAll();
+    }).catch(function() { if (btn) setLoading(btn, false); });
+}
+
+function depsInstallOne() {
+    var pkg = document.getElementById('install-pkg').value.trim();
+    if (!pkg) return;
+    depsInstallPkg(pkg, null);
+    document.getElementById('install-pkg').value = '';
+}
+
+function checkSystemDeps() {
+    var btn = document.getElementById('btn-sys-check');
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+    fetch('/settings/deps/system-check', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Check System Tools'; }
+            if (!d.ok) return;
+            var tools = d.tools || {};
+            for (var name in tools) {
+                var el = document.getElementById('dep-' + name);
+                if (!el) continue;
+                var info = tools[name];
+                if (info.found) {
+                    el.textContent = info.version || 'installed';
+                    el.style.color = 'var(--success, #34c759)';
+                    el.style.borderColor = 'var(--success, #34c759)';
+                    el.style.border = '1px solid var(--success, #34c759)';
+                } else {
+                    el.textContent = 'not found';
+                    el.style.color = 'var(--danger, #ff3b30)';
+                    el.style.border = '1px solid var(--danger, #ff3b30)';
+                }
+            }
+        })
+        .catch(function() { if (btn) { btn.disabled = false; btn.textContent = 'Check System Tools'; } });
+}
+
+// Auto-check system deps on page load
+document.addEventListener('DOMContentLoaded', function() { checkSystemDeps(); });
+
+function depsInstallGroup(group) {
+    var pkgs = _depsGroupPkgs[group];
+    if (!pkgs || !pkgs.length) return;
+    var out = document.getElementById('install-result');
+    out.style.display = '';
+    renderOutput('install-result', 'Installing ' + (_depsGroupLabels[group] || group) + ' packages: ' + pkgs.join(', ') + '...');
+    postJSON('/settings/deps/install', {packages: pkgs}).then(function(data) {
+        var results = data.results || [];
+        var lines = results.map(function(r) {
+            return r.package + ': ' + (r.success ? 'OK' : 'FAILED — ' + r.output);
+        });
+        renderOutput('install-result', lines.join('\n'));
+        depsCheckAll();
+    });
+}
+</script>
+{% endblock %}

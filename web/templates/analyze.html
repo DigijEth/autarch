@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Analysis & Forensics - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analysis & Forensics</h1>
+</div>
+
+<!-- File Analysis -->
+<div class="section">
+    <h2>File Analysis</h2>
+    <div class="input-row">
+        <input type="text" id="analyze-filepath" placeholder="File path (e.g., /usr/bin/ls)">
+        <button id="btn-analyze-file" class="btn btn-primary" onclick="analyzeFile()">Analyze</button>
+    </div>
+    <pre class="output-panel scrollable" id="file-output"></pre>
+</div>
+
+<!-- String Extraction -->
+<div class="section">
+    <h2>String Extraction</h2>
+    <div class="input-row">
+        <input type="text" id="strings-filepath" placeholder="File path">
+        <input type="number" id="strings-minlen" value="4" min="2" max="20" style="max-width:80px" title="Min string length">
+        <button id="btn-strings" class="btn btn-primary" onclick="extractStrings()">Extract</button>
+    </div>
+    <pre class="output-panel scrollable" id="strings-output"></pre>
+</div>
+
+<!-- Hash Lookup -->
+<div class="section">
+    <h2>Hash Lookup</h2>
+    <div class="input-row">
+        <input type="text" id="hash-input" placeholder="MD5, SHA1, or SHA256 hash">
+        <button class="btn btn-primary" onclick="hashLookup()">Lookup</button>
+    </div>
+    <pre class="output-panel" id="hash-output"></pre>
+</div>
+
+<!-- Log Analysis -->
+<div class="section">
+    <h2>Log Analysis</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">Common logs: /var/log/auth.log, /var/log/syslog, /var/log/apache2/access.log</p>
+    <div class="input-row">
+        <input type="text" id="log-filepath" placeholder="Log file path">
+        <button id="btn-analyze-log" class="btn btn-primary" onclick="analyzeLog()">Analyze</button>
+    </div>
+    <pre class="output-panel scrollable" id="log-analyze-output"></pre>
+</div>
+
+<!-- Hex Dump -->
+<div class="section">
+    <h2>Hex Dump</h2>
+    <div class="input-row">
+        <input type="text" id="hex-filepath" placeholder="File path">
+        <input type="number" id="hex-offset" value="0" min="0" style="max-width:100px" title="Offset">
+        <input type="number" id="hex-length" value="256" min="1" max="4096" style="max-width:100px" title="Length">
+        <button id="btn-hex" class="btn btn-primary" onclick="hexDump()">Dump</button>
+    </div>
+    <pre class="output-panel scrollable" id="hex-output"></pre>
+</div>
+
+<!-- File Compare -->
+<div class="section">
+    <h2>File Compare</h2>
+    <div class="input-row">
+        <input type="text" id="compare-file1" placeholder="File 1 path">
+        <input type="text" id="compare-file2" placeholder="File 2 path">
+        <button id="btn-compare" class="btn btn-primary" onclick="compareFiles()">Compare</button>
+    </div>
+    <pre class="output-panel scrollable" id="compare-output"></pre>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Analyze Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

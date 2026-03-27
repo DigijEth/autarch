@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Legendary Creator - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Legendary Creator</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Generate deeply detailed synthetic personas for testing, simulation, and red-team social engineering drills.
+        </p>
+    </div>
+    <a href="{{ url_for('simulate.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Simulate</a>
+</div>
+
+<!-- Seed Parameters -->
+<div class="section">
+    <h2>Legend Seeds <span style="font-size:0.78rem;font-weight:400;color:var(--text-secondary)">(all optional — leave blank for fully random)</span></h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem 1rem">
+
+        <div class="form-group">
+            <label for="seed-gender">Gender</label>
+            <select id="seed-gender">
+                <option value="">Random</option>
+                <option>Male</option>
+                <option>Female</option>
+                <option>Non-binary</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="seed-nationality">Nationality / Country</label>
+            <input type="text" id="seed-nationality" placeholder="e.g. American, British, Korean">
+        </div>
+
+        <div class="form-group">
+            <label for="seed-ethnicity">Ethnicity</label>
+            <input type="text" id="seed-ethnicity" placeholder="e.g. Hispanic, White, Japanese-American">
+        </div>
+
+        <div class="form-group">
+            <label for="seed-age">Age or Range</label>
+            <input type="text" id="seed-age" placeholder="e.g. 28, or 25–35">
+        </div>
+
+        <div class="form-group">
+            <label for="seed-profession">Profession / Industry</label>
+            <input type="text" id="seed-profession" placeholder="e.g. Software engineer, Nurse, Teacher">
+        </div>
+
+        <div class="form-group">
+            <label for="seed-city">City / Region</label>
+            <input type="text" id="seed-city" placeholder="e.g. Austin TX, Pacific Northwest">
+        </div>
+
+        <div class="form-group">
+            <label for="seed-education">Education Level</label>
+            <select id="seed-education">
+                <option value="">Random</option>
+                <option>High school diploma</option>
+                <option>Some college</option>
+                <option>Associate's degree</option>
+                <option>Bachelor's degree</option>
+                <option>Master's degree</option>
+                <option>PhD / Doctorate</option>
+                <option>Trade / vocational</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="seed-interests">Interests / Hobbies</label>
+            <input type="text" id="seed-interests" placeholder="e.g. hiking, photography, gaming">
+        </div>
+
+    </div>
+
+    <div class="form-group" style="margin-top:0.25rem">
+        <label for="seed-notes">Additional Notes / Constraints</label>
+        <input type="text" id="seed-notes"
+               placeholder="e.g. Has a dog, grew up in a small town, is introverted, recently divorced">
+    </div>
+
+    <div style="display:flex;gap:0.75rem;align-items:center;margin-top:1rem;flex-wrap:wrap">
+        <button id="btn-generate" class="btn btn-primary" onclick="generateLegend()">
+            &#x25B6; Generate Legend
+        </button>
+        <button class="btn btn-sm" onclick="clearSeeds()">Clear Seeds</button>
+        <span id="gen-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+    </div>
+</div>
+
+<!-- Output -->
+<div class="section" id="output-section" style="display:none">
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem">
+        <h2 style="margin:0">Generated Legend</h2>
+        <div style="margin-left:auto;display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="copyLegend()">Copy Text</button>
+            <button class="btn btn-sm" onclick="exportLegend()">Export .txt</button>
+            <button class="btn btn-sm" onclick="generateLegend()">Regenerate</button>
+        </div>
+    </div>
+
+    <!-- Streaming raw output (hidden, used as source for copy/export) -->
+    <pre id="legend-raw" style="display:none"></pre>
+
+    <!-- Rendered display -->
+    <div id="legend-display" style="
+        font-family: var(--font-mono, monospace);
+        font-size: 0.83rem;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.25rem 1.5rem;
+        max-height: 72vh;
+        overflow-y: auto;
+        color: var(--text-primary);
+    "></div>
+</div>
+
+<style>
+/* Section headings inside the legend output */
+#legend-display .leg-section {
+    color: var(--simulate, #f59e0b);
+    font-weight: 700;
+    font-size: 0.88rem;
+    letter-spacing: 0.04em;
+    margin-top: 1.25em;
+    display: block;
+}
+#legend-display .leg-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+#legend-display .leg-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 1em;
+    background: var(--accent);
+    animation: blink 0.9s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 1px;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+</style>
+
+<script>
+var _legendText = '';
+var _legendDone  = false;
+var _legendReader = null;
+
+function generateLegend() {
+    var status = document.getElementById('gen-status');
+    var btn    = document.getElementById('btn-generate');
+    var sec    = document.getElementById('output-section');
+    var disp   = document.getElementById('legend-display');
+    var raw    = document.getElementById('legend-raw');
+
+    // Abort previous stream if any
+    if (_legendReader) { try { _legendReader.cancel(); } catch(e){} _legendReader = null; }
+
+    _legendText = '';
+    _legendDone = false;
+    disp.innerHTML = '<span class="leg-cursor"></span>';
+    raw.textContent = '';
+    sec.style.display = '';
+    btn.disabled = true;
+    status.textContent = 'Generating…';
+
+    var seeds = {
+        gender:      document.getElementById('seed-gender').value,
+        nationality: document.getElementById('seed-nationality').value,
+        ethnicity:   document.getElementById('seed-ethnicity').value,
+        age:         document.getElementById('seed-age').value,
+        profession:  document.getElementById('seed-profession').value,
+        city:        document.getElementById('seed-city').value,
+        education:   document.getElementById('seed-education').value,
+        interests:   document.getElementById('seed-interests').value,
+        notes:       document.getElementById('seed-notes').value,
+    };
+
+    fetch('/simulate/legendary/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(seeds)
+    }).then(function(res) {
+        if (!res.ok) { finishGen('HTTP ' + res.status, true); return; }
+        _legendReader = res.body.getReader();
+        var dec = new TextDecoder();
+        var buf = '';
+
+        function pump() {
+            _legendReader.read().then(function(chunk) {
+                if (chunk.done) { finishGen(''); return; }
+                buf += dec.decode(chunk.value, {stream: true});
+                var parts = buf.split('\n\n');
+                buf = parts.pop();
+                parts.forEach(function(part) {
+                    var line = part.replace(/^data:\s*/, '').trim();
+                    if (!line) return;
+                    try {
+                        var d = JSON.parse(line);
+                        if (d.error) { finishGen('Error: ' + d.error, true); return; }
+                        if (d.token) { appendToken(d.token); }
+                        if (d.done)  { finishGen('Done.'); }
+                    } catch(e) {}
+                });
+                pump();
+            }).catch(function(e) { finishGen('Stream error: ' + e.message, true); });
+        }
+        pump();
+    }).catch(function(e) { finishGen('Request failed: ' + e.message, true); });
+}
+
+function appendToken(token) {
+    _legendText += token;
+    renderLegend(_legendText, false);
+}
+
+function finishGen(msg, isErr) {
+    _legendDone = true;
+    _legendReader = null;
+    document.getElementById('btn-generate').disabled = false;
+    document.getElementById('gen-status').textContent = msg || '';
+    document.getElementById('legend-raw').textContent = _legendText;
+    renderLegend(_legendText, true);
+}
+
+/* Render the accumulated text into the display div with light formatting */
+function renderLegend(text, done) {
+    var disp = document.getElementById('legend-display');
+
+    // Convert ## SECTION headings to highlighted spans, bold KEY: labels
+    var html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        // ## SECTION header
+        .replace(/^(## .+)$/gm, '<span class="leg-section">$1</span>')
+        // Bold "Key Label:" at start of line or after whitespace
+        .replace(/^([A-Za-z][A-Za-z /&'-]+:)(?= )/gm, '<span class="leg-label">$1</span>');
+
+    disp.innerHTML = html + (done ? '' : '<span class="leg-cursor"></span>');
+    disp.scrollTop = disp.scrollHeight;
+}
+
+function copyLegend() {
+    if (!_legendText) return;
+    navigator.clipboard.writeText(_legendText).then(function() {
+        var btn = event.target;
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy Text'; }, 1500);
+    });
+}
+
+function exportLegend() {
+    if (!_legendText) return;
+    var blob = new Blob([_legendText], {type: 'text/plain'});
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'legend_' + Date.now() + '.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function clearSeeds() {
+    ['seed-nationality','seed-ethnicity','seed-age','seed-profession',
+     'seed-city','seed-interests','seed-notes'].forEach(function(id) {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('seed-gender').value    = '';
+    document.getElementById('seed-education').value = '';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+{% block title %}Offense - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Offense</h1>
+</div>
+
+<!-- MSF Server Control -->
+<div class="section">
+    <h2>Metasploit Server</h2>
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <div class="status-indicator" id="msf-status">
+            <span class="status-dot inactive"></span>Checking...
+        </div>
+        <div id="msf-version" style="font-size:0.8rem;color:var(--text-muted)"></div>
+        <div style="flex:1"></div>
+        <button id="btn-connect" class="btn btn-primary btn-small" onclick="msfConnect()" style="display:none">Connect</button>
+        <button id="btn-disconnect" class="btn btn-small" onclick="msfDisconnect()" style="display:none">Disconnect</button>
+        <button id="btn-start-server" class="btn btn-small" onclick="toggleServerPanel()" style="display:none">Start Server</button>
+        <button id="btn-stop-server" class="btn btn-danger btn-small" onclick="msfStopServer()" style="display:none">Stop Server</button>
+    </div>
+
+    <!-- Server config panel (hidden by default) -->
+    <div id="server-panel" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--surface);border:1px solid var(--border);border-radius:6px">
+        <div style="display:grid;grid-template-columns:1fr 80px 1fr 1fr;gap:0.5rem;align-items:end">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="msf-host">Host</label>
+                <input type="text" id="msf-host" value="127.0.0.1">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="msf-port">Port</label>
+                <input type="text" id="msf-port" value="55553">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="msf-user">Username</label>
+                <input type="text" id="msf-user" value="msf">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="msf-pass">Password</label>
+                <input type="password" id="msf-pass" placeholder="required">
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+            <label style="font-size:0.85rem;display:flex;align-items:center;gap:0.3rem;cursor:pointer">
+                <input type="checkbox" id="msf-ssl" checked> SSL
+            </label>
+            <div style="flex:1"></div>
+            <button class="btn btn-small" onclick="msfSaveSettings()">Save Settings</button>
+            <button class="btn btn-primary btn-small" onclick="msfStartServer()">Start &amp; Connect</button>
+            <button class="btn btn-small" onclick="msfConnectOnly()">Connect Only</button>
+        </div>
+        <div id="server-msg" style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem"></div>
+    </div>
+</div>
+
+<!-- Module Search -->
+<div class="section">
+    <h2>Module Search</h2>
+    <div class="input-row">
+        <input type="text" id="msf-search" placeholder="Search modules (e.g., eternalblue, smb, ssh)" onkeypress="if(event.key==='Enter')searchMSFModules()">
+        <button id="btn-msf-search" class="btn btn-primary" onclick="searchMSFModules()">Search</button>
+    </div>
+    <div id="msf-search-results" class="results-stream" style="max-height:400px;overflow-y:auto">
+        <div class="empty-state">Search the offline module library or connected MSF instance.</div>
+    </div>
+</div>
+
+<!-- Run Module -->
+<div class="section">
+    <h2>Run Module</h2>
+    <div class="tab-bar">
+        <button class="tab active" data-tab-group="run-tabs" data-tab="ssh"      onclick="showTab('run-tabs','ssh')">SSH</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="portscan"  onclick="showTab('run-tabs','portscan')">Port Scan</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="osdetect"  onclick="showTab('run-tabs','osdetect')">OS Detect</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="vuln"      onclick="showTab('run-tabs','vuln')">Vuln Scan</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="smb"       onclick="showTab('run-tabs','smb')">SMB</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="http"      onclick="showTab('run-tabs','http')">HTTP</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="exploit"   onclick="showTab('run-tabs','exploit')">Exploit</button>
+        <button class="tab"        data-tab-group="run-tabs" data-tab="custom"    onclick="showTab('run-tabs','custom')">Custom</button>
+    </div>
+
+    <!-- SSH tab -->
+    <div class="tab-content active" data-tab-group="run-tabs" data-tab="ssh">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ssh-rhosts">Target(s)</label>
+                <input type="text" id="ssh-rhosts" placeholder="192.168.1.0/24 or 10.0.0.5">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ssh-rport">Port</label>
+                <input type="text" id="ssh-rport" value="22" style="width:70px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ssh-threads">Threads</label>
+                <input type="text" id="ssh-threads" value="10" style="width:60px">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-primary" onclick="runFeaturedModule('ssh')">Run SSH Version Scan</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('ssh-enum')">SSH Enum Users</button>
+            <button class="btn btn-secondary" onclick="toggleBruteRow()">SSH Brute-Force &darr;</button>
+        </div>
+        <div id="ssh-brute-row" style="display:none;margin-top:0.5rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.75rem;align-items:end">
+                <div class="form-group" style="margin-bottom:0">
+                    <label for="ssh-username">Username</label>
+                    <input type="text" id="ssh-username" placeholder="root">
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label for="ssh-password">Password</label>
+                    <input type="text" id="ssh-password" placeholder="password">
+                </div>
+                <button class="btn btn-danger" onclick="runFeaturedModule('ssh-brute')">Run Brute-Force</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Port Scan tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="portscan">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ps-rhosts">Target(s)</label>
+                <input type="text" id="ps-rhosts" placeholder="192.168.1.0/24 or 10.0.0.5">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ps-ports">Ports</label>
+                <input type="text" id="ps-ports" value="1-1024" style="width:100px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="ps-threads">Threads</label>
+                <input type="text" id="ps-threads" value="10" style="width:60px">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-primary" onclick="runFeaturedModule('tcp-scan')">TCP Scan</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('syn-scan')">SYN Scan</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('ack-scan')">ACK Scan</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('udp-scan')">UDP Sweep</button>
+        </div>
+    </div>
+
+    <!-- OS Detect tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="osdetect">
+        <div style="margin-top:0.75rem">
+            <div class="form-group">
+                <label for="os-rhosts">Target(s)</label>
+                <input type="text" id="os-rhosts" placeholder="192.168.1.0/24 or 10.0.0.5">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="runFeaturedModule('smb-version')">SMB Version</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('http-header')">HTTP Header</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('ftp-version')">FTP Version</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('telnet-version')">Telnet Version</button>
+        </div>
+    </div>
+
+    <!-- Vuln Scan tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="vuln">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="vuln-rhosts">Target(s)</label>
+                <input type="text" id="vuln-rhosts" placeholder="192.168.1.0/24 or 10.0.0.5">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="vuln-threads">Threads</label>
+                <input type="text" id="vuln-threads" value="5" style="width:60px">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-danger" onclick="runFeaturedModule('eternalblue-check')">EternalBlue Check</button>
+            <button class="btn btn-danger" onclick="runFeaturedModule('bluekeep-check')">BlueKeep Check</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('ssl-heartbleed')">Heartbleed Check</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('shellshock-check')">Shellshock Check</button>
+        </div>
+    </div>
+
+    <!-- SMB tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="smb">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="smb-rhosts">Target(s)</label>
+                <input type="text" id="smb-rhosts" placeholder="192.168.1.0/24 or 10.0.0.5">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="smb-user">Username</label>
+                <input type="text" id="smb-user" placeholder="admin" style="width:100px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="smb-pass">Password</label>
+                <input type="text" id="smb-pass" placeholder="" style="width:100px">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-primary" onclick="runFeaturedModule('smb-enum-shares')">Enum Shares</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('smb-enum-users')">Enum Users</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('smb-login')">SMB Login</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('smb-pipe-auditor')">Pipe Auditor</button>
+        </div>
+    </div>
+
+    <!-- HTTP tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="http">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="http-rhosts">Target(s)</label>
+                <input type="text" id="http-rhosts" placeholder="192.168.1.0/24 or example.com">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="http-rport">Port</label>
+                <input type="text" id="http-rport" value="80" style="width:70px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="http-threads">Threads</label>
+                <input type="text" id="http-threads" value="5" style="width:60px">
+            </div>
+        </div>
+        <div style="margin-top:0.5rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="http-targeturi">Target URI</label>
+                <input type="text" id="http-targeturi" value="/" placeholder="/">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-primary" onclick="runFeaturedModule('http-dir-scanner')">Dir Scanner</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('http-title')">HTTP Title</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('http-robots')">robots.txt</button>
+            <button class="btn btn-secondary" onclick="runFeaturedModule('http-cert')">SSL Cert</button>
+        </div>
+    </div>
+
+    <!-- Exploit tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="exploit">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;align-items:end;margin-top:0.75rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="exp-rhosts">Target (RHOSTS)</label>
+                <input type="text" id="exp-rhosts" placeholder="192.168.1.5">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="exp-lhost">Your IP (LHOST)</label>
+                <input type="text" id="exp-lhost" placeholder="192.168.1.100">
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0.75rem;align-items:end;margin-top:0.5rem">
+            <div class="form-group" style="margin-bottom:0">
+                <label for="exp-module">Exploit Module</label>
+                <input type="text" id="exp-module" placeholder="exploit/windows/smb/ms17_010_eternalblue">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="exp-payload">Payload</label>
+                <input type="text" id="exp-payload" placeholder="windows/x64/meterpreter/reverse_tcp" style="width:250px">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+                <label for="exp-lport">LPORT</label>
+                <input type="text" id="exp-lport" value="4444" style="width:70px">
+            </div>
+        </div>
+        <div class="tool-actions" style="margin-top:0.75rem">
+            <button class="btn btn-danger" onclick="runFeaturedModule('exploit-run')">Launch Exploit</button>
+        </div>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem">Exploits run as background jobs. Check Active Sessions for shells.</p>
+    </div>
+
+    <!-- Custom tab -->
+    <div class="tab-content" data-tab-group="run-tabs" data-tab="custom">
+        <div style="margin-top:0.75rem">
+            <div class="form-group">
+                <label for="custom-module">Module Path</label>
+                <input type="text" id="custom-module" placeholder="auxiliary/scanner/ssh/ssh_version">
+            </div>
+            <div class="form-group">
+                <label for="custom-options">Options (JSON)</label>
+                <input type="text" id="custom-options" placeholder='{"RHOSTS":"10.0.0.1","RPORT":22}'>
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="runFeaturedModule('custom')">Run Module</button>
+        </div>
+    </div>
+
+    <!-- Shared output area -->
+    <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border)">
+        <span id="run-status" style="font-size:0.85rem;color:var(--text-secondary);flex:1"></span>
+        <button id="run-stop-btn" class="btn btn-sm btn-danger" style="display:none" onclick="stopCurrentModule()">Stop</button>
+    </div>
+    <div id="module-output" class="results-stream" style="min-height:140px;margin-top:0.5rem"></div>
+</div>
+
+<!-- Module Browser -->
+<div class="section">
+    <h2>Module Browser</h2>
+    <div class="tab-bar">
+        <button class="tab active" data-tab-group="msf-browse" data-tab="auxiliary" onclick="showTab('msf-browse','auxiliary');browseMSFModules('auxiliary')">Scanners</button>
+        <button class="tab" data-tab-group="msf-browse" data-tab="exploit" onclick="showTab('msf-browse','exploit');browseMSFModules('exploit')">Exploits</button>
+        <button class="tab" data-tab-group="msf-browse" data-tab="post" onclick="showTab('msf-browse','post');browseMSFModules('post')">Post</button>
+        <button class="tab" data-tab-group="msf-browse" data-tab="payload" onclick="showTab('msf-browse','payload');browseMSFModules('payload')">Payloads</button>
+    </div>
+    <input type="hidden" id="msf-page-auxiliary" value="1">
+    <input type="hidden" id="msf-page-exploit" value="1">
+    <input type="hidden" id="msf-page-post" value="1">
+    <input type="hidden" id="msf-page-payload" value="1">
+    <div class="tab-content active" data-tab-group="msf-browse" data-tab="auxiliary" id="msf-modules-auxiliary">
+        <div class="empty-state">Click a tab to browse modules.</div>
+    </div>
+    <div class="tab-content" data-tab-group="msf-browse" data-tab="exploit" id="msf-modules-exploit"></div>
+    <div class="tab-content" data-tab-group="msf-browse" data-tab="post" id="msf-modules-post"></div>
+    <div class="tab-content" data-tab-group="msf-browse" data-tab="payload" id="msf-modules-payload"></div>
+</div>
+
+<!-- Sessions & Jobs -->
+<div class="section">
+    <h2>Active Sessions &amp; Jobs</h2>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="loadMSFSessions()">Refresh Sessions</button>
+        <button class="btn btn-small" onclick="loadMSFJobs()">Refresh Jobs</button>
+    </div>
+    <div id="msf-sessions">
+        <div class="empty-state">Click "Refresh" to check for active sessions and jobs.</div>
+    </div>
+    <div id="msf-jobs" style="margin-top:0.5rem"></div>
+</div>
+
+{% if modules %}
+<div class="section">
+    <h2>Offense Modules</h2>
+    <ul class="module-list">
+    {% for name, info in modules.items() %}
+        <li class="module-item">
+            <div>
+                <div class="module-name">{{ name }}</div>
+                <div class="module-desc">{{ info.description }}</div>
+            </div>
+            <div class="module-meta">v{{ info.version }}</div>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Agent Hal -->
+<div class="section">
+    <h2>Agent Hal — Autonomous Mode</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.75rem">Give Hal a security task and watch it execute step by step using MSF and other tools.</p>
+    <div class="input-row">
+        <input type="text" id="agent-task" placeholder="e.g. scan 10.0.0.5 for open SSH ports and identify the service version">
+        <button class="btn btn-primary" onclick="runHalTask()">Run</button>
+        <button id="agent-stop-btn" class="btn btn-danger" style="display:none" onclick="stopHalTask()">Stop</button>
+    </div>
+    <div id="agent-output" class="results-stream" style="min-height:120px"></div>
+</div>
+
+<script>
+let _currentJobId = null;
+let _currentRunId = null;
+
+// Check MSF status on page load
+document.addEventListener('DOMContentLoaded', function() { checkMSFStatus(); });
+
+/* ── Featured Module Definitions ───────────────────────────────── */
+const _FEATURED = {
+    // SSH
+    'ssh':           {path: 'auxiliary/scanner/ssh/ssh_version',  opts: () => ({RHOSTS: v('ssh-rhosts'), RPORT: parseInt(v('ssh-rport')) || 22, THREADS: parseInt(v('ssh-threads')) || 10})},
+    'ssh-enum':      {path: 'auxiliary/scanner/ssh/ssh_enumusers', opts: () => ({RHOSTS: v('ssh-rhosts'), RPORT: parseInt(v('ssh-rport')) || 22, THREADS: parseInt(v('ssh-threads')) || 10})},
+    'ssh-brute':     {path: 'auxiliary/scanner/ssh/ssh_login',    opts: () => ({RHOSTS: v('ssh-rhosts'), RPORT: parseInt(v('ssh-rport')) || 22, USERNAME: v('ssh-username'), PASSWORD: v('ssh-password')})},
+    // Port Scan
+    'tcp-scan':      {path: 'auxiliary/scanner/portscan/tcp',     opts: () => ({RHOSTS: v('ps-rhosts'), PORTS: v('ps-ports') || '1-1024', THREADS: parseInt(v('ps-threads')) || 10})},
+    'syn-scan':      {path: 'auxiliary/scanner/portscan/syn',     opts: () => ({RHOSTS: v('ps-rhosts'), PORTS: v('ps-ports') || '1-1024', THREADS: parseInt(v('ps-threads')) || 10})},
+    'ack-scan':      {path: 'auxiliary/scanner/portscan/ack',     opts: () => ({RHOSTS: v('ps-rhosts'), PORTS: v('ps-ports') || '1-1024', THREADS: parseInt(v('ps-threads')) || 10})},
+    'udp-scan':      {path: 'auxiliary/scanner/discovery/udp_sweep', opts: () => ({RHOSTS: v('ps-rhosts'), THREADS: parseInt(v('ps-threads')) || 10})},
+    // OS Detect
+    'smb-version':   {path: 'auxiliary/scanner/smb/smb_version',  opts: () => ({RHOSTS: v('os-rhosts')})},
+    'http-header':   {path: 'auxiliary/scanner/http/http_header', opts: () => ({RHOSTS: v('os-rhosts')})},
+    'ftp-version':   {path: 'auxiliary/scanner/ftp/ftp_version',  opts: () => ({RHOSTS: v('os-rhosts')})},
+    'telnet-version':{path: 'auxiliary/scanner/telnet/telnet_version', opts: () => ({RHOSTS: v('os-rhosts')})},
+    // Vuln Scan
+    'eternalblue-check': {path: 'auxiliary/scanner/smb/smb_ms17_010', opts: () => ({RHOSTS: v('vuln-rhosts'), THREADS: parseInt(v('vuln-threads')) || 5})},
+    'bluekeep-check':    {path: 'auxiliary/scanner/rdp/cve_2019_0708_bluekeep', opts: () => ({RHOSTS: v('vuln-rhosts'), THREADS: parseInt(v('vuln-threads')) || 5})},
+    'ssl-heartbleed':    {path: 'auxiliary/scanner/ssl/openssl_heartbleed', opts: () => ({RHOSTS: v('vuln-rhosts'), THREADS: parseInt(v('vuln-threads')) || 5})},
+    'shellshock-check':  {path: 'auxiliary/scanner/http/apache_mod_cgi_bash_env', opts: () => ({RHOSTS: v('vuln-rhosts'), THREADS: parseInt(v('vuln-threads')) || 5})},
+    // SMB
+    'smb-enum-shares': {path: 'auxiliary/scanner/smb/smb_enumshares', opts: () => ({RHOSTS: v('smb-rhosts'), SMBUser: v('smb-user'), SMBPass: v('smb-pass')})},
+    'smb-enum-users':  {path: 'auxiliary/scanner/smb/smb_enumusers',  opts: () => ({RHOSTS: v('smb-rhosts'), SMBUser: v('smb-user'), SMBPass: v('smb-pass')})},
+    'smb-login':       {path: 'auxiliary/scanner/smb/smb_login',      opts: () => ({RHOSTS: v('smb-rhosts'), SMBUser: v('smb-user'), SMBPass: v('smb-pass')})},
+    'smb-pipe-auditor':{path: 'auxiliary/scanner/smb/pipe_auditor',   opts: () => ({RHOSTS: v('smb-rhosts'), SMBUser: v('smb-user'), SMBPass: v('smb-pass')})},
+    // HTTP
+    'http-dir-scanner': {path: 'auxiliary/scanner/http/dir_scanner',  opts: () => ({RHOSTS: v('http-rhosts'), RPORT: parseInt(v('http-rport')) || 80, THREADS: parseInt(v('http-threads')) || 5, PATH: v('http-targeturi') || '/'})},
+    'http-title':       {path: 'auxiliary/scanner/http/title',        opts: () => ({RHOSTS: v('http-rhosts'), RPORT: parseInt(v('http-rport')) || 80})},
+    'http-robots':      {path: 'auxiliary/scanner/http/robots_txt',   opts: () => ({RHOSTS: v('http-rhosts'), RPORT: parseInt(v('http-rport')) || 80})},
+    'http-cert':        {path: 'auxiliary/scanner/http/cert',         opts: () => ({RHOSTS: v('http-rhosts'), RPORT: parseInt(v('http-rport')) || 443})},
+    // Exploit
+    'exploit-run':   {path: null, opts: () => {
+        const o = {RHOSTS: v('exp-rhosts'), LHOST: v('exp-lhost'), LPORT: parseInt(v('exp-lport')) || 4444};
+        const payload = v('exp-payload');
+        if (payload) o.PAYLOAD = payload;
+        return o;
+    }},
+    // Custom
+    'custom':        {path: null, opts: () => {try{return JSON.parse(v('custom-options') || '{}')}catch(e){return {}}}},
+};
+
+function v(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+/* ── Server Control ─────────────────────────────────────────────── */
+function checkMSFStatus() {
+    fetch('/offense/status').then(r => r.json()).then(d => {
+        const el = document.getElementById('msf-status');
+        const ver = document.getElementById('msf-version');
+        const btnConnect = document.getElementById('btn-connect');
+        const btnDisconnect = document.getElementById('btn-disconnect');
+        const btnStart = document.getElementById('btn-start-server');
+        const btnStop = document.getElementById('btn-stop-server');
+
+        if (d.connected) {
+            el.innerHTML = '<span class="status-dot active"></span>Connected';
+            ver.textContent = d.version ? 'Metasploit ' + d.version : '';
+            btnConnect.style.display = 'none';
+            btnDisconnect.style.display = '';
+            btnStop.style.display = d.server_running ? '' : 'none';
+            btnStart.style.display = 'none';
+        } else if (d.server_running) {
+            el.innerHTML = '<span class="status-dot" style="background:var(--warning)"></span>Server running (not connected)';
+            ver.textContent = '';
+            btnConnect.style.display = '';
+            btnDisconnect.style.display = 'none';
+            btnStop.style.display = '';
+            btnStart.style.display = 'none';
+        } else {
+            el.innerHTML = '<span class="status-dot inactive"></span>Not running';
+            ver.textContent = '';
+            btnConnect.style.display = 'none';
+            btnDisconnect.style.display = 'none';
+            btnStop.style.display = 'none';
+            btnStart.style.display = '';
+        }
+
+        // Populate settings panel
+        if (d.host) document.getElementById('msf-host').value = d.host;
+        if (d.port) document.getElementById('msf-port').value = d.port;
+        if (d.username) document.getElementById('msf-user').value = d.username;
+        document.getElementById('msf-ssl').checked = d.ssl !== false;
+    }).catch(() => {
+        document.getElementById('msf-status').innerHTML = '<span class="status-dot inactive"></span>Error checking status';
+    });
+}
+
+function toggleServerPanel() {
+    const panel = document.getElementById('server-panel');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+
+function _getServerSettings() {
+    return {
+        host: v('msf-host') || '127.0.0.1',
+        port: parseInt(v('msf-port')) || 55553,
+        username: v('msf-user') || 'msf',
+        password: v('msf-pass'),
+        ssl: document.getElementById('msf-ssl').checked,
+    };
+}
+
+function msfStartServer() {
+    const settings = _getServerSettings();
+    if (!settings.password) { alert('Password is required'); return; }
+    const msg = document.getElementById('server-msg');
+    msg.textContent = 'Starting server...';
+
+    fetch('/offense/server/start', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings)
+    }).then(r => r.json()).then(d => {
+        msg.textContent = d.ok ? (d.message || 'Started') : ('Error: ' + (d.error || 'unknown'));
+        if (d.ok) { document.getElementById('server-panel').style.display = 'none'; checkMSFStatus(); }
+    }).catch(e => { msg.textContent = 'Error: ' + e.message; });
+}
+
+function msfConnectOnly() {
+    const settings = _getServerSettings();
+    if (!settings.password) { alert('Password is required'); return; }
+    const msg = document.getElementById('server-msg');
+    msg.textContent = 'Connecting...';
+
+    fetch('/offense/connect', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: settings.password})
+    }).then(r => r.json()).then(d => {
+        msg.textContent = d.ok ? 'Connected' : ('Error: ' + (d.error || 'unknown'));
+        if (d.ok) { document.getElementById('server-panel').style.display = 'none'; checkMSFStatus(); }
+    }).catch(e => { msg.textContent = 'Error: ' + e.message; });
+}
+
+function msfConnect() {
+    // Quick connect using saved password
+    fetch('/offense/connect', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { checkMSFStatus(); }
+        else { toggleServerPanel(); document.getElementById('server-msg').textContent = d.error || 'Connection failed — enter password'; }
+    });
+}
+
+function msfDisconnect() {
+    fetch('/offense/disconnect', {method: 'POST'}).then(() => checkMSFStatus());
+}
+
+function msfStopServer() {
+    if (!confirm('Stop the MSF RPC server?')) return;
+    fetch('/offense/server/stop', {method: 'POST'}).then(() => checkMSFStatus());
+}
+
+function msfSaveSettings() {
+    const settings = _getServerSettings();
+    fetch('/offense/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(settings)
+    }).then(r => r.json()).then(d => {
+        document.getElementById('server-msg').textContent = d.ok ? 'Settings saved' : ('Error: ' + d.error);
+    });
+}
+
+/* ── Module Execution ───────────────────────────────────────────── */
+function toggleBruteRow() {
+    var row = document.getElementById('ssh-brute-row');
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function runFeaturedModule(key) {
+    const cfg = _FEATURED[key];
+    if (!cfg) return;
+    let path;
+    if (key === 'custom') {
+        path = v('custom-module');
+    } else if (key === 'exploit-run') {
+        path = v('exp-module');
+    } else {
+        path = cfg.path;
+    }
+    if (!path) { alert('Enter a module path'); return; }
+    const opts = cfg.opts();
+    // Remove empty string values
+    Object.keys(opts).forEach(k => { if (opts[k] === '' || opts[k] === undefined) delete opts[k]; });
+    if (!opts.RHOSTS && !['custom'].includes(key)) { alert('Enter a target'); return; }
+    runModule(path, opts);
+}
+
+function runModule(module_path, options) {
+    const out = document.getElementById('module-output');
+    const status = document.getElementById('run-status');
+    const stopBtn = document.getElementById('run-stop-btn');
+    out.innerHTML = '';
+    status.textContent = 'Starting ' + module_path + '...';
+    stopBtn.style.display = '';
+    _currentJobId = null;
+
+    fetch('/offense/module/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({module_path, options})
+    }).then(res => {
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        function pump() {
+            reader.read().then(({done, value}) => {
+                if (done) { status.textContent = 'Finished.'; stopBtn.style.display = 'none'; return; }
+                buf += dec.decode(value, {stream: true});
+                const parts = buf.split('\n\n');
+                buf = parts.pop();
+                parts.forEach(part => {
+                    const line = part.replace(/^data:\s*/, '').trim();
+                    if (!line) return;
+                    try {
+                        const d = JSON.parse(line);
+                        if (d.job_id) { _currentJobId = d.job_id; status.textContent = 'Running ' + module_path + '…'; }
+                        if (d.error) { out.innerHTML += '<div class="err">Error: ' + escapeHtml(d.error) + '</div>'; stopBtn.style.display = 'none'; }
+                        if (d.line) {
+                            let cls = '';
+                            if (d.line.includes('[+]')) cls = 'success';
+                            else if (d.line.includes('[-]') || d.line.includes('Error')) cls = 'err';
+                            else if (d.line.includes('[!]')) cls = 'warn';
+                            out.innerHTML += '<div class="' + cls + '">' + escapeHtml(d.line) + '</div>';
+                            out.scrollTop = out.scrollHeight;
+                        }
+                        if (d.done) {
+                            status.textContent = 'Done.';
+                            stopBtn.style.display = 'none';
+                            if (d.open_ports && d.open_ports.length) {
+                                out.innerHTML += '<div class="success" style="margin-top:0.5rem;font-weight:600">Open ports: ' + d.open_ports.map(p => escapeHtml(String(p.port || p))).join(', ') + '</div>';
+                            }
+                            if (d.services && d.services.length) {
+                                let html = '<div style="margin-top:0.5rem;font-weight:600;color:var(--accent)">Services detected:</div>';
+                                d.services.forEach(s => { html += '<div class="success">' + escapeHtml(s.ip + ':' + s.port + ' — ' + s.info) + '</div>'; });
+                                out.innerHTML += html;
+                            }
+                        }
+                    } catch(e) {}
+                });
+                pump();
+            }).catch(e => { status.textContent = 'Error.'; out.innerHTML += '<div class="err">' + escapeHtml(e.message) + '</div>'; stopBtn.style.display = 'none'; });
+        }
+        pump();
+    }).catch(e => { status.textContent = 'Failed.'; out.innerHTML = '<div class="err">' + escapeHtml(e.message) + '</div>'; stopBtn.style.display = 'none'; });
+}
+
+function stopCurrentModule() {
+    if (!_currentJobId) return;
+    fetch('/offense/module/stop', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id: _currentJobId})});
+    document.getElementById('run-stop-btn').style.display = 'none';
+    document.getElementById('run-status').textContent = 'Stopped.';
+}
+
+/* ── Sessions & Jobs ────────────────────────────────────────────── */
+function loadMSFSessions() {
+    const el = document.getElementById('msf-sessions');
+    fetch('/offense/sessions').then(r => r.json()).then(d => {
+        if (d.error) { el.innerHTML = '<div class="empty-state">' + escapeHtml(d.error) + '</div>'; return; }
+        const sessions = d.sessions || {};
+        const keys = Object.keys(sessions);
+        if (!keys.length) { el.innerHTML = '<div class="empty-state">No active sessions.</div>'; return; }
+        let html = '<table style="width:100%;font-size:0.85rem"><tr><th>ID</th><th>Type</th><th>Target</th><th>Info</th></tr>';
+        keys.forEach(sid => {
+            const s = sessions[sid];
+            html += '<tr><td>' + escapeHtml(sid) + '</td><td>' + escapeHtml(s.type || '') + '</td><td>' + escapeHtml(s.tunnel_peer || s.target_host || '') + '</td><td>' + escapeHtml(s.info || '') + '</td></tr>';
+        });
+        html += '</table>';
+        el.innerHTML = html;
+    }).catch(() => { el.innerHTML = '<div class="empty-state">Failed to load sessions.</div>'; });
+}
+
+function loadMSFJobs() {
+    const el = document.getElementById('msf-jobs');
+    fetch('/offense/jobs').then(r => r.json()).then(d => {
+        if (d.error) { el.innerHTML = '<div class="empty-state">' + escapeHtml(d.error) + '</div>'; return; }
+        const jobs = d.jobs || {};
+        const keys = Object.keys(jobs);
+        if (!keys.length) { el.innerHTML = '<div class="empty-state">No running jobs.</div>'; return; }
+        let html = '<table style="width:100%;font-size:0.85rem"><tr><th>ID</th><th>Name</th><th></th></tr>';
+        keys.forEach(jid => {
+            html += '<tr><td>' + escapeHtml(jid) + '</td><td>' + escapeHtml(String(jobs[jid])) + '</td><td><button class="btn btn-sm btn-danger" onclick="stopMSFJob(\'' + escapeHtml(jid) + '\')">Stop</button></td></tr>';
+        });
+        html += '</table>';
+        el.innerHTML = html;
+    }).catch(() => { el.innerHTML = '<div class="empty-state">Failed to load jobs.</div>'; });
+}
+
+function stopMSFJob(jobId) {
+    fetch('/offense/jobs/' + jobId + '/stop', {method:'POST'}).then(() => loadMSFJobs());
+}
+
+/* ── Agent Hal ──────────────────────────────────────────────────── */
+async function runHalTask() {
+    const task = v('agent-task');
+    if (!task) return;
+    const out = document.getElementById('agent-output');
+    out.innerHTML = '';
+    document.getElementById('agent-stop-btn').style.display = '';
+    const res = await fetch('/api/agent/run', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({task})});
+    const data = await res.json();
+    if (data.error) { out.innerHTML = '<div class="err">' + escapeHtml(data.error) + '</div>'; document.getElementById('agent-stop-btn').style.display = 'none'; return; }
+    _currentRunId = data.run_id;
+    streamAgentSteps(data.run_id);
+}
+
+function streamAgentSteps(run_id) {
+    const out = document.getElementById('agent-output');
+    const es = new EventSource('/api/agent/stream/' + run_id);
+    es.onmessage = function(e) {
+        try {
+            const d = JSON.parse(e.data);
+            if (d.done)  { es.close(); document.getElementById('agent-stop-btn').style.display = 'none'; return; }
+            if (d.error) { out.innerHTML += '<div class="err">[error] ' + escapeHtml(d.error) + '</div>'; es.close(); document.getElementById('agent-stop-btn').style.display = 'none'; return; }
+            const cls = d.type === 'thought' ? 'dim' : d.type === 'action' ? 'info' : d.type === 'result' ? 'warn' : '';
+            out.innerHTML += '<div class="' + cls + '">[' + escapeHtml(d.type || '') + '] ' + escapeHtml(d.content || '') + '</div>';
+            out.scrollTop = out.scrollHeight;
+        } catch(err) {}
+    };
+}
+
+async function stopHalTask() {
+    if (_currentRunId) await fetch('/api/agent/stop/' + _currentRunId, {method:'POST'});
+    document.getElementById('agent-stop-btn').style.display = 'none';
+}
+</script>
+{% endblock %}

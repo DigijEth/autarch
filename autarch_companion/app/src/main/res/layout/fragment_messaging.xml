@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <!-- ═══ Conversation List View ═══ -->
+    <LinearLayout
+        android:id="@+id/conversation_list_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="visible">
+
+        <!-- Toolbar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:background="@color/surface">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/messaging_title"
+                android:textColor="@color/terminal_green"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace" />
+
+            <!-- Shizuku status dot -->
+            <View
+                android:id="@+id/shizuku_status_dot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_marginEnd="12dp" />
+
+            <!-- Search button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_search"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="?"
+                android:textSize="16sp"
+                android:textColor="@color/terminal_green"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="40dp"
+                android:padding="0dp"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_marginEnd="4dp" />
+
+            <!-- Default SMS toggle -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_default_sms"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/messaging_become_default"
+                android:textSize="10sp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                app:backgroundTint="@color/terminal_green_dim"
+                android:layout_marginEnd="4dp" />
+
+            <!-- Tools menu -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_tools"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/messaging_tools"
+                android:textSize="10sp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                app:backgroundTint="@color/terminal_green_dim" />
+        </LinearLayout>
+
+        <!-- Search bar (hidden by default) -->
+        <LinearLayout
+            android:id="@+id/search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:background="@color/surface_dark"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/input_search"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:hint="@string/messaging_search_hint"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:inputType="text"
+                android:background="@color/surface"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:singleLine="true" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_search_go"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="GO"
+                android:textSize="11sp"
+                android:layout_marginStart="8dp"
+                style="@style/Widget.Material3.Button"
+                app:backgroundTint="@color/terminal_green" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_search_close"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="X"
+                android:textSize="11sp"
+                android:layout_marginStart="4dp"
+                style="@style/Widget.Material3.Button.TextButton" />
+        </LinearLayout>
+
+        <!-- Conversation RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_conversations"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:padding="4dp" />
+
+        <!-- Empty state -->
+        <TextView
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/messaging_empty"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:fontFamily="monospace"
+            android:visibility="gone" />
+
+        <!-- FAB for new message -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_new_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:contentDescription="@string/messaging_new_message"
+            app:backgroundTint="@color/terminal_green"
+            app:tint="@color/background" />
+
+    </LinearLayout>
+
+    <!-- ═══ Message Thread View ═══ -->
+    <LinearLayout
+        android:id="@+id/thread_view_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <!-- Thread header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:background="@color/surface">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_back"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="&lt;"
+                android:textSize="18sp"
+                android:textColor="@color/terminal_green"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="40dp"
+                android:padding="0dp"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_marginEnd="8dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/thread_contact_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:singleLine="true" />
+
+                <TextView
+                    android:id="@+id/thread_address"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:singleLine="true" />
+            </LinearLayout>
+
+            <!-- Thread tools -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_thread_export"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="@string/messaging_export"
+                android:textSize="10sp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                app:backgroundTint="@color/terminal_green_dim" />
+        </LinearLayout>
+
+        <!-- Messages RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_messages"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:padding="8dp" />
+
+        <!-- Message input bar -->
+        <LinearLayout
+            android:id="@+id/message_input_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp"
+            android:background="@color/surface">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/input_message"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/messaging_input_hint"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="14sp"
+                android:fontFamily="monospace"
+                android:inputType="textMultiLine"
+                android:background="@color/surface_dark"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp"
+                android:maxLines="4"
+                android:minHeight="40dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_send"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="@string/messaging_send"
+                android:textSize="12sp"
+                android:layout_marginStart="8dp"
+                style="@style/Widget.Material3.Button"
+                app:backgroundTint="@color/terminal_green" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ═══ Output Log (bottom overlay, hidden by default) ═══ -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/output_log_card"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="8dp"
+        app:cardBackgroundColor="@color/surface_dark"
+        app:cardCornerRadius="8dp"
+        app:strokeColor="@color/terminal_green_dim"
+        app:strokeWidth="1dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Output:"
+                    android:textColor="@color/terminal_green_dim"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_close_log"
+                    android:layout_width="wrap_content"
+                    android:layout_height="30dp"
+                    android:text="X"
+                    android:textSize="10sp"
+                    style="@style/Widget.Material3.Button.TextButton" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/messaging_output_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="> ready_"
+                    android:textColor="@color/terminal_green"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp" />
+            </ScrollView>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

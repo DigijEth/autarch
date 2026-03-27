@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+{% block title %}Remote Monitor Station - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Remote Monitoring Station</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Connect and control remote WiFi monitoring devices via .piap profiles.
+    </p>
+</div>
+
+<!-- Device Selector -->
+<div class="section" style="margin-bottom:1rem">
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <select id="piap-select" onchange="rmLoadPiap()" style="min-width:200px;padding:0.4rem">
+            <option value="">— Select Device —</option>
+            {% for p in piap_files %}
+            <option value="{{ p.filename }}">{{ p.name }}</option>
+            {% endfor %}
+            <option value="__new__">+ Create New</option>
+        </select>
+        <button class="btn btn-primary" id="rm-connect-btn" onclick="rmConnect()" disabled>Connect</button>
+        <button class="btn" id="rm-disconnect-btn" onclick="rmDisconnect()" disabled style="display:none">Disconnect</button>
+        <span id="rm-conn-status" style="font-size:0.85rem;color:var(--text-secondary)"></span>
+    </div>
+</div>
+
+<!-- Device Panel (hidden until loaded) -->
+<div id="rm-device-panel" style="display:none">
+
+    <!-- Device Info Bar -->
+    <div class="section" style="margin-bottom:1rem;padding:0.5rem 1rem;display:flex;gap:2rem;flex-wrap:wrap;font-size:0.85rem" id="rm-device-info-bar">
+        <span><strong>Model:</strong> <span id="rm-model"></span></span>
+        <span><strong>OS:</strong> <span id="rm-os"></span></span>
+        <span><strong>Chipset:</strong> <span id="rm-chipset"></span></span>
+        <span><strong>Host:</strong> <span id="rm-host"></span></span>
+    </div>
+
+    <!-- Sub-tab bar (built dynamically from .piap) -->
+    <div class="tab-bar" id="rm-tab-bar">
+        <button class="tab active" onclick="rmTab('radios')">Radios</button>
+        <!-- Additional tabs built from features -->
+    </div>
+
+    <!-- ==================== RADIOS TAB ==================== -->
+    <div class="rm-tab-panel" id="rm-tab-radios">
+        <div id="rm-radios-container"></div>
+    </div>
+
+    <!-- ==================== CAPTURE TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-capture">
+        <div class="section">
+            <h2>Packet Capture</h2>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-cap-radio" style="padding:0.4rem"></select>
+                <button class="btn btn-primary" onclick="rmCaptureStart()">Start Capture</button>
+                <button class="btn btn-danger" onclick="rmCaptureStop()">Stop Capture</button>
+            </div>
+            <div id="rm-capture-status" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem"></div>
+            <pre id="rm-capture-output" style="max-height:400px;overflow:auto;background:var(--bg-secondary);padding:1rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== SCAN TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-scan">
+        <div class="section">
+            <h2>WiFi Scan</h2>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-scan-radio" style="padding:0.4rem"></select>
+                <button class="btn btn-primary" onclick="rmWifiScan()">Scan</button>
+            </div>
+            <div id="rm-scan-status" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem"></div>
+            <pre id="rm-scan-output" style="max-height:400px;overflow:auto;background:var(--bg-secondary);padding:1rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== DEAUTH TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-deauth">
+        <div class="section">
+            <h2>Deauthentication</h2>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-deauth-radio" style="padding:0.4rem"></select>
+                <label>BSSID:</label>
+                <input type="text" id="rm-deauth-bssid" placeholder="AA:BB:CC:DD:EE:FF" style="padding:0.4rem;width:180px">
+                <label>Count:</label>
+                <input type="number" id="rm-deauth-count" value="10" min="1" max="1000" style="padding:0.4rem;width:60px">
+                <button class="btn btn-danger" onclick="rmDeauth()">Send Deauth</button>
+            </div>
+            <pre id="rm-deauth-output" style="max-height:300px;overflow:auto;background:var(--bg-secondary);padding:1rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== CHANNEL HOP TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-chanhop">
+        <div class="section">
+            <h2>Channel Hopper</h2>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-hop-radio" style="padding:0.4rem"></select>
+                <label>Dwell (ms):</label>
+                <input type="number" id="rm-hop-dwell" value="500" min="100" max="5000" step="100" style="padding:0.4rem;width:80px">
+                <button class="btn btn-primary" onclick="rmHopStart()">Start Hopping</button>
+                <button class="btn btn-danger" onclick="rmHopStop()">Stop</button>
+            </div>
+            <div style="margin-bottom:0.5rem">
+                <label>Channels (comma separated, leave blank for all):</label>
+                <input type="text" id="rm-hop-channels" placeholder="1,6,11 or blank for all" style="width:100%;padding:0.4rem;margin-top:0.25rem">
+            </div>
+            <pre id="rm-hop-output" style="max-height:200px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== AIRODUMP TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-airodump">
+        <div class="section">
+            <h2>Airodump-ng</h2>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-airo-radio" style="padding:0.4rem"></select>
+                <label>Channel:</label>
+                <input type="text" id="rm-airo-channel" placeholder="all or specific" value="" style="padding:0.4rem;width:80px">
+                <label>Band:</label>
+                <select id="rm-airo-band" style="padding:0.4rem">
+                    <option value="">All</option>
+                    <option value="--band a">5GHz</option>
+                    <option value="--band bg">2.4GHz</option>
+                </select>
+                <button class="btn btn-primary" onclick="rmAirodumpStart()">Start</button>
+                <button class="btn btn-danger" onclick="rmAirodumpStop()">Stop</button>
+                <button class="btn" onclick="rmAirodumpRefresh()">Refresh</button>
+            </div>
+            <div style="margin-bottom:0.5rem;font-size:0.85rem;color:var(--text-secondary)" id="rm-airo-status"></div>
+            <h3>Access Points</h3>
+            <div id="rm-airo-aps" style="overflow-x:auto;margin-bottom:1rem"></div>
+            <h3>Clients</h3>
+            <div id="rm-airo-clients" style="overflow-x:auto"></div>
+            <pre id="rm-airo-raw" style="max-height:300px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem;display:none"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== HANDSHAKE TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-handshake">
+        <div class="section">
+            <h2>Handshake Capture</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">
+                Capture WPA/WPA2 handshakes for offline cracking. Optionally deauth clients to force reconnection.
+            </p>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-hs-radio" style="padding:0.4rem"></select>
+                <label>Target BSSID:</label>
+                <input type="text" id="rm-hs-bssid" placeholder="AA:BB:CC:DD:EE:FF" style="padding:0.4rem;width:180px">
+                <label>Channel:</label>
+                <input type="text" id="rm-hs-channel" placeholder="6" style="padding:0.4rem;width:50px">
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="rmHsCapture()">Start Capture</button>
+                <button class="btn btn-danger" onclick="rmHsDeauth()">Deauth + Capture</button>
+                <button class="btn" onclick="rmHsStop()">Stop</button>
+                <button class="btn" onclick="rmHsPull()">Pull Capture File</button>
+                <label><input type="checkbox" id="rm-hs-auto-deauth" checked> Auto-deauth clients</label>
+            </div>
+            <div id="rm-hs-status" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem"></div>
+            <pre id="rm-hs-output" style="max-height:300px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== RECON TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-recon">
+        <div class="section">
+            <h2>Wireless Recon</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">
+                Passive reconnaissance — discover APs, clients, probe requests, and hidden networks.
+            </p>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-recon-radio" style="padding:0.4rem"></select>
+                <label>Duration (sec):</label>
+                <input type="number" id="rm-recon-duration" value="30" min="5" max="300" style="padding:0.4rem;width:60px">
+                <button class="btn btn-primary" onclick="rmReconStart()">Start Recon</button>
+                <button class="btn btn-danger" onclick="rmReconStop()">Stop</button>
+            </div>
+            <div id="rm-recon-status" style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:0.5rem"></div>
+            <h3>Discovered Networks</h3>
+            <div id="rm-recon-networks" style="overflow-x:auto;margin-bottom:1rem"></div>
+            <h3>Probe Requests</h3>
+            <div id="rm-recon-probes" style="overflow-x:auto;margin-bottom:1rem"></div>
+            <h3>Raw Output</h3>
+            <pre id="rm-recon-raw" style="max-height:300px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== INJECTION TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-injection">
+        <div class="section">
+            <h2>Frame Injection</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">
+                Test frame injection capability and send custom frames.
+            </p>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+                <label>Radio:</label>
+                <select id="rm-inj-radio" style="padding:0.4rem"></select>
+                <button class="btn btn-primary" onclick="rmInjTest()">Test Injection</button>
+            </div>
+            <div style="margin-bottom:1rem">
+                <label>Custom aireplay-ng command:</label>
+                <div style="display:flex;gap:0.5rem;margin-top:0.25rem">
+                    <input type="text" id="rm-inj-cmd" placeholder="--fakeauth 0 -a AA:BB:CC:DD:EE:FF" style="flex:1;padding:0.4rem">
+                    <button class="btn" onclick="rmInjCustom()">Run</button>
+                </div>
+            </div>
+            <pre id="rm-inj-output" style="max-height:300px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== TERMINAL TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-terminal">
+        <div class="section">
+            <h2>Remote Terminal</h2>
+            <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+                <input type="text" id="rm-cmd-input" placeholder="Command..." style="flex:1;padding:0.4rem" onkeypress="if(event.key==='Enter')rmExec()">
+                <button class="btn btn-primary" onclick="rmExec()">Run</button>
+            </div>
+            <pre id="rm-terminal-output" style="max-height:500px;overflow:auto;background:var(--bg-secondary);padding:1rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>
+    </div>
+
+    <!-- ==================== INFO TAB ==================== -->
+    <div class="rm-tab-panel hidden" id="rm-tab-info">
+        <div class="section">
+            <h2>Device Info</h2>
+            <button class="btn" onclick="rmGetInfo()" style="margin-bottom:1rem">Refresh</button>
+            <div id="rm-info-output"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Create New Dialog -->
+<div id="rm-new-dialog" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:999;display:none;align-items:center;justify-content:center">
+    <div style="background:var(--bg-primary);padding:2rem;border-radius:8px;max-width:500px;width:90%">
+        <h2 style="margin-top:0">Create New Device Profile</h2>
+        <p>To add a new device:</p>
+        <ol>
+            <li>Navigate to <code>data/piap/</code></li>
+            <li>Copy <code>template.piap</code> to a new file</li>
+            <li>Edit the file with your device's information</li>
+            <li>Fill in all fields marked <code>CHANGEME</code></li>
+            <li>Save and refresh this page</li>
+        </ol>
+        <p style="font-size:0.85rem;color:var(--text-secondary)">
+            Template location: <code>/data/piap/template.piap</code>
+        </p>
+        <button class="btn" onclick="document.getElementById('rm-new-dialog').style.display='none'">Close</button>
+    </div>
+</div>
+
+<script>
+let rmPiap = null;
+let rmConnected = false;
+
+function rmTab(name) {
+    document.querySelectorAll('.rm-tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('#rm-tab-bar .tab').forEach(t => t.classList.remove('active'));
+    const panel = document.getElementById('rm-tab-' + name);
+    if (panel) panel.classList.remove('hidden');
+    event.target.classList.add('active');
+}
+
+function rmLoadPiap() {
+    const sel = document.getElementById('piap-select');
+    const filename = sel.value;
+
+    if (filename === '__new__') {
+        document.getElementById('rm-new-dialog').style.display = 'flex';
+        sel.value = '';
+        return;
+    }
+    if (!filename) {
+        document.getElementById('rm-device-panel').style.display = 'none';
+        document.getElementById('rm-connect-btn').disabled = true;
+        return;
+    }
+
+    fetch('/remote-monitor/api/load', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename: filename})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.ok) { alert(data.error); return; }
+        rmPiap = data.data;
+        rmBuildUI();
+        document.getElementById('rm-connect-btn').disabled = false;
+    });
+}
+
+function rmBuildUI() {
+    const d = rmPiap.device;
+    document.getElementById('rm-model').textContent = d.model || '';
+    document.getElementById('rm-os').textContent = d.os || '';
+    document.getElementById('rm-chipset').textContent = d.wifi_chipset || d.chipset || '';
+    document.getElementById('rm-host').textContent = rmPiap.connection.host || '';
+
+    // Build tab bar
+    const tabBar = document.getElementById('rm-tab-bar');
+    tabBar.innerHTML = '<button class="tab active" onclick="rmTab(\'radios\')">Radios</button>';
+    const features = rmPiap.features;
+    if (features.capture === 'true') tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'capture\')">Capture</button>';
+    if (features.wifi_scan === 'true') tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'scan\')">WiFi Scan</button>';
+    tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'recon\')">Recon</button>';
+    if (features.aircrack === 'true') tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'airodump\')">Airodump</button>';
+    tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'handshake\')">Handshake</button>';
+    if (features.deauth === 'true') tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'deauth\')">Deauth</button>';
+    if (features.channel_hop === 'true') tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'chanhop\')">Channel Hop</button>';
+    tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'injection\')">Injection</button>';
+    tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'terminal\')">Terminal</button>';
+    tabBar.innerHTML += '<button class="tab" onclick="rmTab(\'info\')">Info</button>';
+
+    // Build radio panels
+    const container = document.getElementById('rm-radios-container');
+    container.innerHTML = '';
+    rmPiap.radios.forEach((radio, idx) => {
+        const channels = (radio.channel_list || []).map(c =>
+            `<option value="${c}" ${c === radio.default_channel ? 'selected' : ''}>${c}</option>`
+        ).join('');
+        const modes = (radio.mode_list || []).map(m =>
+            `<span style="background:var(--bg-tertiary);padding:2px 8px;border-radius:3px;font-size:0.8rem">${m}</span>`
+        ).join(' ');
+
+        container.innerHTML += `
+        <div class="section" style="margin-bottom:1rem">
+            <h2>${radio.name || 'Radio ' + idx}</h2>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem">
+                <span><strong>PHY:</strong> ${radio.phy}</span>
+                <span><strong>Band:</strong> ${radio.band || ''}</span>
+                <span><strong>Modes:</strong> ${modes}</span>
+                <span><strong>Injection:</strong> ${radio.injection === 'true' ? 'Yes' : 'No'}</span>
+                <span><strong>Radiotap:</strong> ${radio.radiotap === 'true' ? 'Yes' : 'No'}</span>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.5rem">
+                <label>Channel:</label>
+                <select id="rm-radio-${idx}-ch" style="padding:0.4rem">${channels}</select>
+                <button class="btn btn-primary" onclick="rmMonitorOn(${idx})">Monitor ON</button>
+                <button class="btn btn-danger" onclick="rmMonitorOff(${idx})">Monitor OFF</button>
+                <button class="btn" onclick="rmSetChannel(${idx})">Set Channel</button>
+                <button class="btn" onclick="rmRadioStatus(${idx})">Status</button>
+            </div>
+            <pre id="rm-radio-${idx}-output" style="max-height:200px;overflow:auto;background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem"></pre>
+        </div>`;
+    });
+
+    // Populate radio selects in feature tabs
+    const radioOpts = rmPiap.radios.map((r, i) =>
+        `<option value="${i}">${r.name || 'Radio ' + i}</option>`
+    ).join('');
+    ['rm-cap-radio', 'rm-scan-radio', 'rm-deauth-radio', 'rm-hop-radio', 'rm-airo-radio', 'rm-hs-radio', 'rm-recon-radio', 'rm-inj-radio'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = radioOpts;
+    });
+
+    document.getElementById('rm-device-panel').style.display = 'block';
+}
+
+function _rmPost(url, extra) {
+    const body = {connection: rmPiap.connection, features: rmPiap.features, ...extra};
+    return fetch('/remote-monitor/api/' + url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    }).then(r => r.json());
+}
+
+function rmConnect() {
+    document.getElementById('rm-conn-status').textContent = 'Connecting...';
+    _rmPost('connect', {}).then(data => {
+        if (data.ok) {
+            rmConnected = true;
+            document.getElementById('rm-conn-status').innerHTML = '<span style="color:#4caf50">Connected</span>';
+            document.getElementById('rm-connect-btn').style.display = 'none';
+            document.getElementById('rm-disconnect-btn').style.display = '';
+            document.getElementById('rm-disconnect-btn').disabled = false;
+        } else {
+            document.getElementById('rm-conn-status').innerHTML = '<span style="color:#f44336">Failed: ' + (data.stderr || 'unknown') + '</span>';
+        }
+    });
+}
+
+function rmDisconnect() {
+    rmConnected = false;
+    document.getElementById('rm-conn-status').textContent = 'Disconnected';
+    document.getElementById('rm-connect-btn').style.display = '';
+    document.getElementById('rm-connect-btn').disabled = false;
+    document.getElementById('rm-disconnect-btn').style.display = 'none';
+}
+
+function rmMonitorOn(idx) {
+    const channel = document.getElementById('rm-radio-' + idx + '-ch').value;
+    const out = document.getElementById('rm-radio-' + idx + '-output');
+    out.textContent = 'Enabling monitor mode...';
+    _rmPost('radio/monitor-on', {radio: rmPiap.radios[idx], channel: channel}).then(data => {
+        out.textContent = data.ok ? 'Monitor mode enabled on channel ' + channel : 'Error: ' + (data.stderr || data.stdout);
+    });
+}
+
+function rmMonitorOff(idx) {
+    const out = document.getElementById('rm-radio-' + idx + '-output');
+    out.textContent = 'Disabling monitor mode...';
+    _rmPost('radio/monitor-off', {radio: rmPiap.radios[idx]}).then(data => {
+        out.textContent = data.ok ? 'Monitor mode disabled' : 'Error: ' + (data.stderr || data.stdout);
+    });
+}
+
+function rmSetChannel(idx) {
+    const channel = document.getElementById('rm-radio-' + idx + '-ch').value;
+    const out = document.getElementById('rm-radio-' + idx + '-output');
+    _rmPost('radio/set-channel', {radio: rmPiap.radios[idx], channel: channel}).then(data => {
+        out.textContent = data.ok ? 'Channel set to ' + channel : 'Error: ' + (data.stderr || data.stdout);
+    });
+}
+
+function rmRadioStatus(idx) {
+    const out = document.getElementById('rm-radio-' + idx + '-output');
+    out.textContent = 'Getting status...';
+    _rmPost('radio/status', {radio: rmPiap.radios[idx]}).then(data => {
+        out.textContent = data.stdout || data.stderr || 'No output';
+    });
+}
+
+function rmCaptureStart() {
+    const idx = document.getElementById('rm-cap-radio').value;
+    document.getElementById('rm-capture-status').textContent = 'Starting capture...';
+    _rmPost('capture/start', {radio: rmPiap.radios[idx]}).then(data => {
+        document.getElementById('rm-capture-status').textContent = data.ok ? 'Capture running' : 'Error: ' + (data.stderr || '');
+    });
+}
+
+function rmCaptureStop() {
+    document.getElementById('rm-capture-status').textContent = 'Stopping...';
+    _rmPost('capture/stop', {}).then(data => {
+        document.getElementById('rm-capture-status').textContent = 'Capture stopped';
+    });
+}
+
+function rmWifiScan() {
+    const idx = document.getElementById('rm-scan-radio').value;
+    const out = document.getElementById('rm-scan-output');
+    document.getElementById('rm-scan-status').textContent = 'Scanning...';
+    out.textContent = '';
+    _rmPost('scan', {radio: rmPiap.radios[idx]}).then(data => {
+        document.getElementById('rm-scan-status').textContent = data.ok ? 'Scan complete' : 'Error';
+        out.textContent = data.stdout || data.stderr || 'No results';
+    });
+}
+
+function rmDeauth() {
+    const idx = document.getElementById('rm-deauth-radio').value;
+    const bssid = document.getElementById('rm-deauth-bssid').value;
+    const count = document.getElementById('rm-deauth-count').value;
+    if (!bssid) { alert('Enter a BSSID'); return; }
+    _rmPost('deauth', {radio: rmPiap.radios[idx], bssid: bssid, count: count}).then(data => {
+        document.getElementById('rm-deauth-output').textContent = data.stdout || data.stderr || 'Sent';
+    });
+}
+
+function rmExec() {
+    const cmd = document.getElementById('rm-cmd-input').value;
+    if (!cmd) return;
+    const out = document.getElementById('rm-terminal-output');
+    out.textContent += '$ ' + cmd + '\n';
+    _rmPost('exec', {cmd: cmd}).then(data => {
+        out.textContent += (data.stdout || data.stderr || '') + '\n';
+        out.scrollTop = out.scrollHeight;
+    });
+    document.getElementById('rm-cmd-input').value = '';
+}
+
+function rmGetInfo() {
+    const out = document.getElementById('rm-info-output');
+    out.innerHTML = '<em>Loading...</em>';
+    _rmPost('info', {info: rmPiap.info}).then(data => {
+        if (!data.ok) { out.textContent = 'Error'; return; }
+        let html = '';
+        for (const [key, val] of Object.entries(data.info)) {
+            html += `<div class="section" style="margin-bottom:0.5rem"><h3>${key}</h3><pre style="background:var(--bg-secondary);padding:0.5rem;border-radius:4px;font-size:0.8rem">${val}</pre></div>`;
+        }
+        out.innerHTML = html;
+    });
+}
+
+// ── Channel Hopper ──────────────────────────────────────────────────────
+let rmHopRunning = false;
+function rmHopStart() {
+    const idx = document.getElementById('rm-hop-radio').value;
+    const radio = rmPiap.radios[idx];
+    const dwell = document.getElementById('rm-hop-dwell').value;
+    const customCh = document.getElementById('rm-hop-channels').value.trim();
+    const channels = customCh || radio.channels;
+    const out = document.getElementById('rm-hop-output');
+    out.textContent = 'Starting channel hopper...';
+
+    const cmd = `sh -c 'while true; do for ch in ${channels.replace(/,/g, ' ')}; do iw dev ${radio.monitor_interface} set channel $ch 2>/dev/null && echo "Channel: $ch"; sleep ${dwell / 1000}; done; done' &`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        rmHopRunning = true;
+        out.textContent = 'Hopping across channels: ' + channels;
+    });
+}
+
+function rmHopStop() {
+    _rmPost('exec', {cmd: "pkill -f 'while true; do for ch'"}).then(data => {
+        rmHopRunning = false;
+        document.getElementById('rm-hop-output').textContent = 'Stopped';
+    });
+}
+
+// ── Airodump ────────────────────────────────────────────────────────────
+function rmAirodumpStart() {
+    const idx = document.getElementById('rm-airo-radio').value;
+    const radio = rmPiap.radios[idx];
+    const channel = document.getElementById('rm-airo-channel').value.trim();
+    const band = document.getElementById('rm-airo-band').value;
+    document.getElementById('rm-airo-status').textContent = 'Starting airodump-ng...';
+
+    let cmd = `airodump-ng ${radio.monitor_interface} --write /tmp/airo --output-format csv -w /tmp/airo --write-interval 2`;
+    if (channel) cmd += ` -c ${channel}`;
+    if (band) cmd += ` ${band}`;
+    cmd += ' &';
+
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        document.getElementById('rm-airo-status').textContent = 'Airodump running. Click Refresh to see results.';
+    });
+}
+
+function rmAirodumpStop() {
+    _rmPost('exec', {cmd: 'killall airodump-ng 2>/dev/null'}).then(data => {
+        document.getElementById('rm-airo-status').textContent = 'Stopped';
+    });
+}
+
+function rmAirodumpRefresh() {
+    _rmPost('exec', {cmd: 'cat /tmp/airo-01.csv 2>/dev/null || echo "No data yet"'}).then(data => {
+        const raw = data.stdout || '';
+        document.getElementById('rm-airo-raw').textContent = raw;
+        document.getElementById('rm-airo-raw').style.display = 'block';
+        rmParseAirodump(raw);
+    });
+}
+
+function rmParseAirodump(csv) {
+    const lines = csv.split('\n');
+    let aps = [], clients = [], section = 'ap';
+
+    lines.forEach(line => {
+        if (line.includes('Station MAC')) { section = 'client'; return; }
+        if (line.trim() === '' || line.startsWith('BSSID') || line.startsWith('\r')) return;
+        const cols = line.split(',').map(c => c.trim());
+        if (section === 'ap' && cols.length >= 14) {
+            aps.push({bssid: cols[0], power: cols[8], channel: cols[3], enc: cols[5], essid: cols[13]});
+        } else if (section === 'client' && cols.length >= 6) {
+            clients.push({mac: cols[0], power: cols[3], bssid: cols[5], probes: cols[6] || ''});
+        }
+    });
+
+    let apHtml = '<table style="width:100%;font-size:0.8rem"><tr><th>BSSID</th><th>Ch</th><th>Pwr</th><th>Enc</th><th>ESSID</th></tr>';
+    aps.forEach(a => { apHtml += `<tr><td>${a.bssid}</td><td>${a.channel}</td><td>${a.power}</td><td>${a.enc}</td><td>${a.essid}</td></tr>`; });
+    apHtml += '</table>';
+    document.getElementById('rm-airo-aps').innerHTML = aps.length ? apHtml : '<em>No APs found</em>';
+
+    let clHtml = '<table style="width:100%;font-size:0.8rem"><tr><th>MAC</th><th>Pwr</th><th>BSSID</th><th>Probes</th></tr>';
+    clients.forEach(c => { clHtml += `<tr><td>${c.mac}</td><td>${c.power}</td><td>${c.bssid}</td><td>${c.probes}</td></tr>`; });
+    clHtml += '</table>';
+    document.getElementById('rm-airo-clients').innerHTML = clients.length ? clHtml : '<em>No clients found</em>';
+}
+
+// ── Handshake Capture ───────────────────────────────────────────────────
+function rmHsCapture() {
+    const idx = document.getElementById('rm-hs-radio').value;
+    const radio = rmPiap.radios[idx];
+    const bssid = document.getElementById('rm-hs-bssid').value;
+    const channel = document.getElementById('rm-hs-channel').value;
+    if (!bssid) { alert('Enter target BSSID'); return; }
+
+    const out = document.getElementById('rm-hs-output');
+    document.getElementById('rm-hs-status').textContent = 'Starting handshake capture...';
+
+    let cmd = `iw dev ${radio.monitor_interface} set channel ${channel} 2>/dev/null; airodump-ng ${radio.monitor_interface} --bssid ${bssid} -c ${channel} --write /tmp/handshake --output-format pcap -w /tmp/handshake &`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        document.getElementById('rm-hs-status').textContent = 'Capturing on channel ' + channel + ' for ' + bssid;
+        out.textContent = 'Waiting for handshake...\n';
+
+        if (document.getElementById('rm-hs-auto-deauth').checked) {
+            setTimeout(() => rmHsDeauth(), 3000);
+        }
+    });
+}
+
+function rmHsDeauth() {
+    const idx = document.getElementById('rm-hs-radio').value;
+    const radio = rmPiap.radios[idx];
+    const bssid = document.getElementById('rm-hs-bssid').value;
+    if (!bssid) { alert('Enter target BSSID'); return; }
+
+    document.getElementById('rm-hs-status').textContent = 'Sending deauth to force reconnection...';
+    const cmd = `aireplay-ng --deauth 5 -a ${bssid} ${radio.monitor_interface}`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        document.getElementById('rm-hs-output').textContent += (data.stdout || data.stderr || '') + '\n';
+    });
+}
+
+function rmHsStop() {
+    _rmPost('exec', {cmd: 'killall airodump-ng 2>/dev/null; killall aireplay-ng 2>/dev/null'}).then(data => {
+        document.getElementById('rm-hs-status').textContent = 'Stopped';
+    });
+}
+
+function rmHsPull() {
+    document.getElementById('rm-hs-status').textContent = 'Checking for capture files...';
+    _rmPost('exec', {cmd: 'ls -la /tmp/handshake* 2>/dev/null'}).then(data => {
+        document.getElementById('rm-hs-output').textContent = data.stdout || 'No capture files found';
+    });
+}
+
+// ── Wireless Recon ──────────────────────────────────────────────────────
+function rmReconStart() {
+    const idx = document.getElementById('rm-recon-radio').value;
+    const radio = rmPiap.radios[idx];
+    const duration = document.getElementById('rm-recon-duration').value;
+    document.getElementById('rm-recon-status').textContent = 'Running passive recon for ' + duration + 's...';
+
+    const cmd = `timeout ${duration} tcpdump -i ${radio.monitor_interface} -e -c 500 2>&1`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        const raw = data.stdout || '';
+        document.getElementById('rm-recon-raw').textContent = raw;
+        document.getElementById('rm-recon-status').textContent = 'Recon complete';
+        rmParseRecon(raw);
+    });
+}
+
+function rmReconStop() {
+    _rmPost('exec', {cmd: 'killall tcpdump 2>/dev/null'}).then(data => {
+        document.getElementById('rm-recon-status').textContent = 'Stopped';
+    });
+}
+
+function rmParseRecon(raw) {
+    const lines = raw.split('\n');
+    const networks = {};
+    const probes = {};
+
+    lines.forEach(line => {
+        // Extract beacons
+        const beaconMatch = line.match(/Beacon \(([^)]*)\)/);
+        const bssidMatch = line.match(/BSSID:([0-9a-f:]+)/i);
+        const sigMatch = line.match(/(-?\d+)dBm/);
+        if (beaconMatch && bssidMatch) {
+            const ssid = beaconMatch[1] || '(hidden)';
+            const bssid = bssidMatch[1];
+            networks[bssid] = {ssid: ssid, bssid: bssid, signal: sigMatch ? sigMatch[1] : '', count: (networks[bssid]?.count || 0) + 1};
+        }
+
+        // Extract probe requests
+        const probeMatch = line.match(/Probe Request \(([^)]*)\)/);
+        const saMatch = line.match(/SA:([0-9a-f:]+)/i);
+        if (probeMatch && saMatch) {
+            const ssid = probeMatch[1] || '(broadcast)';
+            const sa = saMatch[1];
+            const key = sa + ':' + ssid;
+            probes[key] = {mac: sa, ssid: ssid, count: (probes[key]?.count || 0) + 1};
+        }
+    });
+
+    let netHtml = '<table style="width:100%;font-size:0.8rem"><tr><th>SSID</th><th>BSSID</th><th>Signal</th><th>Beacons</th></tr>';
+    Object.values(networks).sort((a, b) => b.count - a.count).forEach(n => {
+        netHtml += `<tr><td>${n.ssid}</td><td>${n.bssid}</td><td>${n.signal}dBm</td><td>${n.count}</td></tr>`;
+    });
+    netHtml += '</table>';
+    document.getElementById('rm-recon-networks').innerHTML = Object.keys(networks).length ? netHtml : '<em>No networks found</em>';
+
+    let probeHtml = '<table style="width:100%;font-size:0.8rem"><tr><th>Client MAC</th><th>Probing For</th><th>Count</th></tr>';
+    Object.values(probes).sort((a, b) => b.count - a.count).forEach(p => {
+        probeHtml += `<tr><td>${p.mac}</td><td>${p.ssid}</td><td>${p.count}</td></tr>`;
+    });
+    probeHtml += '</table>';
+    document.getElementById('rm-recon-probes').innerHTML = Object.keys(probes).length ? probeHtml : '<em>No probe requests found</em>';
+}
+
+// ── Frame Injection ─────────────────────────────────────────────────────
+function rmInjTest() {
+    const idx = document.getElementById('rm-inj-radio').value;
+    const radio = rmPiap.radios[idx];
+    const out = document.getElementById('rm-inj-output');
+    out.textContent = 'Testing injection capability...';
+    const cmd = `aireplay-ng --test ${radio.monitor_interface} 2>&1`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        out.textContent = data.stdout || data.stderr || 'No output';
+    });
+}
+
+function rmInjCustom() {
+    const idx = document.getElementById('rm-inj-radio').value;
+    const radio = rmPiap.radios[idx];
+    const args = document.getElementById('rm-inj-cmd').value;
+    const out = document.getElementById('rm-inj-output');
+    const cmd = `aireplay-ng ${args} ${radio.monitor_interface} 2>&1`;
+    _rmPost('exec', {cmd: cmd, radio: radio}).then(data => {
+        out.textContent += (data.stdout || data.stderr || '') + '\n';
+        out.scrollTop = out.scrollHeight;
+    });
+}
+</script>
+
+<style>
+.rm-tab-panel { margin-top: 1rem; }
+.rm-tab-panel table { border-collapse: collapse; }
+.rm-tab-panel th, .rm-tab-panel td { padding: 4px 8px; border-bottom: 1px solid var(--border-color, #333); text-align: left; }
+.rm-tab-panel th { color: var(--text-secondary); font-weight: 600; }
+</style>
+{% endblock %}

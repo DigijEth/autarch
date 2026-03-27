@@ -1,0 +1,541 @@
+{% extends "base.html" %}
+{% block title %}Hardware - AUTARCH{% endblock %}
+
+{% block extra_head %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Hardware Access</h1>
+</div>
+
+<!-- ── Connection Mode Toggle ── -->
+<div class="hw-mode-bar">
+    <span class="hw-mode-label">Connection Mode:</span>
+    <div class="hw-mode-toggle">
+        <button id="hw-mode-server" class="hw-mode-btn active" onclick="hwSetMode('server')">
+            Server
+            <span class="hw-mode-desc">Device on AUTARCH host</span>
+        </button>
+        <button id="hw-mode-direct" class="hw-mode-btn" onclick="hwSetMode('direct')">
+            Direct (WebUSB)
+            <span class="hw-mode-desc">Device on this PC</span>
+        </button>
+    </div>
+    <div id="hw-mode-warning" class="hw-mode-warning" style="display:none"></div>
+</div>
+
+<!-- Status Cards (server mode) -->
+<div id="hw-status-server" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+    <div class="stat-card">
+        <div class="stat-label">ADB</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if status.adb else 'inactive' }}"></span>
+            {{ 'Available' if status.adb else 'Not found' }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Fastboot</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if status.fastboot else 'inactive' }}"></span>
+            {{ 'Available' if status.fastboot else 'Not found' }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Serial</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if status.serial else 'warning' }}"></span>
+            {{ 'Available' if status.serial else 'Not installed' }}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">ESPTool</div>
+        <div class="stat-value small">
+            <span class="status-dot {{ 'active' if status.esptool else 'warning' }}"></span>
+            {{ 'Available' if status.esptool else 'Not installed' }}
+        </div>
+    </div>
+</div>
+
+<!-- Status Cards (direct mode) -->
+<div id="hw-status-direct" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); display:none">
+    <div class="stat-card">
+        <div class="stat-label">WebUSB</div>
+        <div class="stat-value small">
+            <span id="hw-cap-webusb" class="status-dot inactive"></span>
+            <span id="hw-cap-webusb-text">Checking...</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Web Serial</div>
+        <div class="stat-value small">
+            <span id="hw-cap-webserial" class="status-dot inactive"></span>
+            <span id="hw-cap-webserial-text">Checking...</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">ADB Device</div>
+        <div class="stat-value small">
+            <span id="hw-direct-adb-status" class="status-dot inactive"></span>
+            <span id="hw-direct-adb-text">Not connected</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Fastboot Device</div>
+        <div class="stat-value small">
+            <span id="hw-direct-fb-status" class="status-dot inactive"></span>
+            <span id="hw-direct-fb-text">Not connected</span>
+        </div>
+    </div>
+</div>
+
+<!-- Main Tabs -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="hw-main" data-tab="android" onclick="showTab('hw-main','android')">Android (ADB/Fastboot)</button>
+    <button class="tab" data-tab-group="hw-main" data-tab="esp32" onclick="showTab('hw-main','esp32')">ESP32 (Serial)</button>
+    <button class="tab" data-tab-group="hw-main" data-tab="factory" onclick="showTab('hw-main','factory')">Factory Flash</button>
+</div>
+
+<!-- ══ Android Tab ══ -->
+<div class="tab-content active" data-tab-group="hw-main" data-tab="android">
+
+    <!-- Archon Server Bootstrap -->
+    <div id="hw-archon-section" class="section">
+        <h2>Archon Server Bootstrap</h2>
+        <p class="text-muted">Start the ArchonServer privileged process on a USB-connected Android device running the Archon companion app.</p>
+        <div class="tool-actions" style="margin-bottom:12px">
+            <button class="btn btn-primary" onclick="hwArchonBootstrap()">Bootstrap ArchonServer</button>
+            <button class="btn btn-small" onclick="hwArchonStatus()">Check Status</button>
+            <button class="btn btn-stop btn-small" onclick="hwArchonStop()">Stop Server</button>
+        </div>
+        <div id="hw-archon-output" class="output-panel scrollable" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word"></div>
+    </div>
+
+    <!-- Direct-mode ADB connect -->
+    <div id="hw-direct-adb-connect" class="section" style="display:none">
+        <h2>ADB Connection</h2>
+        <p class="text-muted">Connect to an Android device via USB. The device must have USB Debugging enabled.</p>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="hwDirectAdbConnect()">Connect ADB Device</button>
+            <button class="btn btn-danger btn-small" id="hw-direct-adb-disconnect-btn" onclick="hwDirectAdbDisconnect()" style="display:none">Disconnect</button>
+        </div>
+        <div id="hw-direct-adb-msg" class="progress-text"></div>
+    </div>
+
+    <!-- ADB Devices (server mode: list from server, direct mode: show connected) -->
+    <div id="hw-adb-section" class="section">
+        <h2>ADB Devices</h2>
+        <div class="tool-actions" id="hw-adb-refresh-bar">
+            <button class="btn btn-primary btn-small" onclick="hwRefreshAdbDevices()">Refresh</button>
+            <button class="btn btn-danger btn-small" onclick="hwAdbKillServer()">Kill ADB Server</button>
+            <button class="btn btn-small" onclick="hwAdbStartServer()">Start ADB Server</button>
+            <span id="hw-adb-server-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
+        </div>
+        <div id="hw-adb-devices"></div>
+    </div>
+
+    <!-- Device Actions (shown when device selected) -->
+    <div id="hw-device-actions" style="display:none">
+
+        <!-- Device Info -->
+        <div class="section">
+            <h2>Device Info <span id="hw-selected-serial" style="color:var(--accent);font-size:0.85rem"></span></h2>
+            <div id="hw-device-info" class="device-info-grid"></div>
+        </div>
+
+        <!-- Shell -->
+        <div class="section">
+            <h2>ADB Shell</h2>
+            <div class="input-row">
+                <input type="text" id="hw-shell-cmd" placeholder="Enter command (e.g., ls /sdcard, getprop ro.product.model)" onkeydown="if(event.key==='Enter')hwShell()">
+                <button class="btn btn-primary" onclick="hwShell()">Run</button>
+            </div>
+            <div id="hw-shell-output" class="output-panel scrollable" style="max-height:300px"></div>
+        </div>
+
+        <!-- Reboot / Sideload / File Transfer -->
+        <div class="section">
+            <h2>Device Actions</h2>
+            <div class="tool-actions" style="margin-bottom:16px">
+                <button class="btn btn-warning btn-small" onclick="hwReboot('system')">Reboot System</button>
+                <button class="btn btn-warning btn-small" onclick="hwReboot('recovery')">Reboot Recovery</button>
+                <button class="btn btn-warning btn-small" onclick="hwReboot('bootloader')">Reboot Bootloader</button>
+            </div>
+
+            <h3>Sideload / Install</h3>
+            <!-- Server mode: text path input -->
+            <div id="hw-sideload-server" class="input-row">
+                <input type="text" id="hw-sideload-path" placeholder="Path to APK or ZIP file">
+                <button class="btn btn-primary" onclick="hwSideload()">Sideload</button>
+            </div>
+            <!-- Direct mode: file picker -->
+            <div id="hw-sideload-direct" class="input-row" style="display:none">
+                <input type="file" id="hw-sideload-file" accept=".apk,.zip">
+                <button class="btn btn-primary" onclick="hwSideloadDirect()">Install APK</button>
+            </div>
+            <div id="hw-sideload-progress" style="display:none">
+                <div class="hw-progress">
+                    <div class="hw-progress-fill" id="hw-sideload-fill" style="width:0%">
+                        <span class="hw-progress-text" id="hw-sideload-pct">0%</span>
+                    </div>
+                </div>
+                <div class="progress-text" id="hw-sideload-msg"></div>
+            </div>
+
+            <h3 style="margin-top:16px">File Transfer</h3>
+            <!-- Server mode: text paths -->
+            <div id="hw-transfer-server">
+                <div class="form-row" style="margin-bottom:8px">
+                    <div class="form-group">
+                        <label>Local Path</label>
+                        <input type="text" id="hw-push-local" placeholder="/path/to/local/file">
+                    </div>
+                    <div class="form-group">
+                        <label>Remote Path</label>
+                        <input type="text" id="hw-push-remote" placeholder="/sdcard/Download/">
+                    </div>
+                </div>
+                <div class="tool-actions">
+                    <button class="btn btn-small" onclick="hwPush()">Push to Device</button>
+                    <button class="btn btn-small" onclick="hwPull()">Pull from Device</button>
+                </div>
+            </div>
+            <!-- Direct mode: file picker + remote path -->
+            <div id="hw-transfer-direct" style="display:none">
+                <div class="form-row" style="margin-bottom:8px">
+                    <div class="form-group">
+                        <label>File to Push</label>
+                        <input type="file" id="hw-push-file">
+                    </div>
+                    <div class="form-group">
+                        <label>Remote Path</label>
+                        <input type="text" id="hw-push-remote-direct" placeholder="/sdcard/Download/">
+                    </div>
+                </div>
+                <div class="tool-actions">
+                    <button class="btn btn-small" onclick="hwPushDirect()">Push to Device</button>
+                    <button class="btn btn-small" onclick="hwPullDirect()">Pull from Device</button>
+                </div>
+            </div>
+            <div class="progress-text" id="hw-transfer-msg"></div>
+
+            <h3 style="margin-top:16px">Logcat</h3>
+            <div class="input-row">
+                <input type="number" id="hw-logcat-lines" value="50" min="10" max="1000" style="max-width:100px">
+                <button class="btn btn-small" onclick="hwLogcat()">Get Logcat</button>
+            </div>
+            <div id="hw-logcat-output" class="output-panel scrollable" style="max-height:250px;display:none"></div>
+        </div>
+    </div>
+
+    <!-- Direct-mode Fastboot connect -->
+    <div id="hw-direct-fb-connect" class="section" style="display:none">
+        <h2>Fastboot Connection</h2>
+        <p class="text-muted">Connect to a device in bootloader/fastboot mode via USB.</p>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="hwDirectFbConnect()">Connect Fastboot Device</button>
+            <button class="btn btn-danger btn-small" id="hw-direct-fb-disconnect-btn" onclick="hwDirectFbDisconnect()" style="display:none">Disconnect</button>
+        </div>
+        <div id="hw-direct-fb-msg" class="progress-text"></div>
+    </div>
+
+    <!-- Fastboot Devices (server mode) -->
+    <div id="hw-fastboot-section" class="section">
+        <h2>Fastboot Devices</h2>
+        <div class="tool-actions" id="hw-fb-refresh-bar">
+            <button class="btn btn-primary btn-small" onclick="hwRefreshFastbootDevices()">Refresh</button>
+        </div>
+        <div id="hw-fastboot-devices"></div>
+    </div>
+
+    <!-- Fastboot Actions (shown when fastboot device selected) -->
+    <div id="hw-fastboot-actions" style="display:none">
+        <div class="section">
+            <h2>Fastboot Info <span id="hw-fb-selected" style="color:var(--accent);font-size:0.85rem"></span></h2>
+            <div id="hw-fastboot-info" class="device-info-grid"></div>
+
+            <h3 style="margin-top:16px">Flash Partition</h3>
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Partition</label>
+                    <select id="hw-fb-partition">
+                        <option value="boot">boot</option>
+                        <option value="recovery">recovery</option>
+                        <option value="system">system</option>
+                        <option value="vendor">vendor</option>
+                        <option value="vbmeta">vbmeta</option>
+                        <option value="dtbo">dtbo</option>
+                        <option value="vendor_boot">vendor_boot</option>
+                        <option value="init_boot">init_boot</option>
+                        <option value="radio">radio</option>
+                        <option value="bootloader">bootloader</option>
+                    </select>
+                </div>
+                <div class="form-group" id="hw-fb-firmware-server">
+                    <label>Firmware Image</label>
+                    <input type="text" id="hw-fb-firmware" placeholder="Path to firmware image file">
+                </div>
+                <div class="form-group" id="hw-fb-firmware-direct" style="display:none">
+                    <label>Firmware Image</label>
+                    <input type="file" id="hw-fb-firmware-file" accept=".img,.bin,.mbn">
+                </div>
+            </div>
+            <div class="tool-actions">
+                <button class="btn btn-primary" onclick="hwFastbootFlash()">Flash</button>
+            </div>
+            <div id="hw-fb-flash-progress" style="display:none">
+                <div class="hw-progress">
+                    <div class="hw-progress-fill" id="hw-fb-flash-fill" style="width:0%">
+                        <span class="hw-progress-text" id="hw-fb-flash-pct">0%</span>
+                    </div>
+                </div>
+                <div class="progress-text" id="hw-fb-flash-msg"></div>
+            </div>
+
+            <h3 style="margin-top:16px">Fastboot Actions</h3>
+            <div class="tool-actions">
+                <button class="btn btn-warning btn-small" onclick="hwFastbootReboot('system')">Reboot System</button>
+                <button class="btn btn-warning btn-small" onclick="hwFastbootReboot('bootloader')">Reboot Bootloader</button>
+                <button class="btn btn-warning btn-small" onclick="hwFastbootReboot('recovery')">Reboot Recovery</button>
+                <button class="btn btn-danger btn-small" onclick="hwFastbootUnlock()">OEM Unlock</button>
+            </div>
+            <div id="hw-fb-confirm" style="display:none" class="confirm-dialog">
+                <p>WARNING: OEM Unlock will erase all data on the device. This cannot be undone. Continue?</p>
+                <div class="tool-actions">
+                    <button class="btn btn-danger btn-small" onclick="hwFastbootUnlockConfirm()">Yes, Unlock</button>
+                    <button class="btn btn-small" onclick="document.getElementById('hw-fb-confirm').style.display='none'">Cancel</button>
+                </div>
+            </div>
+            <div class="progress-text" id="hw-fb-msg"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ ESP32 Tab ══ -->
+<div class="tab-content" data-tab-group="hw-main" data-tab="esp32">
+
+    <!-- Direct-mode serial connect -->
+    <div id="hw-direct-esp-connect" class="section" style="display:none">
+        <h2>Serial Connection</h2>
+        <p class="text-muted">Connect to an ESP32/ESP8266 device via USB serial. Select the device from the browser's serial port picker.</p>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="hwDirectEspConnect()">Select Serial Port</button>
+            <button class="btn btn-danger btn-small" id="hw-direct-esp-disconnect-btn" onclick="hwDirectEspDisconnect()" style="display:none">Disconnect</button>
+        </div>
+        <div id="hw-direct-esp-msg" class="progress-text"></div>
+    </div>
+
+    <!-- Serial Ports (server mode) -->
+    <div id="hw-serial-section">
+        <div class="section">
+            <h2>Serial Ports</h2>
+            <div class="tool-actions">
+                <button class="btn btn-primary btn-small" onclick="hwRefreshSerialPorts()">Refresh</button>
+            </div>
+            <div id="hw-serial-ports"></div>
+        </div>
+
+        <!-- Chip Detection -->
+        <div class="section">
+            <h2>Chip Detection</h2>
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Port</label>
+                    <select id="hw-detect-port"><option value="">Select port...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Baud Rate</label>
+                    <select id="hw-detect-baud">
+                        <option value="115200" selected>115200</option>
+                        <option value="9600">9600</option>
+                        <option value="57600">57600</option>
+                        <option value="230400">230400</option>
+                        <option value="460800">460800</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+            </div>
+            <div class="tool-actions">
+                <button class="btn btn-primary" onclick="hwDetectChip()">Detect Chip</button>
+            </div>
+            <div id="hw-detect-result" class="progress-text"></div>
+        </div>
+    </div>
+
+    <!-- ESP32 Flash -->
+    <div class="section">
+        <h2>Flash Firmware</h2>
+        <!-- Server mode: port select + text path -->
+        <div id="hw-esp-flash-server">
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Port</label>
+                    <select id="hw-flash-port"><option value="">Select port...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Baud Rate</label>
+                    <select id="hw-flash-baud">
+                        <option value="460800" selected>460800</option>
+                        <option value="115200">115200</option>
+                        <option value="230400">230400</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Firmware File</label>
+                    <input type="text" id="hw-flash-firmware" placeholder="Path to firmware binary">
+                </div>
+            </div>
+        </div>
+        <!-- Direct mode: file picker + address -->
+        <div id="hw-esp-flash-direct" style="display:none">
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Baud Rate</label>
+                    <select id="hw-flash-baud-direct">
+                        <option value="460800" selected>460800</option>
+                        <option value="115200">115200</option>
+                        <option value="230400">230400</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Firmware File</label>
+                    <input type="file" id="hw-flash-firmware-file" accept=".bin,.elf">
+                </div>
+                <div class="form-group">
+                    <label>Flash Address (hex)</label>
+                    <input type="text" id="hw-flash-address" value="0x0" placeholder="0x0">
+                </div>
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="hwFlashEsp()">Flash</button>
+        </div>
+        <div id="hw-esp-flash-progress" style="display:none">
+            <div class="hw-progress">
+                <div class="hw-progress-fill" id="hw-esp-flash-fill" style="width:0%">
+                    <span class="hw-progress-text" id="hw-esp-flash-pct">0%</span>
+                </div>
+            </div>
+            <div class="progress-text" id="hw-esp-flash-msg"></div>
+        </div>
+    </div>
+
+    <!-- Serial Monitor -->
+    <div class="section">
+        <h2>Serial Monitor</h2>
+        <!-- Server mode: port selector -->
+        <div id="hw-monitor-server">
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Port</label>
+                    <select id="hw-monitor-port"><option value="">Select port...</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Baud Rate</label>
+                    <select id="hw-monitor-baud">
+                        <option value="115200" selected>115200</option>
+                        <option value="9600">9600</option>
+                        <option value="57600">57600</option>
+                        <option value="230400">230400</option>
+                        <option value="460800">460800</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <!-- Direct mode: baud only (port already selected) -->
+        <div id="hw-monitor-direct" style="display:none">
+            <div class="form-row" style="margin-bottom:8px">
+                <div class="form-group">
+                    <label>Baud Rate</label>
+                    <select id="hw-monitor-baud-direct">
+                        <option value="115200" selected>115200</option>
+                        <option value="9600">9600</option>
+                        <option value="57600">57600</option>
+                        <option value="230400">230400</option>
+                        <option value="460800">460800</option>
+                        <option value="921600">921600</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button id="hw-monitor-start-btn" class="btn btn-primary btn-small" onclick="hwMonitorStart()">Start Monitor</button>
+            <button id="hw-monitor-stop-btn" class="btn btn-stop btn-small" onclick="hwMonitorStop()" style="display:none">Stop</button>
+            <button class="btn btn-small" onclick="hwMonitorClear()">Clear</button>
+        </div>
+        <div id="hw-monitor-output" class="serial-monitor"></div>
+        <div class="serial-input-row">
+            <input type="text" id="hw-monitor-input" placeholder="Send data..." onkeydown="if(event.key==='Enter')hwMonitorSend()">
+            <button class="btn btn-small" onclick="hwMonitorSend()">Send</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ Factory Flash Tab (Direct mode only) ══ -->
+<div class="tab-content" data-tab-group="hw-main" data-tab="factory">
+    <div class="section">
+        <h2>Factory Image Flash</h2>
+        <p class="text-muted">Flash a complete factory image to an Android device. Inspired by PixelFlasher. Requires Direct mode with a device in fastboot.</p>
+
+        <div id="hw-factory-requires-direct" style="display:none">
+            <div class="hw-mode-warning">This feature requires Direct mode. Switch to Direct mode and connect a fastboot device first.</div>
+        </div>
+
+        <div id="hw-factory-controls">
+            <!-- Step 1: Select factory image -->
+            <div class="form-row" style="margin-bottom:16px">
+                <div class="form-group" style="flex:2">
+                    <label>Factory Image ZIP</label>
+                    <input type="file" id="hw-factory-zip" accept=".zip" onchange="hwFactoryZipSelected(this)">
+                </div>
+            </div>
+
+            <!-- Step 2: Flash plan (populated after ZIP selected) -->
+            <div id="hw-factory-plan" style="display:none">
+                <h3>Flash Plan</h3>
+                <div id="hw-factory-device-check" class="progress-text"></div>
+                <div id="hw-factory-plan-details"></div>
+
+                <!-- Options -->
+                <div class="form-row" style="margin:16px 0">
+                    <label class="hw-checkbox"><input type="checkbox" id="hw-factory-skip-userdata" checked> Skip userdata (preserve data)</label>
+                    <label class="hw-checkbox"><input type="checkbox" id="hw-factory-disable-vbmeta"> Disable vbmeta verification</label>
+                </div>
+
+                <!-- Step 3: Flash -->
+                <div class="tool-actions">
+                    <button class="btn btn-primary" onclick="hwFactoryFlash()">Flash Factory Image</button>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="hw-factory-progress" style="display:none">
+                <div class="hw-progress">
+                    <div class="hw-progress-fill" id="hw-factory-fill" style="width:0%">
+                        <span class="hw-progress-text" id="hw-factory-pct">0%</span>
+                    </div>
+                </div>
+                <div class="progress-text" id="hw-factory-msg"></div>
+                <div id="hw-factory-log" class="output-panel scrollable" style="max-height:200px;margin-top:8px"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize mode from localStorage
+    var savedMode = localStorage.getItem('hw_connection_mode') || 'server';
+    hwSetMode(savedMode);
+
+    // Server mode: auto-refresh
+    if (savedMode === 'server') {
+        hwRefreshAdbDevices();
+        hwRefreshFastbootDevices();
+        hwRefreshSerialPorts();
+    }
+});
+</script>
+{% endblock %}

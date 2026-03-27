@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "auto_block_top_talkers": false,
+  "auto_enable_syn_cookies": true,
+  "connection_threshold": 100,
+  "syn_threshold": 50,
+  "updated": "2026-03-20T05:22:38.105465"
+}

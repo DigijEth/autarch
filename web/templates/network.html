@@ -1,0 +1,895 @@
+{% extends "base.html" %}
+{% block title %}Network Security - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Network Security</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Connection analysis, intrusion detection, rogue device scanning, and real-time monitoring.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar" id="network-tab-bar">
+    <button class="tab active" onclick="networkTab('connections')">Connections</button>
+    <button class="tab" onclick="networkTab('ids')">Intrusion Detection</button>
+    <button class="tab" onclick="networkTab('rogue')">Rogue Devices</button>
+    <button class="tab" onclick="networkTab('monitor')">Monitor</button>
+    <button class="tab" onclick="networkTab('wifi')">WiFi Scanner</button>
+    <button class="tab" onclick="networkTab('attacks')">Attack Detection</button>
+    <button class="tab" onclick="networkTab('arpspoof')">ARP Spoof</button>
+    <button class="tab" onclick="networkTab('ssid')">SSID Map</button>
+</div>
+
+<!-- ==================== CONNECTIONS TAB ==================== -->
+<div class="network-tab-panel" id="network-tab-connections">
+
+<div class="section">
+    <h2>Active Connections</h2>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+        <button class="btn btn-primary" onclick="scanConnections()">Scan Connections</button>
+        <button class="btn" onclick="scanArpTable()">ARP Table</button>
+        <button class="btn" onclick="scanInterfaces()">Interfaces</button>
+    </div>
+    <div id="conn-status" style="margin-bottom:0.5rem;font-size:0.85rem;color:var(--text-secondary)"></div>
+    <div id="conn-results" style="overflow-x:auto"></div>
+</div>
+
+</div>
+
+<!-- ==================== INTRUSION DETECTION TAB ==================== -->
+<div class="network-tab-panel hidden" id="network-tab-ids">
+
+<div class="section">
+    <h2>Intrusion Detection System</h2>
+    <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem">
+        <button class="btn btn-primary" onclick="runIdsScan()">Run IDS Scan</button>
+        <span id="ids-overall" style="font-size:0.85rem"></span>
+    </div>
+    <div id="ids-results"></div>
+</div>
+
+</div>
+
+<!-- ==================== ROGUE DEVICES TAB ==================== -->
+<div class="network-tab-panel hidden" id="network-tab-rogue">
+
+<div class="section">
+    <h2>Rogue Device Detection</h2>
+    <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem">
+        <button class="btn btn-primary" onclick="scanRogueDevices()">Scan for Rogues</button>
+        <span id="rogue-summary" style="font-size:0.85rem;color:var(--text-secondary)"></span>
+    </div>
+
+    <div id="rogue-new" style="margin-bottom:1rem"></div>
+
+    <h3 style="margin-top:1rem">Known Devices</h3>
+    <div id="rogue-known" style="overflow-x:auto"></div>
+</div>
+
+</div>
+
+<!-- ==================== MONITOR TAB ==================== -->
+<div class="network-tab-panel hidden" id="network-tab-monitor">
+
+<div class="section">
+    <h2>Real-Time Connection Monitor</h2>
+    <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1rem">
+        <button class="btn btn-primary" id="monitor-start-btn" onclick="startMonitor()">Start Monitor</button>
+        <button class="btn btn-danger" id="monitor-stop-btn" onclick="stopMonitor()" disabled>Stop Monitor</button>
+        <span id="monitor-status" style="font-size:0.85rem;color:var(--text-secondary)">Stopped</span>
+    </div>
+    <div id="monitor-feed" style="overflow-x:auto;max-height:500px;overflow-y:auto">
+        <table class="data-table" style="font-size:0.8rem">
+            <thead><tr><th>Time</th><th>Protocol</th><th>Local</th><th>Remote</th><th>Process</th></tr></thead>
+            <tbody id="monitor-body"></tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+
+<!-- WiFi Scanner Tab -->
+<div class="network-tab-panel hidden" id="network-tab-wifi">
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">WiFi Network Scanner</h3>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Scan for nearby WiFi networks. Shows SSIDs, BSSIDs, channels, signal strength, and security.
+            Requires a wireless interface.
+        </p>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="wifiScan()">Scan WiFi Networks</button>
+        </div>
+        <div id="wifi-scan-status" style="font-size:0.82rem;color:var(--text-muted);margin-bottom:0.5rem"></div>
+        <div id="wifi-scan-results"></div>
+    </div>
+</div>
+
+<!-- Attack Detection Tab -->
+<div class="network-tab-panel hidden" id="network-tab-attacks">
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">WiFi Attack Detection</h3>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Scan for active attacks against your network: deauth floods, evil twin APs,
+            WiFi Pineapple rogue APs, MITM/ARP poisoning, and SSL stripping.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="detectAttacks()" id="btn-detect-attacks">Run Attack Detection</button>
+            <span id="attack-detect-status" style="font-size:0.82rem;color:var(--text-muted)"></span>
+        </div>
+        <div id="attack-results"></div>
+    </div>
+
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Pentesting Tools</h3>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Launch offensive WiFi tools for authorized penetration testing.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.5rem">
+            <a href="/deauth" class="btn btn-sm" style="text-align:center;text-decoration:none;border:1px solid var(--danger,#f55);color:var(--danger,#f55)">Deauth Attack</a>
+            <a href="/pineapple" class="btn btn-sm" style="text-align:center;text-decoration:none;border:1px solid var(--danger,#f55);color:var(--danger,#f55)">Pineapple / Evil Twin</a>
+            <a href="/mitm-proxy" class="btn btn-sm" style="text-align:center;text-decoration:none;border:1px solid var(--danger,#f55);color:var(--danger,#f55)">MITM Proxy</a>
+            <a href="/wifi/" class="btn btn-sm" style="text-align:center;text-decoration:none;border:1px solid var(--danger,#f55);color:var(--danger,#f55)">WiFi Audit</a>
+        </div>
+    </div>
+</div>
+
+<!-- ARP Spoof Detection & Remediation Tab -->
+<div class="network-tab-panel hidden" id="network-tab-arpspoof">
+
+    <!-- Detection -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">ARP Spoof Detection</h3>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Scans your ARP table for poisoning indicators: IPs with multiple MACs, gateway MAC changes,
+            and suspicious broadcast entries. Compares against your saved baseline.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="arpSpoofScan()" id="btn-arp-scan">Scan for ARP Spoofing</button>
+            <button class="btn btn-sm" onclick="arpSaveBaseline()" id="btn-arp-baseline">Save Current as Baseline</button>
+            <span id="arp-scan-status" style="font-size:0.82rem;color:var(--text-muted)"></span>
+        </div>
+        <div id="arp-scan-results"></div>
+    </div>
+
+    <!-- ARP Table -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Current ARP Table</h3>
+        <div id="arp-table-display"></div>
+    </div>
+
+    <!-- Remediation Tools -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Remediation Tools</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem;font-size:0.82rem">
+
+            <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.65rem;background:var(--bg-main)">
+                <strong>Flush &amp; Set Static ARP</strong>
+                <div style="color:var(--text-muted);font-size:0.75rem;margin:0.3rem 0">
+                    Remove the poisoned entry and lock in the correct MAC for an IP.
+                </div>
+                <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
+                    <input type="text" id="arp-fix-ip" placeholder="IP (e.g. 192.168.1.1)" style="flex:1;padding:0.3rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card);color:inherit;font-size:0.78rem">
+                    <input type="text" id="arp-fix-mac" placeholder="MAC (e.g. aa:bb:cc:dd:ee:ff)" style="flex:1;padding:0.3rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card);color:inherit;font-size:0.78rem">
+                </div>
+                <button class="btn btn-sm" onclick="arpFixStatic()" style="margin-top:0.4rem">Flush &amp; Set Static</button>
+            </div>
+
+            <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.65rem;background:var(--bg-main)">
+                <strong>Enable Kernel ARP Protection</strong>
+                <div style="color:var(--text-muted);font-size:0.75rem;margin:0.3rem 0">
+                    Set <code>arp_announce=2</code>, <code>arp_ignore=1</code>, and <code>rp_filter=1</code>
+                    to make the kernel reject suspicious ARP replies.
+                </div>
+                <button class="btn btn-sm" onclick="arpEnableProtection()" style="margin-top:0.4rem">Enable Protection</button>
+            </div>
+
+            <div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.65rem;background:var(--bg-main)">
+                <strong>Flush Specific Entry</strong>
+                <div style="color:var(--text-muted);font-size:0.75rem;margin:0.3rem 0">
+                    Remove a single IP from the ARP cache so it re-learns the correct MAC.
+                </div>
+                <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
+                    <input type="text" id="arp-flush-ip" placeholder="IP to flush" style="flex:1;padding:0.3rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card);color:inherit;font-size:0.78rem">
+                    <button class="btn btn-sm" onclick="arpFlushEntry()">Flush</button>
+                </div>
+            </div>
+        </div>
+        <div id="arp-fix-results" style="margin-top:0.75rem"></div>
+    </div>
+
+    <!-- How to Fix Guide -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">How ARP Spoofing Works &amp; How to Fix It</h3>
+        <div style="font-size:0.8rem;color:var(--text-secondary);line-height:1.65">
+            <p><strong>What is ARP Spoofing?</strong><br>
+            An attacker sends fake ARP (Address Resolution Protocol) replies to associate their MAC address
+            with the IP of another device (usually the gateway). This causes your traffic to route through
+            the attacker's machine instead of directly to the router — enabling eavesdropping, credential
+            theft, and session hijacking.</p>
+
+            <p style="margin-top:0.6rem"><strong>Signs you're being spoofed:</strong></p>
+            <ul style="padding-left:1.2rem;margin:0.3rem 0">
+                <li>An IP address (especially the gateway) shows multiple MAC addresses</li>
+                <li>Your gateway's MAC address changed from what it was before</li>
+                <li>Internet is slow or connections drop intermittently</li>
+                <li>HTTPS certificate warnings appearing on sites that worked before</li>
+            </ul>
+
+            <p style="margin-top:0.6rem"><strong>Immediate fix (Linux):</strong></p>
+            <pre style="background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;font-size:0.75rem;overflow-x:auto;margin:0.3rem 0"><span style="color:var(--text-muted)"># 1. Find your gateway IP and its REAL MAC (check your router's label)</span>
+ip route show default
+<span style="color:var(--text-muted)"># 2. Flush the poisoned entry</span>
+sudo ip neigh flush 192.168.1.1
+<span style="color:var(--text-muted)"># 3. Set a static ARP entry (replace with your router's real MAC)</span>
+sudo arp -s 192.168.1.1 aa:bb:cc:dd:ee:ff
+<span style="color:var(--text-muted)"># 4. Enable kernel-level ARP protection</span>
+sudo sysctl -w net.ipv4.conf.all.arp_announce=2
+sudo sysctl -w net.ipv4.conf.all.arp_ignore=1
+sudo sysctl -w net.ipv4.conf.all.rp_filter=1</pre>
+
+            <p style="margin-top:0.6rem"><strong>Permanent fix:</strong></p>
+            <ul style="padding-left:1.2rem;margin:0.3rem 0">
+                <li>Add the sysctl settings to <code>/etc/sysctl.conf</code> so they persist across reboots</li>
+                <li>Use <strong>Dynamic ARP Inspection (DAI)</strong> on managed switches</li>
+                <li>Use <strong>802.1X port authentication</strong> on your network</li>
+                <li>Use a VPN — encrypted traffic can't be read even if intercepted</li>
+                <li>Install <strong>arpwatch</strong>: <code>sudo apt install arpwatch</code> — monitors ARP changes 24/7</li>
+            </ul>
+
+            <p style="margin-top:0.6rem"><strong>Find the attacker:</strong></p>
+            <ul style="padding-left:1.2rem;margin:0.3rem 0">
+                <li>Note the attacker's MAC address from the scan results</li>
+                <li>Use the <strong>Intruder Trace</strong> section below with the attacker's IP</li>
+                <li>Check your router's DHCP lease table to identify the device</li>
+                <li>Run <code>nmap -sn 192.168.1.0/24</code> to find all devices and their MACs</li>
+                <li>Block the attacker: <code>sudo iptables -A INPUT -m mac --mac-source XX:XX:XX:XX:XX:XX -j DROP</code></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- SSID Map Tab -->
+<div class="network-tab-panel hidden" id="network-tab-ssid">
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">SSID Scanner &amp; Mapper</h3>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">
+            Map all WiFi networks in range. Groups access points by SSID, showing all BSSIDs,
+            channels, signal strength, and security for each network. Useful for identifying
+            multi-AP deployments and spotting rogues.
+        </p>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="ssidMap()" id="btn-ssid-map">Build SSID Map</button>
+            <span id="ssid-map-status" style="font-size:0.82rem;color:var(--text-muted)"></span>
+        </div>
+        <div id="ssid-map-results"></div>
+    </div>
+</div>
+
+<!-- ==================== INTRUDER TRACE (always visible) ==================== -->
+<div class="section" style="margin-top:2rem;border-top:1px solid var(--border);padding-top:1.5rem">
+    <h2>Intruder Trace</h2>
+    <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">
+        Trace an IP address: reverse DNS, GeoIP, whois, open ports, associated processes, connection history.
+    </p>
+    <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <input type="text" id="trace-ip" class="form-control" placeholder="Enter IP address" style="max-width:250px">
+        <button class="btn btn-primary" onclick="traceIntruder()">Trace</button>
+    </div>
+    <div id="trace-status" style="margin-top:0.5rem;font-size:0.85rem;color:var(--text-secondary)"></div>
+    <div id="trace-results" style="margin-top:1rem"></div>
+</div>
+
+<style>
+.hidden { display: none !important; }
+.ids-group {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+.ids-group h4 {
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.severity-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.severity-critical { background: rgba(239,68,68,0.2); color: #ef4444; }
+.severity-warning { background: rgba(234,179,8,0.2); color: #eab308; }
+.severity-clean { background: rgba(34,197,94,0.2); color: #22c55e; }
+.rogue-new-device {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.trace-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+.trace-section h4 { margin: 0 0 0.5rem 0; color: var(--accent); }
+.trace-section pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-height: 200px;
+    overflow-y: auto;
+}
+</style>
+
+<script>
+/* ── Tab switching ── */
+function networkTab(name) {
+    var panels = document.querySelectorAll('.network-tab-panel');
+    for (var i = 0; i < panels.length; i++) panels[i].classList.add('hidden');
+    var tabs = document.querySelectorAll('#network-tab-bar .tab');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    document.getElementById('network-tab-' + name).classList.remove('hidden');
+    event.target.classList.add('active');
+}
+
+/* ── Helpers ── */
+function postJSON(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: body ? JSON.stringify(body) : '{}'
+    }).then(function(r) { return r.json(); });
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Connections ── */
+function scanConnections() {
+    var el = document.getElementById('conn-results');
+    var st = document.getElementById('conn-status');
+    st.textContent = 'Scanning connections...';
+    el.innerHTML = '';
+    postJSON('/network/connections').then(function(d) {
+        if (!d.ok) { st.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        st.textContent = d.count + ' connection(s) found';
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>' +
+            '<th>Protocol</th><th>Local</th><th>Remote</th><th>State</th><th>Process</th></tr></thead><tbody>';
+        for (var i = 0; i < d.connections.length; i++) {
+            var c = d.connections[i];
+            html += '<tr><td>' + escHtml(c.protocol) + '</td><td>' + escHtml(c.local) +
+                '</td><td>' + escHtml(c.remote) + '</td><td>' + escHtml(c.state) +
+                '</td><td>' + escHtml(c.process) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+        halAnalyze('Network: Connection Scan', JSON.stringify(d, null, 2), 'network scan', 'network');
+    }).catch(function(e) { st.textContent = 'Error: ' + e; });
+}
+
+function scanArpTable() {
+    var el = document.getElementById('conn-results');
+    var st = document.getElementById('conn-status');
+    st.textContent = 'Fetching ARP table...';
+    el.innerHTML = '';
+    postJSON('/network/arp-table').then(function(d) {
+        if (!d.ok) { st.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        st.textContent = d.count + ' ARP entries';
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>' +
+            '<th>IP</th><th>MAC</th><th>Interface</th><th>State</th></tr></thead><tbody>';
+        for (var i = 0; i < d.entries.length; i++) {
+            var e = d.entries[i];
+            html += '<tr><td>' + escHtml(e.ip) + '</td><td>' + escHtml(e.mac) +
+                '</td><td>' + escHtml(e.dev) + '</td><td>' + escHtml(e.state) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    }).catch(function(e) { st.textContent = 'Error: ' + e; });
+}
+
+function scanInterfaces() {
+    var el = document.getElementById('conn-results');
+    var st = document.getElementById('conn-status');
+    st.textContent = 'Listing interfaces...';
+    el.innerHTML = '';
+    postJSON('/network/interfaces').then(function(d) {
+        if (!d.ok) { st.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        st.textContent = d.interfaces.length + ' interface(s)';
+        var html = '<table class="data-table" style="font-size:0.8rem"><thead><tr>' +
+            '<th>Name</th><th>State</th><th>MAC</th><th>MTU</th><th>Addresses</th></tr></thead><tbody>';
+        for (var i = 0; i < d.interfaces.length; i++) {
+            var ifc = d.interfaces[i];
+            var addrs = '';
+            if (ifc.addresses) {
+                for (var j = 0; j < ifc.addresses.length; j++) {
+                    if (j > 0) addrs += '<br>';
+                    addrs += escHtml(ifc.addresses[j].address || '');
+                }
+            }
+            html += '<tr><td><strong>' + escHtml(ifc.name) + '</strong></td><td>' + escHtml(ifc.state) +
+                '</td><td>' + escHtml(ifc.mac) + '</td><td>' + escHtml(ifc.mtu) +
+                '</td><td>' + addrs + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    }).catch(function(e) { st.textContent = 'Error: ' + e; });
+}
+
+/* ── IDS ── */
+function severityBadge(sev) {
+    return '<span class="severity-badge severity-' + sev + '">' + sev + '</span>';
+}
+
+function runIdsScan() {
+    var el = document.getElementById('ids-results');
+    var ov = document.getElementById('ids-overall');
+    ov.innerHTML = 'Scanning...';
+    el.innerHTML = '';
+    postJSON('/network/ids/scan').then(function(d) {
+        if (!d.ok) { ov.textContent = 'Scan failed'; return; }
+        var r = d.results;
+        ov.innerHTML = 'Overall: ' + severityBadge(r.overall);
+
+        var groups = [
+            {key: 'arp_spoof', title: 'ARP Spoof Detection'},
+            {key: 'promiscuous', title: 'Promiscuous Mode'},
+            {key: 'dhcp', title: 'Unauthorized DHCP'},
+            {key: 'suspicious_conns', title: 'Suspicious Connections'},
+            {key: 'raw_sockets', title: 'Raw Socket Processes'}
+        ];
+
+        var html = '';
+        for (var i = 0; i < groups.length; i++) {
+            var g = groups[i];
+            var data = r[g.key];
+            html += '<div class="ids-group">';
+            html += '<h4>' + escHtml(g.title) + ' ' + severityBadge(data.severity) + '</h4>';
+            html += '<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 0.5rem 0">' + escHtml(data.details) + '</p>';
+            if (data.alerts && data.alerts.length > 0) {
+                html += '<ul style="margin:0;padding-left:1.2rem;font-size:0.8rem">';
+                for (var j = 0; j < data.alerts.length; j++) {
+                    var sev = data.severity === 'critical' ? 'color:#ef4444' : 'color:#eab308';
+                    html += '<li style="' + sev + ';margin-bottom:0.25rem">' + escHtml(data.alerts[j].message) + '</li>';
+                }
+                html += '</ul>';
+            }
+            html += '</div>';
+        }
+        el.innerHTML = html;
+        halAnalyze('Network: IDS Scan', JSON.stringify(d, null, 2), 'network scan', 'network');
+    }).catch(function(e) { ov.textContent = 'Error: ' + e; });
+}
+
+/* ── Rogue Devices ── */
+function scanRogueDevices() {
+    var newEl = document.getElementById('rogue-new');
+    var knownEl = document.getElementById('rogue-known');
+    var sumEl = document.getElementById('rogue-summary');
+    sumEl.textContent = 'Scanning...';
+    newEl.innerHTML = '';
+    knownEl.innerHTML = '';
+    postJSON('/network/rogue-detect').then(function(d) {
+        if (!d.ok) { sumEl.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        var s = d.summary;
+        sumEl.textContent = s.total + ' devices found, ' + s.known + ' known, ' + s.new + ' new, ' + s.spoofed + ' spoofed';
+
+        // New/unauthorized devices
+        if (d.new_devices.length > 0) {
+            var html = '<h3 style="color:#ef4444;margin-bottom:0.5rem">New / Unknown Devices</h3>';
+            for (var i = 0; i < d.new_devices.length; i++) {
+                var dev = d.new_devices[i];
+                html += '<div class="rogue-new-device">';
+                html += '<div><strong>' + escHtml(dev.ip) + '</strong> &mdash; ' + escHtml(dev.mac) + '</div>';
+                html += '<div style="display:flex;gap:0.5rem">';
+                html += '<button class="btn btn-sm" onclick="trustDevice(\'' + escHtml(dev.ip) + '\',\'' + escHtml(dev.mac) + '\')">Trust</button>';
+                html += '<button class="btn btn-danger btn-sm" onclick="blockDevice(\'' + escHtml(dev.ip) + '\')">Block</button>';
+                html += '</div></div>';
+            }
+            newEl.innerHTML = html;
+        }
+
+        // Spoofed alerts
+        if (d.spoofed.length > 0) {
+            var shtml = '<h3 style="color:#ef4444;margin:1rem 0 0.5rem 0">Spoofed MAC Alerts</h3>';
+            for (var i = 0; i < d.spoofed.length; i++) {
+                shtml += '<div class="rogue-new-device">' + escHtml(d.spoofed[i].message) + '</div>';
+            }
+            newEl.innerHTML += shtml;
+        }
+
+        // Known devices table
+        var known = d.known_devices;
+        var keys = Object.keys(known);
+        if (keys.length > 0) {
+            var khtml = '<table class="data-table" style="font-size:0.8rem"><thead><tr>' +
+                '<th>IP</th><th>MAC</th><th>Trusted</th><th>First Seen</th><th>Last Seen</th></tr></thead><tbody>';
+            for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                var kd = known[k];
+                khtml += '<tr><td>' + escHtml(k) + '</td><td>' + escHtml(kd.mac) +
+                    '</td><td>' + (kd.trusted ? 'Yes' : 'No') +
+                    '</td><td>' + escHtml(kd.first_seen || '') +
+                    '</td><td>' + escHtml(kd.last_seen || '') + '</td></tr>';
+            }
+            khtml += '</tbody></table>';
+            knownEl.innerHTML = khtml;
+        } else {
+            knownEl.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No known devices yet. Scan and trust devices to build your baseline.</p>';
+        }
+        halAnalyze('Network: Rogue Device Scan', JSON.stringify(d, null, 2), 'network scan', 'network');
+    }).catch(function(e) { sumEl.textContent = 'Error: ' + e; });
+}
+
+function trustDevice(ip, mac) {
+    postJSON('/network/rogue-detect/trust', {ip: ip, mac: mac}).then(function(d) {
+        if (d.ok) scanRogueDevices();
+        else alert('Error: ' + (d.error || 'unknown'));
+    });
+}
+
+function blockDevice(ip) {
+    if (!confirm('Block IP ' + ip + '?')) return;
+    postJSON('/network/block-ip', {ip: ip, action: 'block'}).then(function(d) {
+        alert(d.message || d.error || 'Done');
+    });
+}
+
+/* ── Monitor ── */
+var monitorSource = null;
+
+function startMonitor() {
+    document.getElementById('monitor-body').innerHTML = '';
+    postJSON('/network/monitor/start').then(function(d) {
+        if (!d.ok) { alert(d.error || 'Failed'); return; }
+        document.getElementById('monitor-start-btn').disabled = true;
+        document.getElementById('monitor-stop-btn').disabled = false;
+        document.getElementById('monitor-status').textContent = 'Running...';
+        document.getElementById('monitor-status').style.color = '#22c55e';
+
+        monitorSource = new EventSource('/network/monitor/feed');
+        monitorSource.onmessage = function(ev) {
+            try {
+                var data = JSON.parse(ev.data);
+                if (data.done) { stopMonitor(); return; }
+                var body = document.getElementById('monitor-body');
+                var row = document.createElement('tr');
+                var ts = data.timestamp ? data.timestamp.split('T')[1].split('.')[0] : '';
+                row.innerHTML = '<td>' + escHtml(ts) + '</td><td>' + escHtml(data.protocol) +
+                    '</td><td>' + escHtml(data.local) + '</td><td>' + escHtml(data.remote) +
+                    '</td><td>' + escHtml(data.process) + '</td>';
+                body.insertBefore(row, body.firstChild);
+                // Cap displayed rows
+                while (body.children.length > 200) body.removeChild(body.lastChild);
+            } catch(e) {}
+        };
+        monitorSource.onerror = function() {
+            document.getElementById('monitor-status').textContent = 'Connection lost';
+            document.getElementById('monitor-status').style.color = '#ef4444';
+        };
+    });
+}
+
+function stopMonitor() {
+    postJSON('/network/monitor/stop').then(function() {
+        document.getElementById('monitor-start-btn').disabled = false;
+        document.getElementById('monitor-stop-btn').disabled = true;
+        document.getElementById('monitor-status').textContent = 'Stopped';
+        document.getElementById('monitor-status').style.color = 'var(--text-secondary)';
+    });
+    if (monitorSource) { monitorSource.close(); monitorSource = null; }
+}
+
+/* ── Intruder Trace ── */
+function traceIntruder() {
+    var ip = document.getElementById('trace-ip').value.trim();
+    if (!ip) { alert('Enter an IP address'); return; }
+    var st = document.getElementById('trace-status');
+    var el = document.getElementById('trace-results');
+    st.textContent = 'Tracing ' + ip + '... this may take up to 30 seconds.';
+    el.innerHTML = '';
+    postJSON('/network/intruder-trace', {ip: ip}).then(function(d) {
+        if (!d.ok) { st.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+        st.textContent = 'Trace complete for ' + ip;
+        var t = d.trace;
+        var sections = [
+            {title: 'Reverse DNS', data: t.reverse_dns},
+            {title: 'GeoIP', data: t.geoip},
+            {title: 'Whois', data: t.whois},
+            {title: 'Open Ports', data: t.open_ports},
+            {title: 'Associated Processes', data: t.processes},
+            {title: 'Connection History', data: t.connection_history}
+        ];
+        var html = '';
+        for (var i = 0; i < sections.length; i++) {
+            html += '<div class="trace-section"><h4>' + escHtml(sections[i].title) + '</h4>';
+            html += '<pre>' + escHtml(sections[i].data) + '</pre></div>';
+        }
+        el.innerHTML = html;
+    }).catch(function(e) { st.textContent = 'Error: ' + e; });
+}
+
+// ── WiFi Scanner ─────────────────────────────────────────────────────────────
+function wifiScan() {
+    var status = document.getElementById('wifi-scan-status');
+    var results = document.getElementById('wifi-scan-results');
+    status.textContent = 'Scanning WiFi networks…';
+    results.innerHTML = '';
+
+    fetch('/network/wifi/scan', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (!d.ok) { status.textContent = 'Error: ' + (d.error || 'Unknown'); return; }
+            status.textContent = d.count + ' network(s) found';
+            if (!d.networks || !d.networks.length) { results.innerHTML = '<p style="color:var(--text-muted)">No networks found.</p>'; return; }
+
+            var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr>'
+                + '<th>SSID</th><th>BSSID</th><th>Channel</th><th>Signal</th><th>Security</th><th>Mode</th>'
+                + '</tr></thead><tbody>';
+            for (var i = 0; i < d.networks.length; i++) {
+                var n = d.networks[i];
+                var sig = parseInt(n.signal) || 0;
+                var sigColor = sig > 70 ? 'var(--success,#34c759)' : sig > 40 ? '#f59e0b' : 'var(--danger,#ff3b30)';
+                html += '<tr><td><strong>' + escHtml(n.ssid) + '</strong></td>'
+                    + '<td style="font-family:monospace;font-size:0.75rem">' + escHtml(n.bssid) + '</td>'
+                    + '<td>' + escHtml(n.channel) + '</td>'
+                    + '<td style="color:' + sigColor + '">' + escHtml(n.signal) + '%</td>'
+                    + '<td>' + escHtml(n.security) + '</td>'
+                    + '<td>' + escHtml(n.mode || '') + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            results.innerHTML = html;
+            halAnalyze('Network: WiFi Scan', JSON.stringify(d, null, 2), 'network scan', 'network');
+        })
+        .catch(function(e) { status.textContent = 'Request failed: ' + e.message; });
+}
+
+// ── Attack Detection ─────────────────────────────────────────────────────────
+function detectAttacks() {
+    var btn = document.getElementById('btn-detect-attacks');
+    var status = document.getElementById('attack-detect-status');
+    var results = document.getElementById('attack-results');
+    btn.disabled = true; btn.textContent = 'Scanning…';
+    status.textContent = 'Running 5 attack detection checks…';
+    results.innerHTML = '';
+
+    fetch('/network/wifi/detect-attacks', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Run Attack Detection';
+            if (!d.ok) { status.textContent = 'Error: ' + (d.error || 'Unknown'); return; }
+
+            var sev = d.severity || {};
+            status.innerHTML = '<span style="color:var(--danger,#ff3b30)">' + (sev.critical || 0) + ' critical</span>'
+                + ' &middot; <span style="color:#f59e0b">' + (sev.warning || 0) + ' warning</span>'
+                + ' &middot; <span style="color:var(--success,#34c759)">' + (sev.clean || 0) + ' clean</span>';
+
+            var html = '';
+            var findings = d.findings || [];
+            for (var i = 0; i < findings.length; i++) {
+                var f = findings[i];
+                var color = f.severity === 'critical' ? 'var(--danger,#ff3b30)' : f.severity === 'warning' ? '#f59e0b' : 'var(--success,#34c759)';
+                var icon = f.severity === 'critical' ? '&#x26A0;' : f.severity === 'warning' ? '&#x26A0;' : '&#x2713;';
+                html += '<div style="border:1px solid ' + color + ';border-radius:var(--radius);padding:0.65rem 0.85rem;margin-bottom:0.5rem;background:var(--bg-card)">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center">'
+                    + '<strong style="color:' + color + '">' + icon + ' ' + escHtml(f.check) + '</strong>'
+                    + '<span style="font-size:0.72rem;padding:2px 8px;border-radius:3px;border:1px solid ' + color + ';color:' + color + '">' + f.severity + '</span>'
+                    + '</div>'
+                    + '<div style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.3rem">' + escHtml(f.description) + '</div>';
+                if (f.details && f.details.length) {
+                    html += '<ul style="font-size:0.75rem;color:var(--text-muted);margin:0.4rem 0 0 1rem;padding:0">';
+                    for (var j = 0; j < f.details.length; j++) {
+                        html += '<li>' + escHtml(f.details[j]) + '</li>';
+                    }
+                    html += '</ul>';
+                }
+                html += '</div>';
+            }
+            results.innerHTML = html;
+            halAnalyze('Network: Attack Detection', JSON.stringify(d, null, 2), 'network scan', 'network');
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Run Attack Detection'; status.textContent = 'Failed: ' + e.message; });
+}
+
+// ── SSID Map ─────────────────────────────────────────────────────────────────
+function ssidMap() {
+    var btn = document.getElementById('btn-ssid-map');
+    var status = document.getElementById('ssid-map-status');
+    var results = document.getElementById('ssid-map-results');
+    btn.disabled = true; btn.textContent = 'Mapping…';
+    status.textContent = 'Building SSID map…';
+    results.innerHTML = '';
+
+    fetch('/network/wifi/ssid-map', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Build SSID Map';
+            if (!d.ok) { status.textContent = 'Error: ' + (d.error || 'Unknown'); return; }
+            status.textContent = d.total_ssids + ' SSIDs, ' + d.total_aps + ' access points';
+
+            var html = '';
+            var ssids = d.ssids || [];
+            for (var i = 0; i < ssids.length; i++) {
+                var s = ssids[i];
+                var aps = s.aps || [];
+                html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.65rem 0.85rem;margin-bottom:0.5rem;background:var(--bg-card)">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">'
+                    + '<strong style="color:var(--accent)">' + escHtml(s.ssid) + '</strong>'
+                    + '<span style="font-size:0.72rem;color:var(--text-muted)">' + aps.length + ' AP(s) &middot; ' + escHtml(s.security || '') + '</span>'
+                    + '</div>';
+
+                if (aps.length > 0) {
+                    html += '<table style="width:100%;font-size:0.75rem;border-collapse:collapse">'
+                        + '<tr style="color:var(--text-muted)"><td>BSSID</td><td>Ch</td><td>Signal</td><td>Security</td></tr>';
+                    for (var j = 0; j < aps.length; j++) {
+                        var a = aps[j];
+                        var sig = parseInt(a.signal) || 0;
+                        var sigColor = sig > 70 ? 'var(--success,#34c759)' : sig > 40 ? '#f59e0b' : 'var(--danger,#ff3b30)';
+                        html += '<tr><td style="font-family:monospace">' + escHtml(a.bssid) + '</td>'
+                            + '<td>' + escHtml(a.channel) + '</td>'
+                            + '<td style="color:' + sigColor + '">' + sig + '%</td>'
+                            + '<td>' + escHtml(a.security || '') + '</td></tr>';
+                    }
+                    html += '</table>';
+                }
+                html += '</div>';
+            }
+            results.innerHTML = html || '<p style="color:var(--text-muted)">No SSIDs found.</p>';
+            halAnalyze('Network: SSID Map', JSON.stringify(d, null, 2), 'network scan', 'network');
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Build SSID Map'; status.textContent = 'Failed: ' + e.message; });
+}
+
+// ── ARP Spoof Detection & Remediation ────────────────────────────────────────
+function arpSpoofScan() {
+    var btn = document.getElementById('btn-arp-scan');
+    var status = document.getElementById('arp-scan-status');
+    var results = document.getElementById('arp-scan-results');
+    var tableDisplay = document.getElementById('arp-table-display');
+    btn.disabled = true; btn.textContent = 'Scanning...';
+    status.textContent = 'Checking ARP table and gateway...';
+    results.innerHTML = ''; tableDisplay.innerHTML = '';
+
+    fetch('/network/arp-spoof/scan', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Scan for ARP Spoofing';
+            if (!d.ok) { status.textContent = 'Error: ' + (d.error || 'Unknown'); return; }
+
+            // Gateway info
+            var gw = d.gateway || {};
+            var gwHtml = '<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem">'
+                + 'Gateway: <strong>' + escHtml(gw.ip || '?') + '</strong>'
+                + ' &middot; MAC: <code>' + escHtml(gw.mac || '?') + '</code>'
+                + ' &middot; Interface: ' + escHtml(gw.interface || '?')
+                + ' &middot; Baseline: ' + (d.has_baseline ? '<span style="color:var(--success,#34c759)">saved</span>' : '<span style="color:#f59e0b">not set</span>')
+                + '</div>';
+
+            // Severity summary
+            var sevColors = {critical: 'var(--danger,#ff3b30)', warning: '#f59e0b', clean: 'var(--success,#34c759)'};
+            status.innerHTML = '<span style="color:' + (sevColors[d.severity] || 'var(--text-muted)') + ';font-weight:700">'
+                + d.severity.toUpperCase() + '</span> — ' + (d.findings || []).length + ' finding(s)';
+
+            // Findings
+            var html = gwHtml;
+            var findings = d.findings || [];
+            if (findings.length === 0) {
+                html += '<div style="padding:0.5rem 0.75rem;border:1px solid var(--success,#34c759);border-radius:var(--radius);color:var(--success,#34c759);font-size:0.82rem">'
+                    + '&#x2713; No ARP spoofing detected. Your ARP table looks clean.</div>';
+            }
+            for (var i = 0; i < findings.length; i++) {
+                var f = findings[i];
+                var fc = f.severity === 'critical' ? 'var(--danger,#ff3b30)' : '#f59e0b';
+                html += '<div style="border:1px solid ' + fc + ';border-radius:var(--radius);padding:0.6rem 0.8rem;margin-bottom:0.5rem;background:var(--bg-card)">'
+                    + '<strong style="color:' + fc + '">&#x26A0; ' + escHtml(f.message) + '</strong>'
+                    + '<div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.25rem">' + escHtml(f.detail || '') + '</div>';
+                if (f.fix) {
+                    html += '<div style="font-size:0.75rem;margin-top:0.3rem"><strong>Fix:</strong> <code>' + escHtml(f.fix) + '</code></div>';
+                }
+                html += '</div>';
+            }
+            results.innerHTML = html;
+
+            // ARP table
+            var entries = d.arp_table || [];
+            if (entries.length) {
+                var thtml = '<table class="data-table" style="font-size:0.8rem"><thead><tr><th>IP</th><th>MAC</th><th>State</th><th>Action</th></tr></thead><tbody>';
+                for (var j = 0; j < entries.length; j++) {
+                    var e = entries[j];
+                    thtml += '<tr><td>' + escHtml(e.ip) + '</td><td style="font-family:monospace">' + escHtml(e.mac) + '</td>'
+                        + '<td>' + escHtml(e.state) + '</td>'
+                        + '<td><button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" '
+                        + 'onclick="arpFlushOne(\'' + escHtml(e.ip) + '\')">Flush</button></td></tr>';
+                }
+                thtml += '</tbody></table>';
+                tableDisplay.innerHTML = thtml;
+            }
+
+            halAnalyze('Network: ARP Spoof Scan', JSON.stringify(d, null, 2), 'ARP spoofing detection', 'network');
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Scan for ARP Spoofing'; status.textContent = 'Failed: ' + e.message; });
+}
+
+function arpSaveBaseline() {
+    var btn = document.getElementById('btn-arp-baseline');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    fetch('/network/arp-spoof/save-baseline', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Save Current as Baseline';
+            if (d.ok) {
+                alert('Baseline saved! Gateway MAC: ' + (d.gateway_mac || 'unknown') + ', ' + d.entries + ' entries stored.');
+            } else {
+                alert('Error saving baseline');
+            }
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Save Current as Baseline'; });
+}
+
+function arpFixStatic() {
+    var ip = document.getElementById('arp-fix-ip').value.trim();
+    var mac = document.getElementById('arp-fix-mac').value.trim();
+    if (!ip || !mac) { alert('Enter both IP and MAC'); return; }
+    _arpFix('flush_and_static', {ip: ip, mac: mac});
+}
+
+function arpEnableProtection() {
+    _arpFix('enable_arp_protection', {});
+}
+
+function arpFlushEntry() {
+    var ip = document.getElementById('arp-flush-ip').value.trim();
+    if (!ip) { alert('Enter an IP'); return; }
+    _arpFix('flush_entry', {ip: ip});
+}
+
+function arpFlushOne(ip) {
+    _arpFix('flush_entry', {ip: ip});
+}
+
+function _arpFix(action, extra) {
+    var el = document.getElementById('arp-fix-results');
+    el.innerHTML = '<span style="color:var(--text-muted)">Applying fix...</span>';
+    var payload = Object.assign({action: action}, extra);
+    fetch('/network/arp-spoof/fix', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (!d.ok) { el.innerHTML = '<span style="color:var(--danger,#ff3b30)">Error: ' + escHtml(d.error || 'Unknown') + '</span>'; return; }
+        var html = '';
+        var results = d.results || [];
+        for (var i = 0; i < results.length; i++) {
+            var r = results[i];
+            var color = r.ok ? 'var(--success,#34c759)' : 'var(--danger,#ff3b30)';
+            html += '<div style="font-size:0.78rem;margin-bottom:0.3rem">'
+                + '<span style="color:' + color + '">' + (r.ok ? '&#x2713;' : '&#x2715;') + '</span> '
+                + '<code>' + escHtml(r.cmd) + '</code>';
+            if (r.output) html += ' <span style="color:var(--text-muted)">' + escHtml(r.output.trim()) + '</span>';
+            html += '</div>';
+        }
+        el.innerHTML = html || '<span style="color:var(--success,#34c759)">Done</span>';
+    })
+    .catch(function(e) { el.innerHTML = '<span style="color:var(--danger,#ff3b30)">Failed: ' + e.message + '</span>'; });
+}
+</script>
+{% endblock %}

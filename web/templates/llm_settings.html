@@ -1,0 +1,1301 @@
+{% extends "base.html" %}
+{% block title %}LLM Settings - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1>LLM Settings</h1>
+    <a href="{{ url_for('settings.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Back to Settings</a>
+</div>
+
+<!-- Backend Selector + Load Status -->
+<div class="section">
+    <h2>Active Backend</h2>
+    <div class="tab-bar" id="llm-tab-bar">
+        <button class="tab {% if llm_backend == 'local' or llm_backend == 'transformers' %}active{% endif %}"
+                onclick="llmTab('local')">Local Model</button>
+        <button class="tab {% if llm_backend == 'claude' %}active{% endif %}"
+                onclick="llmTab('claude')">Claude</button>
+        <button class="tab {% if llm_backend == 'openai' %}active{% endif %}"
+                onclick="llmTab('openai')">OpenAI</button>
+        <button class="tab {% if llm_backend == 'huggingface' %}active{% endif %}"
+                onclick="llmTab('huggingface')">HuggingFace</button>
+    </div>
+    <p style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.5rem">
+        Configured backend: <strong style="color:var(--accent)">{{ llm_backend }}</strong>
+        — select a tab, fill in settings, and click <em>Save &amp; Activate</em>, then <em>Initialize LLM</em> to initialise.
+    </p>
+
+    <!-- Load / Status bar -->
+    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-top:0.9rem;
+                padding:0.65rem 0.9rem;border-radius:var(--radius);border:1px solid var(--border);
+                background:var(--bg-card)">
+        <div id="llm-status-dot" style="width:10px;height:10px;border-radius:50%;
+             background:var(--text-muted);flex-shrink:0" title="Not loaded"></div>
+        <span id="llm-status-text" style="font-size:0.83rem;color:var(--text-secondary);flex:1">
+            Not loaded — click <strong>Initialize LLM</strong> to initialise the current backend.
+        </span>
+        <button id="btn-llm-load" class="btn btn-primary btn-sm" onclick="loadLLM()">
+            Initialize LLM
+        </button>
+        <button class="btn btn-sm" onclick="debugOpen()"
+                title="Open debug console to see detailed load output">
+            Debug Log
+        </button>
+    </div>
+    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.4rem">
+        Local GGUF models may take 10–60 s to load depending on size.
+        The page will wait — check the Debug Log for live output.
+    </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- LOCAL MODEL TAB                                                    -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="tab-local" class="llm-tab-panel {% if llm_backend != 'local' and llm_backend != 'transformers' %}hidden{% endif %}">
+
+    <!-- Model Folder + File Picker -->
+    <div class="section">
+        <h2>Model Selection</h2>
+        <div class="form-group">
+            <label for="model-dir">Models Folder</label>
+            <div style="display:flex;gap:0.5rem">
+                <input type="text" id="model-dir" value="{{ default_models_dir }}" style="flex:1" placeholder="/path/to/models">
+                <button class="btn btn-sm btn-primary" onclick="scanModels()">Scan</button>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.3rem">
+                Scans for .gguf, .ggml, .bin files and SafeTensors model directories.
+            </p>
+        </div>
+
+        <div id="model-list-wrap" style="display:none">
+            <label>Available Models</label>
+            <div id="model-list" style="margin-top:0.4rem;max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:4px"></div>
+        </div>
+
+        <div class="form-group" style="margin-top:0.75rem">
+            <label for="selected-model-path">Selected Model Path</label>
+            <input type="text" id="selected-model-path"
+                   value="{{ llama.model_path if llm_backend == 'local' else transformers.model_path }}"
+                   placeholder="Click a model above or enter path manually" style="font-family:monospace;font-size:0.82rem">
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="safetensors-chk"
+                       {% if llm_backend == 'transformers' %}checked{% endif %}
+                       onchange="llmToggleSafetensors(this.checked)">
+                SafeTensors / Transformers mode (uncheck for llama.cpp GGUF)
+            </label>
+        </div>
+    </div>
+
+    <!-- llama.cpp Parameters -->
+    <div id="llamacpp-params" class="section {% if llm_backend == 'transformers' %}hidden{% endif %}">
+        <h2>llama.cpp Parameters</h2>
+        <form id="form-local" method="POST" action="{{ url_for('settings.update_llm') }}" class="settings-form">
+            <input type="hidden" name="backend" value="local">
+            <input type="hidden" id="llama-model-hidden" name="model_path" value="{{ llama.model_path }}">
+            <input type="hidden" id="gpu-backend-input" name="gpu_backend" value="{{ llama.get('gpu_backend', 'cpu') }}">
+
+            <!-- ── GPU / Compute Backend Selector ─────────────────────────── -->
+            <h3 style="margin-top:0;font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">GPU / Compute Backend</h3>
+            <div class="gpu-presets" id="gpu-presets">
+
+                <div class="gpu-card {% if llama.get('gpu_backend','cpu') == 'cuda' %}gpu-selected{% endif %}"
+                     data-backend="cuda" onclick="selectGpuPreset('cuda')">
+                    <div class="gpu-card-icon" style="color:#76b900">&#x26A1;</div>
+                    <div class="gpu-card-name">CUDA</div>
+                    <div class="gpu-card-ram" style="color:#76b900">7.5 GB VRAM</div>
+                    <div class="gpu-card-chip">NVIDIA GPU</div>
+                    <div class="gpu-card-badge" style="background:rgba(118,185,0,0.12);border-color:rgba(118,185,0,0.3);color:#76b900">n_gpu_layers = -1</div>
+                </div>
+
+                <div class="gpu-card {% if llama.get('gpu_backend','cpu') == 'vulkan' %}gpu-selected{% endif %}"
+                     data-backend="vulkan" onclick="selectGpuPreset('vulkan')">
+                    <div class="gpu-card-icon" style="color:#0071c5">&#x25C6;</div>
+                    <div class="gpu-card-name">Intel · Vulkan</div>
+                    <div class="gpu-card-ram" style="color:#0071c5">15 GB RAM</div>
+                    <div class="gpu-card-chip">Intel GPU / iGPU</div>
+                    <div class="gpu-card-badge" style="background:rgba(0,113,197,0.12);border-color:rgba(0,113,197,0.3);color:#5ba4e8">n_gpu_layers = -1</div>
+                </div>
+
+                <div class="gpu-card {% if llama.get('gpu_backend','cpu') != 'cuda' and llama.get('gpu_backend','cpu') != 'vulkan' %}gpu-selected{% endif %}"
+                     data-backend="cpu" onclick="selectGpuPreset('cpu')">
+                    <div class="gpu-card-icon" style="color:var(--text-secondary)">&#x1F5A5;</div>
+                    <div class="gpu-card-name">CPU Only</div>
+                    <div class="gpu-card-ram" style="color:var(--text-secondary)">24 GB RAM</div>
+                    <div class="gpu-card-chip">Any CPU</div>
+                    <div class="gpu-card-badge" style="background:rgba(128,128,128,0.1);border-color:rgba(128,128,128,0.25);color:#888">n_gpu_layers = 0</div>
+                </div>
+
+            </div>
+
+            <!-- Install hint shown after selecting CUDA/Vulkan -->
+            <div id="gpu-hint" class="gpu-hint" style="display:none"></div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-top:1.25rem">Context &amp; Threading</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="llama-n-ctx">Context Size (n_ctx)</label>
+                    <input type="number" id="llama-n-ctx" name="n_ctx" value="{{ llama.n_ctx }}" min="128" max="131072" step="128">
+                    <small>Token window. Higher = more memory.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-n-threads">CPU Threads</label>
+                    <input type="number" id="llama-n-threads" name="n_threads" value="{{ llama.n_threads }}" min="1" max="128">
+                    <small>Match physical cores.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-n-gpu">GPU Layers</label>
+                    <input type="number" id="llama-n-gpu" name="n_gpu_layers" value="{{ llama.n_gpu_layers }}" min="-1">
+                    <small>-1 = all, 0 = CPU only.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-n-batch">Batch Size (n_batch)</label>
+                    <input type="number" id="llama-n-batch" name="n_batch" value="{{ llama.get('n_batch', 512) }}" min="1" max="4096">
+                    <small>Prompt processing batch.</small>
+                </div>
+            </div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Sampling / Generation</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="llama-temp">Temperature</label>
+                    <input type="number" id="llama-temp" name="temperature" value="{{ llama.temperature }}" step="0.05" min="0" max="2">
+                    <small>0 = deterministic, 1 = creative.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-top-p">Top-P</label>
+                    <input type="number" id="llama-top-p" name="top_p" value="{{ llama.top_p }}" step="0.05" min="0" max="1">
+                    <small>Nucleus sampling threshold.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-top-k">Top-K</label>
+                    <input type="number" id="llama-top-k" name="top_k" value="{{ llama.top_k }}" min="0" max="200">
+                    <small>0 = disabled.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-repeat">Repeat Penalty</label>
+                    <input type="number" id="llama-repeat" name="repeat_penalty" value="{{ llama.repeat_penalty }}" step="0.05" min="1" max="2">
+                    <small>Penalises repeated tokens.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-max-tok">Max Tokens</label>
+                    <input type="number" id="llama-max-tok" name="max_tokens" value="{{ llama.max_tokens }}" min="1" max="131072">
+                    <small>Max new tokens generated.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-seed">Seed</label>
+                    <input type="number" id="llama-seed" name="seed" value="{{ llama.seed }}">
+                    <small>-1 = random.</small>
+                </div>
+            </div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">RoPE &amp; Mirostat</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="llama-rope">RoPE Scaling</label>
+                    <select id="llama-rope" name="rope_scaling_type">
+                        <option value="0" {% if llama.get('rope_scaling_type', '0') == '0' %}selected{% endif %}>None (0)</option>
+                        <option value="1" {% if llama.get('rope_scaling_type', '0') == '1' %}selected{% endif %}>Linear (1)</option>
+                        <option value="2" {% if llama.get('rope_scaling_type', '0') == '2' %}selected{% endif %}>YaRN (2)</option>
+                    </select>
+                    <small>Extends context via RoPE.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-mirostat">Mirostat Mode</label>
+                    <select id="llama-mirostat" name="mirostat_mode">
+                        <option value="0" {% if llama.get('mirostat_mode', '0') == '0' %}selected{% endif %}>Off (0)</option>
+                        <option value="1" {% if llama.get('mirostat_mode', '0') == '1' %}selected{% endif %}>v1 (1)</option>
+                        <option value="2" {% if llama.get('mirostat_mode', '0') == '2' %}selected{% endif %}>v2 (2)</option>
+                    </select>
+                    <small>Replaces top-p/k sampling.</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-m-tau">Mirostat Tau</label>
+                    <input type="number" id="llama-m-tau" name="mirostat_tau" value="{{ llama.get('mirostat_tau', 5.0) }}" step="0.5" min="0">
+                    <small>Target entropy (5.0 default).</small>
+                </div>
+                <div class="form-group">
+                    <label for="llama-m-eta">Mirostat Eta</label>
+                    <input type="number" id="llama-m-eta" name="mirostat_eta" value="{{ llama.get('mirostat_eta', 0.1) }}" step="0.01" min="0">
+                    <small>Learning rate (0.1 default).</small>
+                </div>
+            </div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Performance Flags</h3>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="flash_attn" {% if llama.get('flash_attn', False) %}checked{% endif %}>
+                    Flash Attention (faster on supported hardware)
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" onclick="syncLocalPath('llama')">Save &amp; Activate llama.cpp</button>
+        </form>
+    </div>
+
+    <!-- Transformers / SafeTensors Parameters -->
+    <div id="transformers-params" class="section {% if llm_backend != 'transformers' %}hidden{% endif %}">
+        <h2>Transformers / SafeTensors Parameters</h2>
+        <form id="form-transformers" method="POST" action="{{ url_for('settings.update_llm') }}" class="settings-form">
+            <input type="hidden" name="backend" value="transformers">
+            <input type="hidden" id="tf-model-hidden" name="model_path" value="{{ transformers.model_path }}">
+
+            <h3 style="margin-top:0;font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Device &amp; Precision</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="tf-device">Device</label>
+                    <select id="tf-device" name="device">
+                        <option value="auto" {% if transformers.device == 'auto' %}selected{% endif %}>auto</option>
+                        <option value="cpu" {% if transformers.device == 'cpu' %}selected{% endif %}>cpu</option>
+                        <option value="cuda" {% if transformers.device == 'cuda' %}selected{% endif %}>cuda</option>
+                        <option value="cuda:0" {% if transformers.device == 'cuda:0' %}selected{% endif %}>cuda:0</option>
+                        <option value="cuda:1" {% if transformers.device == 'cuda:1' %}selected{% endif %}>cuda:1</option>
+                        <option value="mps" {% if transformers.device == 'mps' %}selected{% endif %}>mps (Apple)</option>
+                        <option value="xpu" {% if transformers.device == 'xpu' %}selected{% endif %}>xpu (Intel)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="tf-dtype">Torch Dtype</label>
+                    <select id="tf-dtype" name="torch_dtype">
+                        <option value="auto" {% if transformers.torch_dtype == 'auto' %}selected{% endif %}>auto</option>
+                        <option value="float16" {% if transformers.torch_dtype == 'float16' %}selected{% endif %}>float16</option>
+                        <option value="bfloat16" {% if transformers.torch_dtype == 'bfloat16' %}selected{% endif %}>bfloat16</option>
+                        <option value="float32" {% if transformers.torch_dtype == 'float32' %}selected{% endif %}>float32</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="load_in_8bit" {% if transformers.load_in_8bit %}checked{% endif %}>
+                    8-bit quantization (bitsandbytes)
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="load_in_4bit" {% if transformers.load_in_4bit %}checked{% endif %}>
+                    4-bit quantization (bitsandbytes)
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="llm_int8_enable_fp32_cpu_offload"
+                           {% if transformers.llm_int8_enable_fp32_cpu_offload %}checked{% endif %}>
+                    FP32 CPU Offload
+                    <small style="color:var(--text-muted);margin-left:0.3rem">(enables partial GPU+CPU loading for 8-bit)</small>
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" name="trust_remote_code" {% if transformers.trust_remote_code %}checked{% endif %}>
+                    Trust Remote Code
+                </label>
+            </div>
+            <div class="form-group" style="max-width:340px;margin-bottom:0.75rem">
+                <label for="tf-device-map">Device Map</label>
+                <input type="text" id="tf-device-map" name="device_map"
+                       value="{{ transformers.get('device_map', 'auto') }}"
+                       placeholder="auto">
+                <small>
+                    <code>auto</code> (default) — let transformers decide &nbsp;|&nbsp;
+                    <code>cpu</code> — CPU only &nbsp;|&nbsp;
+                    <code>cuda:0</code> — single GPU. Enable FP32 CPU Offload above if 8-bit gives a "dispatched on CPU" error.
+                </small>
+            </div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Tokenizer</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="tf-pad-side">Padding Side</label>
+                    <select id="tf-pad-side" name="padding_side">
+                        <option value="left" {% if transformers.get('padding_side', 'left') == 'left' %}selected{% endif %}>left</option>
+                        <option value="right" {% if transformers.get('padding_side', 'left') == 'right' %}selected{% endif %}>right</option>
+                    </select>
+                    <small>left = causal LM standard.</small>
+                </div>
+            </div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="use_fast_tokenizer"
+                           {% if transformers.get('use_fast_tokenizer', True) %}checked{% endif %}>
+                    Use Fast Tokenizer (Rust-backed)
+                </label>
+            </div>
+
+            <h3 style="font-size:0.9rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em">Generation</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="tf-max-tok">Max New Tokens</label>
+                    <input type="number" id="tf-max-tok" name="max_tokens" value="{{ transformers.max_tokens }}" min="1" max="131072">
+                </div>
+                <div class="form-group">
+                    <label for="tf-temp">Temperature</label>
+                    <input type="number" id="tf-temp" name="temperature" value="{{ transformers.temperature }}" step="0.05" min="0" max="2">
+                </div>
+                <div class="form-group">
+                    <label for="tf-top-p">Top-P</label>
+                    <input type="number" id="tf-top-p" name="top_p" value="{{ transformers.top_p }}" step="0.05" min="0" max="1">
+                </div>
+                <div class="form-group">
+                    <label for="tf-top-k">Top-K</label>
+                    <input type="number" id="tf-top-k" name="top_k" value="{{ transformers.top_k }}" min="0" max="200">
+                    <small>0 = disabled.</small>
+                </div>
+                <div class="form-group">
+                    <label for="tf-rep-pen">Repetition Penalty</label>
+                    <input type="number" id="tf-rep-pen" name="repetition_penalty" value="{{ transformers.repetition_penalty }}" step="0.05" min="1" max="2">
+                </div>
+                <div class="form-group">
+                    <label for="tf-beams">Num Beams</label>
+                    <input type="number" id="tf-beams" name="num_beams" value="{{ transformers.get('num_beams', 1) }}" min="1" max="16">
+                    <small>1 = greedy/sampling.</small>
+                </div>
+            </div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:1rem">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="do_sample"
+                           {% if transformers.get('do_sample', True) %}checked{% endif %}>
+                    Do Sample (enables temp/top-p/top-k)
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" onclick="syncLocalPath('tf')">Save &amp; Activate Transformers</button>
+        </form>
+    </div>
+
+</div><!-- end tab-local -->
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- CLAUDE TAB                                                         -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="tab-claude" class="llm-tab-panel {% if llm_backend != 'claude' %}hidden{% endif %}">
+    <div class="section">
+        <h2>Claude API</h2>
+        <p style="font-size:0.82rem;color:var(--text-secondary)">
+            Requires an <a href="https://console.anthropic.com" target="_blank" rel="noopener">Anthropic API</a> key.
+            AUTARCH calls Claude directly for chat, agent, and analysis tasks.
+        </p>
+
+        <div class="form-group">
+            <label for="claude-key">API Key</label>
+            <input type="password" id="claude-key" value="{{ claude.api_key }}" placeholder="sk-ant-api03-...">
+            <small>Stored in autarch_settings.conf — keep it safe.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="claude-model">Model</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <select id="claude-model" style="flex:1">
+                    <option value="{{ claude.model }}" selected>{{ claude.model }}</option>
+                </select>
+                <button class="btn btn-sm" onclick="claudeFetchModels()" id="btn-claude-refresh" title="Fetch available models from API">Refresh</button>
+            </div>
+            <small id="claude-model-hint">Click <strong>Refresh</strong> to fetch available models from the API.</small>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+            <div class="form-group">
+                <label for="claude-max-tok">Max Tokens</label>
+                <input type="number" id="claude-max-tok" value="{{ claude.max_tokens }}" min="1" max="200000">
+            </div>
+            <div class="form-group">
+                <label for="claude-temp">Temperature</label>
+                <input type="number" id="claude-temp" value="{{ claude.temperature }}" step="0.05" min="0" max="1">
+                <small>0–1. Claude default is 1.</small>
+            </div>
+            <div class="form-group">
+                <label for="claude-top-p">Top-P</label>
+                <input type="number" id="claude-top-p" value="{{ claude.get('top_p', 1.0) }}" step="0.05" min="0" max="1">
+                <small>Use with lower temp.</small>
+            </div>
+            <div class="form-group">
+                <label for="claude-top-k">Top-K</label>
+                <input type="number" id="claude-top-k" value="{{ claude.get('top_k', 0) }}" min="0">
+                <small>0 = disabled.</small>
+            </div>
+        </div>
+
+        <!-- Action buttons + inline status -->
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+            <button class="btn btn-primary" onclick="claudeActivate()" id="btn-claude-activate">
+                Activate Claude
+            </button>
+            <button class="btn btn-sm" onclick="claudeSave()" id="btn-claude-save">
+                Save Settings
+            </button>
+            <button class="btn btn-sm" onclick="claudeReload()" id="btn-claude-reload" title="Re-test API key and reconnect">
+                Reload
+            </button>
+            <div id="claude-status-dot" style="width:10px;height:10px;border-radius:50%;
+                 background:{% if llm_backend == 'claude' %}var(--success, #34c759){% else %}var(--text-muted){% endif %};flex-shrink:0"></div>
+            <span id="claude-status-text" style="font-size:0.83rem;color:var(--text-secondary)">
+                {% if llm_backend == 'claude' %}Active — {{ claude.model }}{% else %}Not active{% endif %}
+            </span>
+        </div>
+        <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.35rem">
+            <strong>Save</strong> stores settings + API key to encrypted vault.
+            <strong>Reload</strong> re-tests the connection without changing settings.
+            <strong>Activate</strong> saves + loads Claude as the active backend.
+        </p>
+    </div>
+</div><!-- end tab-claude -->
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- OPENAI TAB                                                         -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="tab-openai" class="llm-tab-panel {% if llm_backend != 'openai' %}hidden{% endif %}">
+    <div class="section">
+        <h2>OpenAI API</h2>
+        <p style="font-size:0.82rem;color:var(--text-secondary)">
+            Also compatible with any OpenAI-format endpoint: LiteLLM, Ollama (<code>/v1</code>), vLLM, LocalAI, etc.
+            Just set the Base URL to your local server.
+        </p>
+        <form method="POST" action="{{ url_for('settings.update_llm') }}" class="settings-form">
+            <input type="hidden" name="backend" value="openai">
+
+            <div class="form-group">
+                <label for="oai-key">API Key</label>
+                <input type="password" id="oai-key" name="api_key" value="{{ openai.api_key }}" placeholder="sk-...">
+                <small>Leave blank for local servers (Ollama, vLLM, etc.).</small>
+            </div>
+
+            <div class="form-group">
+                <label for="oai-base-url">Base URL</label>
+                <input type="text" id="oai-base-url" name="base_url" value="{{ openai.base_url }}" placeholder="https://api.openai.com/v1">
+                <small>Change to point to local LLM servers.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="oai-model">Model</label>
+                <input type="text" id="oai-model" name="model" value="{{ openai.model }}" placeholder="gpt-4o" list="oai-model-list">
+                <datalist id="oai-model-list">
+                    <option value="gpt-4o">
+                    <option value="gpt-4o-mini">
+                    <option value="gpt-4-turbo">
+                    <option value="gpt-3.5-turbo">
+                    <option value="o1-preview">
+                    <option value="o1-mini">
+                    <option value="o3-mini">
+                </datalist>
+                <small>Type any model ID, or pick from suggestions.</small>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="oai-max-tok">Max Tokens</label>
+                    <input type="number" id="oai-max-tok" name="max_tokens" value="{{ openai.max_tokens }}" min="1" max="128000">
+                </div>
+                <div class="form-group">
+                    <label for="oai-temp">Temperature</label>
+                    <input type="number" id="oai-temp" name="temperature" value="{{ openai.temperature }}" step="0.1" min="0" max="2">
+                    <small>0–2. 1 = default.</small>
+                </div>
+                <div class="form-group">
+                    <label for="oai-top-p">Top-P</label>
+                    <input type="number" id="oai-top-p" name="top_p" value="{{ openai.top_p }}" step="0.05" min="0" max="1">
+                </div>
+                <div class="form-group">
+                    <label for="oai-freq-pen">Frequency Penalty</label>
+                    <input type="number" id="oai-freq-pen" name="frequency_penalty" value="{{ openai.frequency_penalty }}" step="0.1" min="-2" max="2">
+                    <small>Reduce repetition.</small>
+                </div>
+                <div class="form-group">
+                    <label for="oai-pres-pen">Presence Penalty</label>
+                    <input type="number" id="oai-pres-pen" name="presence_penalty" value="{{ openai.presence_penalty }}" step="0.1" min="-2" max="2">
+                    <small>Encourage new topics.</small>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save &amp; Activate OpenAI</button>
+        </form>
+    </div>
+</div><!-- end tab-openai -->
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- HUGGINGFACE TAB                                                    -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="tab-huggingface" class="llm-tab-panel {% if llm_backend != 'huggingface' %}hidden{% endif %}">
+    <div class="section">
+        <h2>HuggingFace Inference API</h2>
+
+        <!-- Token / Login -->
+        <h3>Account</h3>
+        <div class="form-group">
+            <label for="hf-token">HuggingFace Token</label>
+            <div style="display:flex;gap:0.5rem">
+                <input type="password" id="hf-token" value="{{ huggingface.api_key }}" placeholder="hf_..." style="flex:1">
+                <button class="btn btn-sm btn-primary" type="button" onclick="hfVerifyToken()">Verify Token</button>
+            </div>
+            <small>Get yours at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a></small>
+        </div>
+        <div id="hf-account-info" style="display:none;padding:0.5rem 0.75rem;border-radius:4px;background:rgba(0,255,65,0.08);border:1px solid var(--success);font-size:0.82rem;margin-bottom:0.75rem"></div>
+
+        <form id="form-hf" method="POST" action="{{ url_for('settings.update_llm') }}" class="settings-form">
+            <input type="hidden" name="backend" value="huggingface">
+            <input type="hidden" id="hf-api-key-hidden" name="api_key" value="{{ huggingface.api_key }}">
+
+            <!-- Model -->
+            <h3>Model</h3>
+            <div class="form-group">
+                <label for="hf-model">Model ID</label>
+                <div style="display:flex;gap:0.5rem">
+                    <input type="text" id="hf-model" name="model" value="{{ huggingface.model }}"
+                           placeholder="mistralai/Mistral-7B-Instruct-v0.3" style="flex:1">
+                    <a href="https://huggingface.co/models?pipeline_tag=text-generation&sort=trending" target="_blank"
+                       rel="noopener" class="btn btn-sm">Browse HF</a>
+                </div>
+                <small>Full model repo ID (e.g. <code>meta-llama/Llama-3.1-8B-Instruct</code>).</small>
+            </div>
+
+            <div class="form-group">
+                <label for="hf-provider">Inference Provider</label>
+                <select id="hf-provider" name="provider">
+                    <option value="auto" {% if huggingface.provider == 'auto' %}selected{% endif %}>auto (HF selects best)</option>
+                    <option value="cerebras" {% if huggingface.provider == 'cerebras' %}selected{% endif %}>Cerebras</option>
+                    <option value="together-ai" {% if huggingface.provider == 'together-ai' %}selected{% endif %}>Together AI</option>
+                    <option value="sambanova" {% if huggingface.provider == 'sambanova' %}selected{% endif %}>SambaNova</option>
+                    <option value="novita" {% if huggingface.provider == 'novita' %}selected{% endif %}>Novita</option>
+                    <option value="cohere" {% if huggingface.provider == 'cohere' %}selected{% endif %}>Cohere</option>
+                    <option value="fireworks-ai" {% if huggingface.provider == 'fireworks-ai' %}selected{% endif %}>Fireworks AI</option>
+                    <option value="hf-inference" {% if huggingface.provider == 'hf-inference' %}selected{% endif %}>HF Inference (default)</option>
+                </select>
+                <small>Provider used for serverless inference. Some require separate accounts.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="hf-endpoint">Custom Endpoint URL (optional)</label>
+                <input type="text" id="hf-endpoint" name="endpoint" value="{{ huggingface.endpoint }}"
+                       placeholder="https://your-endpoint.endpoints.huggingface.cloud">
+                <small>Overrides provider. Use for Dedicated Inference Endpoints.</small>
+            </div>
+
+            <!-- Generation Parameters -->
+            <h3>Generation Parameters</h3>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="hf-max-tok">Max New Tokens</label>
+                    <input type="number" id="hf-max-tok" name="max_tokens" value="{{ huggingface.max_tokens }}" min="1" max="32768">
+                </div>
+                <div class="form-group">
+                    <label for="hf-temp">Temperature</label>
+                    <input type="number" id="hf-temp" name="temperature" value="{{ huggingface.temperature }}" step="0.05" min="0.01" max="2">
+                </div>
+                <div class="form-group">
+                    <label for="hf-top-p">Top-P</label>
+                    <input type="number" id="hf-top-p" name="top_p" value="{{ huggingface.top_p }}" step="0.05" min="0" max="1">
+                </div>
+                <div class="form-group">
+                    <label for="hf-top-k">Top-K</label>
+                    <input type="number" id="hf-top-k" name="top_k" value="{{ huggingface.top_k }}" min="0" max="200">
+                    <small>0 = disabled.</small>
+                </div>
+                <div class="form-group">
+                    <label for="hf-rep-pen">Repetition Penalty</label>
+                    <input type="number" id="hf-rep-pen" name="repetition_penalty" value="{{ huggingface.repetition_penalty }}" step="0.05" min="1" max="2">
+                </div>
+                <div class="form-group">
+                    <label for="hf-seed">Seed</label>
+                    <input type="number" id="hf-seed" name="seed" value="{{ huggingface.seed }}">
+                    <small>-1 = random.</small>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:0.75rem">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="do_sample" {% if huggingface.do_sample %}checked{% endif %}>
+                    Do Sample
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="hf-stop">Stop Sequences (comma-separated)</label>
+                <input type="text" id="hf-stop" name="stop_sequences" value="{{ huggingface.stop_sequences }}"
+                       placeholder="&lt;|endoftext|&gt;, &lt;|im_end|&gt;">
+                <small>Tokens that will stop generation.</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save &amp; Activate HuggingFace</button>
+        </form>
+    </div>
+</div><!-- end tab-huggingface -->
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- AGENTS SECTION                                                      -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section" style="margin-top:2rem">
+    <h2>Agent Configuration</h2>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+        Configure the AI agent backends used by Agent Hal and Autonomy.
+        Agents use the THOUGHT/ACTION/PARAMS loop to accomplish tasks with tools.
+    </p>
+
+    <!-- Agent sub-tabs -->
+    <div class="tab-bar" id="agent-tab-bar">
+        <button class="tab active" onclick="agentTab('local')">Local Agent</button>
+        <button class="tab" onclick="agentTab('claude')">Claude Agent</button>
+        <button class="tab" onclick="agentTab('openai')">OpenAI Agent</button>
+    </div>
+
+    <!-- ── Local Agent Sub-Tab ──────────────────────────────────────── -->
+    <div id="agent-tab-local" class="agent-tab-panel">
+        <div style="padding:1rem 0">
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Uses the currently loaded LLM backend (configured above) for agent operations.
+                Best for offline or privacy-sensitive work.
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="agent-local-steps">Max Steps</label>
+                    <input type="number" id="agent-local-steps" value="{{ agents.local_max_steps }}" min="1" max="100">
+                    <small>Maximum tool-use steps per task.</small>
+                </div>
+                <div class="form-group">
+                    <label for="agent-local-verbose">
+                        <input type="checkbox" id="agent-local-verbose" {% if agents.local_verbose %}checked{% endif %}
+                               style="margin-right:0.4rem">
+                        Verbose Output
+                    </label>
+                    <small>Show step-by-step agent reasoning.</small>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+                <button class="btn btn-primary btn-sm" onclick="agentSave('local')">Save Local Agent Settings</button>
+                <span id="agent-local-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Claude Agent Sub-Tab ─────────────────────────────────────── -->
+    <div id="agent-tab-claude" class="agent-tab-panel hidden">
+        <div style="padding:1rem 0">
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Uses the Anthropic Claude API with native tool use for agent operations.
+                Requires a Claude API key (configured in the Claude tab above).
+                Supports extended thinking and structured tool calls.
+            </p>
+            <div class="form-group">
+                <label for="agent-claude-model">Agent Model</label>
+                <div style="display:flex;gap:0.5rem;align-items:center">
+                    <select id="agent-claude-model" style="flex:1">
+                        <option value="{{ agents.claude_model }}" selected>{{ agents.claude_model }}</option>
+                    </select>
+                    <button class="btn btn-sm" onclick="agentClaudeFetchModels()" id="btn-agent-claude-refresh">Refresh</button>
+                </div>
+                <small id="agent-claude-model-hint">Click Refresh to fetch models from the API. Uses the API key from the Claude tab.</small>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="agent-claude-tokens">Max Tokens</label>
+                    <input type="number" id="agent-claude-tokens" value="{{ agents.claude_max_tokens }}" min="1" max="200000">
+                </div>
+                <div class="form-group">
+                    <label for="agent-claude-steps">Max Steps</label>
+                    <input type="number" id="agent-claude-steps" value="{{ agents.claude_max_steps }}" min="1" max="200">
+                </div>
+                <div class="form-group">
+                    <label for="agent-claude-enabled">
+                        <input type="checkbox" id="agent-claude-enabled" {% if agents.claude_enabled %}checked{% endif %}
+                               style="margin-right:0.4rem">
+                        Enable Claude Agent
+                    </label>
+                    <small>Allow agent tasks to use Claude.</small>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+                <button class="btn btn-primary btn-sm" onclick="agentSave('claude')">Save Claude Agent Settings</button>
+                <span id="agent-claude-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── OpenAI Agent Sub-Tab ─────────────────────────────────────── -->
+    <div id="agent-tab-openai" class="agent-tab-panel hidden">
+        <div style="padding:1rem 0">
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Uses the OpenAI API (or any compatible endpoint: Ollama, vLLM, LiteLLM) with function calling for agent operations.
+                Requires an API key configured in the OpenAI tab above.
+            </p>
+            <div class="form-group">
+                <label for="agent-openai-model">Agent Model</label>
+                <input type="text" id="agent-openai-model" value="{{ agents.openai_model }}" placeholder="gpt-4o"
+                       list="agent-openai-model-list">
+                <datalist id="agent-openai-model-list">
+                    <option value="gpt-4o">
+                    <option value="gpt-4o-mini">
+                    <option value="gpt-4.1">
+                    <option value="gpt-4.1-mini">
+                    <option value="gpt-4.1-nano">
+                    <option value="o3">
+                    <option value="o4-mini">
+                </datalist>
+                <small>Model ID. For local servers (Ollama, etc.) use the name you pulled.</small>
+            </div>
+            <div class="form-group">
+                <label for="agent-openai-base-url">Base URL</label>
+                <input type="text" id="agent-openai-base-url" value="{{ agents.openai_base_url }}" placeholder="https://api.openai.com/v1">
+                <small>Change for Ollama (<code>http://localhost:11434/v1</code>), vLLM, LiteLLM, etc.</small>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem 1rem">
+                <div class="form-group">
+                    <label for="agent-openai-tokens">Max Tokens</label>
+                    <input type="number" id="agent-openai-tokens" value="{{ agents.openai_max_tokens }}" min="1" max="200000">
+                </div>
+                <div class="form-group">
+                    <label for="agent-openai-steps">Max Steps</label>
+                    <input type="number" id="agent-openai-steps" value="{{ agents.openai_max_steps }}" min="1" max="200">
+                </div>
+                <div class="form-group">
+                    <label for="agent-openai-enabled">
+                        <input type="checkbox" id="agent-openai-enabled" {% if agents.openai_enabled %}checked{% endif %}
+                               style="margin-right:0.4rem">
+                        Enable OpenAI Agent
+                    </label>
+                    <small>Allow agent tasks to use OpenAI.</small>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+                <button class="btn btn-primary btn-sm" onclick="agentSave('openai')">Save OpenAI Agent Settings</button>
+                <span id="agent-openai-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active agent backend indicator -->
+    <div style="margin-top:0.75rem;padding:0.5rem 0.75rem;border-radius:var(--radius);border:1px solid var(--border);
+                background:var(--bg-card);font-size:0.82rem;color:var(--text-secondary)">
+        Active agent backend: <strong id="agent-active-backend" style="color:var(--accent)">{{ agents.backend }}</strong>
+        — The agent will use this backend when processing tasks.
+    </div>
+</div>
+
+<style>
+.hidden { display: none !important; }
+.form-group small { display:block; font-size:0.72rem; color:var(--text-muted); margin-top:0.2rem; }
+.agent-tab-panel.hidden { display: none !important; }
+
+/* ── GPU Preset Cards ───────────────────────────────────────────────────── */
+.gpu-presets {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+@media (max-width: 600px) { .gpu-presets { grid-template-columns: 1fr; } }
+
+.gpu-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.85rem 1rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    user-select: none;
+    background: var(--bg-card);
+}
+.gpu-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,255,65,0.07);
+    background: rgba(0,255,65,0.03);
+}
+.gpu-card.gpu-selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0,255,65,0.18);
+    background: rgba(0,255,65,0.04);
+}
+.gpu-card-icon   { font-size: 1.3rem; line-height: 1; margin-bottom: 0.15rem; }
+.gpu-card-name   { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+.gpu-card-ram    { font-size: 0.88rem; font-weight: 700; }
+.gpu-card-chip   { font-size: 0.72rem; color: var(--text-muted); }
+.gpu-card-badge  {
+    display: inline-block;
+    margin-top: 0.35rem;
+    padding: 1px 7px;
+    border-radius: 3px;
+    font-size: 0.68rem;
+    font-family: monospace;
+    border: 1px solid;
+    font-weight: 600;
+    align-self: flex-start;
+}
+.gpu-hint {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    padding: 0.45rem 0.75rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(0,255,65,0.04);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 0.75rem;
+}
+</style>
+
+<script>
+// ── Initialize LLM ────────────────────────────────────────────────────────────────
+function loadLLM() {
+    var btn  = document.getElementById('btn-llm-load');
+    var dot  = document.getElementById('llm-status-dot');
+    var text = document.getElementById('llm-status-text');
+
+    btn.disabled  = true;
+    btn.textContent = 'Loading…';
+    dot.style.background  = '#f59e0b';  // amber = in-progress
+    dot.title = 'Loading…';
+    text.innerHTML = '<em>Initialising — please wait. Check the Debug Log window for live output…</em>';
+
+    fetch('/settings/llm/load', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled    = false;
+            btn.textContent = 'Initialize LLM';
+            if (d.ok) {
+                dot.style.background = 'var(--success, #34c759)';
+                dot.title = 'Loaded';
+                text.innerHTML = '&#x2713; <strong style="color:var(--success,#34c759)">'
+                    + escapeHtml(d.backend) + '</strong> ready &mdash; '
+                    + escapeHtml(d.model_name);
+            } else {
+                dot.style.background = 'var(--danger, #ff3b30)';
+                dot.title = 'Error';
+                text.innerHTML = '&#x2715; <strong style="color:var(--danger,#ff3b30)">Load failed:</strong> '
+                    + escapeHtml(d.error || 'Unknown error')
+                    + ' &mdash; <em>check Debug Log for details</em>';
+            }
+        })
+        .catch(function(e) {
+            btn.disabled    = false;
+            btn.textContent = 'Initialize LLM';
+            dot.style.background = 'var(--danger, #ff3b30)';
+            dot.title = 'Error';
+            text.textContent = 'Request failed: ' + e.message;
+        });
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function llmTab(name) {
+    ['local','claude','openai','huggingface'].forEach(function(t) {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+    });
+    document.querySelectorAll('#llm-tab-bar .tab').forEach(function(btn, i) {
+        btn.classList.toggle('active', ['local','claude','openai','huggingface'][i] === name);
+    });
+}
+
+// SafeTensors toggle
+function llmToggleSafetensors(isST) {
+    document.getElementById('llamacpp-params').classList.toggle('hidden', isST);
+    document.getElementById('transformers-params').classList.toggle('hidden', !isST);
+}
+
+// Sync the hidden model_path input from the selected-model-path field
+function syncLocalPath(target) {
+    var val = document.getElementById('selected-model-path').value;
+    if (target === 'llama') {
+        document.getElementById('llama-model-hidden').value = val;
+    } else {
+        document.getElementById('tf-model-hidden').value = val;
+    }
+}
+
+// Scan models folder
+function scanModels() {
+    var folder = document.getElementById('model-dir').value.trim();
+    if (!folder) { alert('Enter a folder path first.'); return; }
+    var btn = event.target;
+    btn.textContent = 'Scanning...';
+    btn.disabled = true;
+
+    fetch('/settings/llm/scan-models', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({folder: folder})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        btn.textContent = 'Scan';
+        btn.disabled = false;
+        if (!d.ok) { alert('Scan error: ' + d.error); return; }
+        var wrap = document.getElementById('model-list-wrap');
+        var list = document.getElementById('model-list');
+        list.innerHTML = '';
+        if (!d.models.length) {
+            list.innerHTML = '<div style="padding:0.75rem;color:var(--text-secondary);font-size:0.82rem">No supported model files found.</div>';
+        } else {
+            d.models.forEach(function(m) {
+                var row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0.75rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.82rem';
+                row.onmouseenter = function() { this.style.background = 'var(--hover)'; };
+                row.onmouseleave = function() { this.style.background = ''; };
+                var badge = m.type === 'safetensors' ? '<span style="background:#5a3f9a;color:#fff;border-radius:3px;padding:1px 5px;font-size:0.7rem">ST</span>' :
+                            '<span style="background:#1a6e3c;color:#fff;border-radius:3px;padding:1px 5px;font-size:0.7rem">GGUF</span>';
+                row.innerHTML = badge + '<span style="flex:1;font-family:monospace">' + escapeHtml(m.name) + '</span>'
+                    + '<span style="color:var(--text-secondary)">' + m.size_mb + ' MB</span>';
+                row.onclick = function() {
+                    document.getElementById('selected-model-path').value = m.path;
+                    // Auto-toggle SafeTensors checkbox
+                    var isST = m.type === 'safetensors';
+                    document.getElementById('safetensors-chk').checked = isST;
+                    llmToggleSafetensors(isST);
+                    // Highlight selected
+                    list.querySelectorAll('div').forEach(function(r2) { r2.style.background = ''; r2.style.outline = ''; });
+                    this.style.background = 'var(--hover)';
+                    this.style.outline = '1px solid var(--accent)';
+                };
+                list.appendChild(row);
+            });
+        }
+        wrap.style.display = '';
+    })
+    .catch(function(e) { btn.textContent = 'Scan'; btn.disabled = false; alert('Request failed: ' + e.message); });
+}
+
+// ── GPU Preset Selector ───────────────────────────────────────────────────────
+const _GPU_PRESETS = {
+    cuda:   {
+        n_gpu_layers: -1, n_batch: 512,
+        hint: '⚡ CUDA selected — all layers offloaded to NVIDIA GPU (n_gpu_layers = -1). ' +
+              'Requires llama-cpp-python compiled with CUDA: ' +
+              'CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall',
+    },
+    vulkan: {
+        n_gpu_layers: -1, n_batch: 512,
+        hint: '◆ Vulkan (Intel) selected — all layers offloaded via Vulkan API (n_gpu_layers = -1). ' +
+              'Requires llama-cpp-python compiled with Vulkan: ' +
+              'CMAKE_ARGS="-DGGML_VULKAN=on" pip install llama-cpp-python --force-reinstall',
+    },
+    cpu:    {
+        n_gpu_layers: 0, n_batch: 256,
+        hint: '',   // no hint needed — always works
+    },
+};
+
+function selectGpuPreset(backend) {
+    // Update card highlight
+    document.querySelectorAll('.gpu-card').forEach(function(c) {
+        c.classList.toggle('gpu-selected', c.dataset.backend === backend);
+    });
+    // Store selection
+    document.getElementById('gpu-backend-input').value = backend;
+    // Apply preset values
+    var p = _GPU_PRESETS[backend];
+    document.getElementById('llama-n-gpu').value   = p.n_gpu_layers;
+    document.getElementById('llama-n-batch').value = p.n_batch;
+    // Show / hide hint
+    var hint = document.getElementById('gpu-hint');
+    if (p.hint) {
+        hint.textContent  = p.hint;
+        hint.style.display = '';
+    } else {
+        hint.style.display = 'none';
+    }
+}
+
+// Initialise hint on page load if a non-CPU preset is already saved
+(function() {
+    var saved = document.getElementById('gpu-backend-input').value;
+    if (saved && saved !== 'cpu') {
+        var h = document.getElementById('gpu-hint');
+        var p = _GPU_PRESETS[saved];
+        if (p && p.hint) { h.textContent = p.hint; h.style.display = ''; }
+    }
+})();
+
+// ── HuggingFace token verify
+function hfVerifyToken() {
+    var token = document.getElementById('hf-token').value.trim();
+    if (!token) { alert('Enter a token first.'); return; }
+    document.getElementById('hf-api-key-hidden').value = token;
+    var btn = event.target;
+    btn.textContent = 'Verifying...';
+    btn.disabled = true;
+    fetch('/settings/llm/hf-verify', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: token})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        btn.textContent = 'Verify Token';
+        btn.disabled = false;
+        var info = document.getElementById('hf-account-info');
+        if (d.ok) {
+            info.style.display = '';
+            info.textContent = '✓ Logged in as: ' + d.username + (d.email ? ' (' + d.email + ')' : '');
+        } else {
+            info.style.display = '';
+            info.style.borderColor = 'var(--danger)';
+            info.style.background = 'rgba(255,59,48,0.08)';
+            info.textContent = '✕ Invalid token: ' + d.error;
+        }
+    })
+    .catch(function(e) { btn.textContent = 'Verify Token'; btn.disabled = false; alert('Request failed: ' + e.message); });
+}
+
+// ── Claude: Activate (save + load in one click) ──────────────────────────────
+function claudeSave() {
+    var btn = document.getElementById('btn-claude-save');
+    var text = document.getElementById('claude-status-text');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    var fd = new FormData();
+    fd.append('backend', 'claude');
+    fd.append('api_key', document.getElementById('claude-key').value);
+    fd.append('model', document.getElementById('claude-model').value);
+    fd.append('max_tokens', document.getElementById('claude-max-tok').value);
+    fd.append('temperature', document.getElementById('claude-temp').value);
+
+    fetch('/settings/llm', {method: 'POST', body: fd, redirect: 'manual'})
+        .then(function() {
+            btn.disabled = false; btn.textContent = 'Save Settings';
+            text.innerHTML = '<span style="color:var(--success,#34c759)">&#x2713; Settings saved to encrypted vault</span>';
+            setTimeout(function() { text.textContent = ''; }, 3000);
+        })
+        .catch(function(e) {
+            btn.disabled = false; btn.textContent = 'Save Settings';
+            text.textContent = 'Save failed: ' + e.message;
+        });
+}
+
+function claudeReload() {
+    var btn = document.getElementById('btn-claude-reload');
+    var dot = document.getElementById('claude-status-dot');
+    var text = document.getElementById('claude-status-text');
+    btn.disabled = true; btn.textContent = 'Reloading…';
+    dot.style.background = '#f59e0b';
+    text.innerHTML = '<em>Re-testing Claude connection…</em>';
+
+    fetch('/settings/llm/load', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Reload';
+            if (d.ok) {
+                dot.style.background = 'var(--success, #34c759)';
+                text.innerHTML = '&#x2713; <strong style="color:var(--success,#34c759)">Connected</strong> — ' + escapeHtml(d.model_name);
+            } else {
+                dot.style.background = 'var(--danger, #ff3b30)';
+                text.innerHTML = '&#x2715; ' + escapeHtml(d.error || 'Connection failed');
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false; btn.textContent = 'Reload';
+            dot.style.background = 'var(--danger, #ff3b30)';
+            text.textContent = 'Failed: ' + e.message;
+        });
+}
+
+function claudeActivate() {
+    var btn  = document.getElementById('btn-claude-activate');
+    var dot  = document.getElementById('claude-status-dot');
+    var text = document.getElementById('claude-status-text');
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    dot.style.background = '#f59e0b';
+    text.textContent = 'Saving settings…';
+
+    // Build form data from the Claude tab fields
+    var fd = new FormData();
+    fd.append('backend', 'claude');
+    fd.append('api_key', document.getElementById('claude-key').value);
+    fd.append('model', document.getElementById('claude-model').value);
+    fd.append('max_tokens', document.getElementById('claude-max-tok').value);
+    fd.append('temperature', document.getElementById('claude-temp').value);
+
+    // Step 1: Save settings via the existing update_llm route (no redirect — use fetch)
+    fetch('/settings/llm', {method: 'POST', body: fd, redirect: 'manual'})
+        .then(function() {
+            // Step 2: Now load the backend
+            btn.textContent = 'Loading…';
+            text.innerHTML = '<em>Initialising Claude — please wait…</em>';
+            return fetch('/settings/llm/load', {method: 'POST'});
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            btn.textContent = 'Activate Claude';
+            if (d.ok) {
+                dot.style.background = 'var(--success, #34c759)';
+                text.innerHTML = '&#x2713; <strong style="color:var(--success,#34c759)">Claude active</strong> — '
+                    + escapeHtml(d.model_name);
+                // Also update the top-level status bar
+                var topDot  = document.getElementById('llm-status-dot');
+                var topText = document.getElementById('llm-status-text');
+                if (topDot) { topDot.style.background = 'var(--success, #34c759)'; topDot.title = 'Loaded'; }
+                if (topText) { topText.innerHTML = '&#x2713; <strong style="color:var(--success,#34c759)">claude</strong> ready — ' + escapeHtml(d.model_name); }
+            } else {
+                dot.style.background = 'var(--danger, #ff3b30)';
+                text.innerHTML = '&#x2715; <strong style="color:var(--danger,#ff3b30)">Load failed:</strong> '
+                    + escapeHtml(d.error || 'Unknown error')
+                    + ' — <em>check Debug Log for details</em>';
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Activate Claude';
+            dot.style.background = 'var(--danger, #ff3b30)';
+            text.textContent = 'Request failed: ' + e.message;
+        });
+}
+
+// ── Agent tab switching ───────────────────────────────────────────────────────
+function agentTab(name) {
+    // Hide all agent panels
+    var panels = document.querySelectorAll('.agent-tab-panel');
+    for (var i = 0; i < panels.length; i++) panels[i].classList.add('hidden');
+    // Deactivate all agent tabs
+    var tabs = document.querySelectorAll('#agent-tab-bar .tab');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    // Show selected
+    var panel = document.getElementById('agent-tab-' + name);
+    if (panel) panel.classList.remove('hidden');
+    // Activate tab button (find by text match)
+    var labels = {local: 'Local Agent', claude: 'Claude Agent', openai: 'OpenAI Agent'};
+    for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].textContent.trim() === labels[name]) tabs[i].classList.add('active');
+    }
+}
+
+// ── Agent save ───────────────────────────────────────────────────────────────
+function agentSave(tab) {
+    var status = document.getElementById('agent-' + tab + '-status');
+    var data = {backend: tab};
+
+    if (tab === 'local') {
+        data.local_max_steps = parseInt(document.getElementById('agent-local-steps').value) || 20;
+        data.local_verbose = document.getElementById('agent-local-verbose').checked;
+    } else if (tab === 'claude') {
+        data.claude_enabled = document.getElementById('agent-claude-enabled').checked;
+        data.claude_model = document.getElementById('agent-claude-model').value;
+        data.claude_max_tokens = parseInt(document.getElementById('agent-claude-tokens').value) || 16384;
+        data.claude_max_steps = parseInt(document.getElementById('agent-claude-steps').value) || 30;
+    } else if (tab === 'openai') {
+        data.openai_enabled = document.getElementById('agent-openai-enabled').checked;
+        data.openai_model = document.getElementById('agent-openai-model').value;
+        data.openai_base_url = document.getElementById('agent-openai-base-url').value;
+        data.openai_max_tokens = parseInt(document.getElementById('agent-openai-tokens').value) || 16384;
+        data.openai_max_steps = parseInt(document.getElementById('agent-openai-steps').value) || 30;
+    }
+
+    status.textContent = 'Saving…';
+    fetch('/settings/agents/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.ok) {
+            status.innerHTML = '<span style="color:var(--success,#34c759)">&#x2713; Saved</span>';
+            document.getElementById('agent-active-backend').textContent = tab;
+        } else {
+            status.innerHTML = '<span style="color:var(--danger,#ff3b30)">&#x2715; ' + escapeHtml(d.error || 'Error') + '</span>';
+        }
+        setTimeout(function() { status.textContent = ''; }, 4000);
+    })
+    .catch(function(e) {
+        status.textContent = 'Failed: ' + e.message;
+    });
+}
+
+// ── Agent Claude: Fetch models (reuses the same API endpoint) ────────────────
+function agentClaudeFetchModels() {
+    var btn  = document.getElementById('btn-agent-claude-refresh');
+    var sel  = document.getElementById('agent-claude-model');
+    var hint = document.getElementById('agent-claude-model-hint');
+    var curVal = sel.value;
+
+    btn.disabled = true;
+    btn.textContent = 'Fetching…';
+    hint.textContent = 'Querying Anthropic API…';
+
+    fetch('/settings/llm/claude-models', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
+            if (!d.ok) {
+                hint.textContent = 'Error: ' + (d.error || 'Unknown');
+                return;
+            }
+            sel.innerHTML = '';
+            var models = d.models || [];
+            if (models.length === 0) {
+                hint.textContent = 'No models returned.';
+                var opt = document.createElement('option');
+                opt.value = curVal; opt.textContent = curVal; opt.selected = true;
+                sel.appendChild(opt);
+                return;
+            }
+            var foundCurrent = false;
+            for (var i = 0; i < models.length; i++) {
+                var m = models[i];
+                var opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name || m.id;
+                if (m.id === curVal) { opt.selected = true; foundCurrent = true; }
+                sel.appendChild(opt);
+            }
+            if (!foundCurrent && curVal) {
+                var opt = document.createElement('option');
+                opt.value = curVal; opt.textContent = curVal + ' (current)'; opt.selected = true;
+                sel.insertBefore(opt, sel.firstChild);
+            }
+            hint.textContent = models.length + ' models available.';
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
+            hint.textContent = 'Failed: ' + e.message;
+        });
+}
+
+// ── Claude: Fetch models from API ────────────────────────────────────────────
+function claudeFetchModels() {
+    var btn    = document.getElementById('btn-claude-refresh');
+    var sel    = document.getElementById('claude-model');
+    var hint   = document.getElementById('claude-model-hint');
+    var curVal = sel.value;
+
+    btn.disabled = true;
+    btn.textContent = 'Fetching…';
+    hint.textContent = 'Querying Anthropic API…';
+
+    fetch('/settings/llm/claude-models', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
+            if (!d.ok) {
+                hint.textContent = 'Error: ' + (d.error || 'Unknown error');
+                return;
+            }
+            // Rebuild the dropdown with live models
+            sel.innerHTML = '';
+            var models = d.models || [];
+            if (models.length === 0) {
+                hint.textContent = 'No models returned — check API key permissions.';
+                var opt = document.createElement('option');
+                opt.value = curVal; opt.textContent = curVal; opt.selected = true;
+                sel.appendChild(opt);
+                return;
+            }
+            var foundCurrent = false;
+            for (var i = 0; i < models.length; i++) {
+                var m = models[i];
+                var opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = m.name || m.id;
+                if (m.id === curVal) { opt.selected = true; foundCurrent = true; }
+                sel.appendChild(opt);
+            }
+            // Keep current value selected even if not in list
+            if (!foundCurrent && curVal) {
+                var opt = document.createElement('option');
+                opt.value = curVal; opt.textContent = curVal + ' (current)'; opt.selected = true;
+                sel.insertBefore(opt, sel.firstChild);
+            }
+            hint.textContent = models.length + ' models available.';
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Refresh';
+            hint.textContent = 'Request failed: ' + e.message;
+        });
+}
+</script>
+{% endblock %}

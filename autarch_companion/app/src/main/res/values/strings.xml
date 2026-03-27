@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Archon</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_links">Links</string>
+    <string name="nav_modules">Modules</string>
+    <string name="nav_setup">Setup</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Discovery -->
+    <string name="server_discovery">Server Discovery</string>
+    <string name="discovery_idle">Tap SCAN to find AUTARCH</string>
+    <string name="discovery_methods">LAN / Wi-Fi Direct / Bluetooth</string>
+    <string name="scan_network">SCAN</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">ARCHON</string>
+    <string name="adb_control">ADB Control</string>
+    <string name="adb_status_unknown">ADB: checking...</string>
+    <string name="enable_adb_tcp">Enable ADB TCP/IP</string>
+    <string name="usbip_export">USB/IP Export</string>
+    <string name="usbip_status_unknown">USB/IP: checking...</string>
+    <string name="enable_usbip_export">Enable USB/IP Export</string>
+    <string name="adb_server">ADB Server</string>
+    <string name="kill_adb">KILL</string>
+    <string name="restart_adb">RESTART</string>
+    <string name="auto_restart_adb">Auto-restart ADB</string>
+    <string name="wireguard_status">WireGuard</string>
+    <string name="wg_checking">WG: checking...</string>
+    <string name="wg_server_ip_label">Server: --</string>
+    <string name="ready">&gt; ready_</string>
+
+    <!-- Links -->
+    <string name="links_title">AUTARCH</string>
+    <string name="server_url_placeholder">Server: --</string>
+    <string name="link_dashboard">Dashboard</string>
+    <string name="link_wireguard">WireGuard</string>
+    <string name="link_shield">Shield</string>
+    <string name="link_hardware">Hardware</string>
+    <string name="link_wireshark">Wireshark</string>
+    <string name="link_osint">OSINT</string>
+    <string name="link_defense">Defense</string>
+    <string name="link_offense">Offense</string>
+    <string name="link_settings">Settings</string>
+
+    <!-- Messaging -->
+    <string name="nav_messaging">Messages</string>
+    <string name="messaging_title">SMS/RCS</string>
+    <string name="messaging_become_default">DEFAULT</string>
+    <string name="messaging_restore_default">RESTORE</string>
+    <string name="messaging_tools">TOOLS</string>
+    <string name="messaging_search_hint">Search messages...</string>
+    <string name="messaging_input_hint">Type a message...</string>
+    <string name="messaging_send">SEND</string>
+    <string name="messaging_export">EXPORT</string>
+    <string name="messaging_new_message">New message</string>
+    <string name="messaging_empty">No conversations found.\nCheck SMS permissions or tap + to forge a message.</string>
+
+    <!-- Forge Dialog -->
+    <string name="forge_dialog_title">FORGE MESSAGE</string>
+    <string name="forge_phone_label">Phone Number</string>
+    <string name="forge_phone_hint">+15551234567</string>
+    <string name="forge_name_label">Contact Name (optional)</string>
+    <string name="forge_name_hint">John Doe</string>
+    <string name="forge_body_label">Message Body</string>
+    <string name="forge_body_hint">Enter message text...</string>
+    <string name="forge_direction_label">Direction</string>
+    <string name="forge_received">RECEIVED</string>
+    <string name="forge_sent">SENT</string>
+    <string name="forge_date_label">Date / Time</string>
+    <string name="forge_pick_date">Date</string>
+    <string name="forge_pick_time">Time</string>
+    <string name="forge_mark_read">Mark as read</string>
+
+    <!-- Settings -->
+    <string name="settings_title">SETTINGS</string>
+    <string name="server_connection">Server Connection</string>
+    <string name="hint_server_ip">AUTARCH Server IP</string>
+    <string name="hint_web_port">Web UI Port (default: 8181)</string>
+    <string name="adb_configuration">ADB Configuration</string>
+    <string name="hint_adb_port">ADB TCP Port</string>
+    <string name="hint_usbip_port">USB/IP Port</string>
+    <string name="bbs_configuration">BBS Configuration</string>
+    <string name="hint_bbs_address">Veilid BBS Address</string>
+    <string name="auto_detect">AUTO-DETECT SERVER</string>
+    <string name="test_connection">TEST</string>
+    <string name="save_settings">SAVE</string>
+</resources>

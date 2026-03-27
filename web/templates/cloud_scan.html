@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Cloud Security{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Cloud Security Scanner</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Discover exposed cloud storage buckets, misconfigured services, and enumerate subdomains.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="cloud" data-tab="buckets" onclick="showTab('cloud','buckets')">Buckets</button>
+    <button class="tab" data-tab-group="cloud" data-tab="services" onclick="showTab('cloud','services')">Services</button>
+    <button class="tab" data-tab-group="cloud" data-tab="subdomains" onclick="showTab('cloud','subdomains')">Subdomains</button>
+</div>
+
+<!-- ==================== BUCKETS TAB ==================== -->
+<div class="tab-content active" data-tab-group="cloud" data-tab="buckets">
+
+<div class="section">
+    <h2>Bucket Discovery</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Search for publicly accessible cloud storage buckets by keyword or company name.
+    </p>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+            <label>Keyword / Company Name</label>
+            <input type="text" id="cloud-bucket-keyword" placeholder="e.g. acme-corp, staging, backups">
+        </div>
+    </div>
+    <div style="margin-bottom:12px">
+        <span style="font-size:0.85rem;color:var(--text-secondary);margin-right:12px">Providers:</span>
+        <label style="margin-right:12px;font-size:0.85rem;color:var(--text-primary);cursor:pointer">
+            <input type="checkbox" id="cloud-prov-aws" checked style="margin-right:4px"> AWS S3
+        </label>
+        <label style="margin-right:12px;font-size:0.85rem;color:var(--text-primary);cursor:pointer">
+            <input type="checkbox" id="cloud-prov-gcs" checked style="margin-right:4px"> Google Cloud Storage
+        </label>
+        <label style="margin-right:12px;font-size:0.85rem;color:var(--text-primary);cursor:pointer">
+            <input type="checkbox" id="cloud-prov-azure" checked style="margin-right:4px"> Azure Blob
+        </label>
+    </div>
+    <div class="tool-actions" style="margin-bottom:12px">
+        <button id="btn-bucket-scan" class="btn btn-primary" onclick="cloudBucketScan()">Scan Buckets</button>
+        <span id="cloud-bucket-status" style="font-size:0.8rem;color:var(--text-muted);margin-left:12px"></span>
+    </div>
+    <table class="data-table">
+        <thead><tr><th>Bucket Name</th><th>Provider</th><th>Status</th><th>Public</th><th>Listable</th></tr></thead>
+        <tbody id="cloud-bucket-results">
+            <tr><td colspan="5" class="empty-state">Enter a keyword and click Scan to discover buckets.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<!-- ==================== SERVICES TAB ==================== -->
+<div class="tab-content" data-tab-group="cloud" data-tab="services">
+
+<div class="section">
+    <h2>Exposed Services Scanner</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Probe a target URL for commonly exposed cloud services, admin panels, and metadata endpoints.
+    </p>
+    <div class="input-row">
+        <input type="text" id="cloud-svc-url" placeholder="Target URL (e.g. https://example.com)">
+        <button id="btn-svc-scan" class="btn btn-primary" onclick="cloudServiceScan()">Scan Services</button>
+    </div>
+    <table class="data-table" style="margin-bottom:20px">
+        <thead><tr><th>Path</th><th>Service</th><th>Status</th><th>Sensitive</th></tr></thead>
+        <tbody id="cloud-svc-results">
+            <tr><td colspan="4" class="empty-state">Enter a target URL and scan for exposed services.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>Cloud Metadata SSRF Check</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Test for accessible cloud metadata endpoints (IMDS) that may be reachable via SSRF.
+    </p>
+    <div class="input-row">
+        <input type="text" id="cloud-ssrf-url" placeholder="Target URL with SSRF vector">
+        <button id="btn-ssrf-check" class="btn btn-warning" onclick="cloudSSRFCheck()">Check SSRF</button>
+    </div>
+    <pre class="output-panel" id="cloud-ssrf-output" style="min-height:0"></pre>
+</div>
+
+</div>
+
+<!-- ==================== SUBDOMAINS TAB ==================== -->
+<div class="tab-content" data-tab-group="cloud" data-tab="subdomains">
+
+<div class="section">
+    <h2>Subdomain Enumeration</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Enumerate subdomains for a target domain and identify cloud provider hints.
+    </p>
+    <div class="input-row">
+        <input type="text" id="cloud-sub-domain" placeholder="Target domain (e.g. example.com)">
+        <button id="btn-sub-enum" class="btn btn-primary" onclick="cloudSubdomainEnum()">Enumerate</button>
+    </div>
+    <span id="cloud-sub-status" style="font-size:0.8rem;color:var(--text-muted)"></span>
+    <table class="data-table" style="margin-top:12px">
+        <thead><tr><th>Subdomain</th><th>IP Address</th><th>Cloud Provider</th></tr></thead>
+        <tbody id="cloud-sub-results">
+            <tr><td colspan="3" class="empty-state">Enter a domain and click Enumerate to discover subdomains.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+<script>
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+/* ── Buckets ── */
+var _bucketPoll = null;
+
+function cloudBucketScan() {
+    var keyword = document.getElementById('cloud-bucket-keyword').value.trim();
+    if (!keyword) return;
+    var providers = [];
+    if (document.getElementById('cloud-prov-aws').checked) providers.push('aws');
+    if (document.getElementById('cloud-prov-gcs').checked) providers.push('gcs');
+    if (document.getElementById('cloud-prov-azure').checked) providers.push('azure');
+    if (!providers.length) { alert('Select at least one provider.'); return; }
+
+    var btn = document.getElementById('btn-bucket-scan');
+    setLoading(btn, true);
+    document.getElementById('cloud-bucket-status').textContent = 'Scanning...';
+    document.getElementById('cloud-bucket-results').innerHTML = '<tr><td colspan="5" class="empty-state">Scanning...</td></tr>';
+
+    postJSON('/cloud/buckets/scan', {keyword: keyword, providers: providers}).then(function(data) {
+        if (data.error) {
+            setLoading(btn, false);
+            document.getElementById('cloud-bucket-status').textContent = 'Error';
+            renderOutput('cloud-bucket-results', data.error);
+            return;
+        }
+        if (data.job_id) {
+            cloudPollBuckets(data.job_id);
+        } else {
+            setLoading(btn, false);
+            cloudRenderBuckets(data.results || []);
+        }
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('cloud-bucket-status').textContent = 'Request failed';
+    });
+}
+
+function cloudPollBuckets(jobId) {
+    if (_bucketPoll) clearInterval(_bucketPoll);
+    _bucketPoll = setInterval(function() {
+        fetchJSON('/cloud/buckets/status/' + jobId).then(function(data) {
+            if (data.status === 'running') {
+                document.getElementById('cloud-bucket-status').textContent = 'Scanning... (' + (data.checked || 0) + ' checked)';
+                if (data.partial) cloudRenderBuckets(data.partial);
+            } else {
+                clearInterval(_bucketPoll);
+                _bucketPoll = null;
+                setLoading(document.getElementById('btn-bucket-scan'), false);
+                document.getElementById('cloud-bucket-status').textContent = 'Done (' + (data.total || 0) + ' found)';
+                cloudRenderBuckets(data.results || []);
+            }
+        }).catch(function() {
+            clearInterval(_bucketPoll);
+            _bucketPoll = null;
+            setLoading(document.getElementById('btn-bucket-scan'), false);
+            document.getElementById('cloud-bucket-status').textContent = 'Poll error';
+        });
+    }, 2000);
+}
+
+function cloudRenderBuckets(results) {
+    var tb = document.getElementById('cloud-bucket-results');
+    if (!results.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="empty-state">No buckets found.</td></tr>';
+        return;
+    }
+    var html = '';
+    results.forEach(function(r) {
+        var statusBadge = r.status === 'exists' ? '<span class="badge badge-pass">Exists</span>'
+                        : r.status === 'not_found' ? '<span class="badge badge-info">Not Found</span>'
+                        : '<span class="badge badge-medium">' + esc(r.status) + '</span>';
+        html += '<tr><td style="font-family:monospace">' + esc(r.name) + '</td>'
+            + '<td>' + esc(r.provider) + '</td>'
+            + '<td>' + statusBadge + '</td>'
+            + '<td>' + (r.public ? '<span class="badge badge-fail">PUBLIC</span>' : '<span class="badge badge-pass">Private</span>') + '</td>'
+            + '<td>' + (r.listable ? '<span class="badge badge-fail">YES</span>' : '--') + '</td></tr>';
+    });
+    tb.innerHTML = html;
+}
+
+/* ── Services ── */
+function cloudServiceScan() {
+    var url = document.getElementById('cloud-svc-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-svc-scan');
+    setLoading(btn, true);
+    postJSON('/cloud/services/scan', {url: url}).then(function(data) {
+        setLoading(btn, false);
+        var tb = document.getElementById('cloud-svc-results');
+        if (data.error) {
+            tb.innerHTML = '<tr><td colspan="4" class="empty-state">Error: ' + esc(data.error) + '</td></tr>';
+            return;
+        }
+        var results = data.results || [];
+        if (!results.length) {
+            tb.innerHTML = '<tr><td colspan="4" class="empty-state">No exposed services detected.</td></tr>';
+            return;
+        }
+        var html = '';
+        results.forEach(function(r) {
+            var sensitiveBadge = r.sensitive ? '<span class="badge badge-fail">SENSITIVE</span>' : '--';
+            html += '<tr><td style="font-family:monospace;font-size:0.85rem">' + esc(r.path) + '</td>'
+                + '<td>' + esc(r.name) + '</td>'
+                + '<td><span class="badge badge-' + (r.status < 400 ? 'pass' : 'info') + '">' + r.status + '</span></td>'
+                + '<td>' + sensitiveBadge + '</td></tr>';
+        });
+        tb.innerHTML = html;
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── SSRF ── */
+function cloudSSRFCheck() {
+    var url = document.getElementById('cloud-ssrf-url').value.trim();
+    if (!url) return;
+    var btn = document.getElementById('btn-ssrf-check');
+    setLoading(btn, true);
+    postJSON('/cloud/ssrf/check', {url: url}).then(function(data) {
+        setLoading(btn, false);
+        renderOutput('cloud-ssrf-output', data.output || data.error || 'No result');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Subdomains ── */
+function cloudSubdomainEnum() {
+    var domain = document.getElementById('cloud-sub-domain').value.trim();
+    if (!domain) return;
+    var btn = document.getElementById('btn-sub-enum');
+    setLoading(btn, true);
+    document.getElementById('cloud-sub-status').textContent = 'Enumerating...';
+    postJSON('/cloud/subdomains/enumerate', {domain: domain}).then(function(data) {
+        setLoading(btn, false);
+        var tb = document.getElementById('cloud-sub-results');
+        if (data.error) {
+            document.getElementById('cloud-sub-status').textContent = 'Error';
+            tb.innerHTML = '<tr><td colspan="3" class="empty-state">Error: ' + esc(data.error) + '</td></tr>';
+            return;
+        }
+        var results = data.results || [];
+        document.getElementById('cloud-sub-status').textContent = results.length + ' subdomains found';
+        if (!results.length) {
+            tb.innerHTML = '<tr><td colspan="3" class="empty-state">No subdomains found.</td></tr>';
+            return;
+        }
+        var html = '';
+        results.forEach(function(r) {
+            var provHint = r.cloud_provider ? '<span class="badge badge-info">' + esc(r.cloud_provider) + '</span>' : '--';
+            html += '<tr><td style="font-family:monospace">' + esc(r.subdomain) + '</td>'
+                + '<td style="font-family:monospace">' + esc(r.ip || '--') + '</td>'
+                + '<td>' + provHint + '</td></tr>';
+        });
+        tb.innerHTML = html;
+    }).catch(function() {
+        setLoading(btn, false);
+        document.getElementById('cloud-sub-status').textContent = 'Request failed';
+    });
+}
+</script>
+{% endblock %}

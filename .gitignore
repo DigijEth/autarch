@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data & databases (regenerated at runtime)
+data/cve/*.db
+data/sites/*.db
+data/uploads/
+data/hardware/
+data/.splash_accepted
+data/hal_memory.enc
+data/vault.enc
+*.pcap
+*.pcapng
+
+# Runtime-generated data
+data/captures/*
+data/reports/*
+data/network/*
+data/android_exploit/*
+
+# Large files
+models/
+*.gguf
+claude.bk
+*.mtf
+
+# Results (user-generated)
+results/
+dossiers/
+
+# OSINT scan results
+*_profiles.json
+
+# Secrets & config with credentials
+.env
+*.pem
+*.key
+
+# Node
+node_modules/
+
+# Gradle
+.gradle/
+gradle-*/
+
+# Bundled tools (large binaries)
+tools/
+
+# Android SDK tools (bundled binaries)
+android/
+
+# Build artifacts
+dist/
+build/
+build_temp/
+release/
+Output/
+installer/
+*.spec.bak
+*.zip
+*.ab
+
+# Local utility scripts
+kill_autarch.bat
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# Development planning docs
+phase2.md
+
+# Snoop data
+snoop/
+data/sites/snoop_full.json
+
+# Custom user data (optional - users may want to track these)
+# custom_adultsites.json
+# custom_sites.inf
+# custom_apis.json

@@ -1,0 +1,53 @@
+# AUTARCH - Core Dependencies
+flask>=3.0
+bcrypt>=4.0
+requests>=2.31
+msgpack>=1.0
+cryptography>=41.0
+PyCryptodome>=3.19
+
+# OSINT & Networking
+# System packages needed: nmap, tcpdump, tshark, whois, dig (dnsutils)
+
+# Hardware / Serial
+pyserial>=3.5
+esptool>=4.0
+
+# Packet Analysis
+pyshark>=0.6
+scapy>=2.5
+
+# Discovery
+zeroconf>=0.131
+
+# Reports & QR
+qrcode>=7.0
+Pillow>=10.0
+
+# MCP (Model Context Protocol)
+mcp>=1.0
+
+# ── LLM Backends ──────────────────────────────────────────
+
+# Local GGUF models (CPU-friendly):
+llama-cpp-python>=0.3.16
+# For CUDA GPU acceleration, reinstall with:
+#   CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+
+# HuggingFace SafeTensors models (GPU-recommended):
+transformers>=4.35
+accelerate>=0.25
+bitsandbytes>=0.41  # for 4-bit/8-bit quantization (Linux/CUDA only; skip on Windows if unavailable)
+# torch>=2.1  # Install manually: https://pytorch.org/get-started/locally/
+
+# Anthropic Claude API:
+anthropic>=0.40
+
+# OpenAI API:
+openai>=1.0
+
+# HuggingFace Inference API:
+huggingface-hub>=0.20
+
+# ── Knowledge System ──────────────────────────────────────
+numpy>=1.24

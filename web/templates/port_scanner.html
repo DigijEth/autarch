@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% block title %}Port Scanner — AUTARCH{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>Port Scanner</h1>
+    <p class="text-muted" style="font-size:0.85rem;color:var(--text-secondary)">
+        Advanced TCP port scanner with nmap integration and real-time live output
+    </p>
+</div>
+
+<div style="display:grid;grid-template-columns:380px 1fr;gap:1.25rem;align-items:start">
+
+    <!-- ── Config Panel ── -->
+    <div>
+        <div class="card">
+            <h3>Scan Configuration</h3>
+
+            <div class="form-group">
+                <label>Target Host / IP</label>
+                <input type="text" id="ps-target" class="form-control"
+                       placeholder="192.168.1.1 or hostname.local"
+                       onkeypress="if(event.key==='Enter')startScan()">
+            </div>
+
+            <div class="form-group">
+                <label>Scan Mode</label>
+                <select id="ps-mode" class="form-control" onchange="onModeChange()">
+                    <option value="quick">Quick — 22 common ports (~1s)</option>
+                    <option value="common" selected>Common — 110 well-known ports (~5s)</option>
+                    <option value="full">Full — All 65,535 ports (may take minutes)</option>
+                    <option value="custom">Custom — Specify ports / ranges</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="custom-ports-group" style="display:none">
+                <label>Ports / Ranges (e.g. 22,80,443,8000-9000)</label>
+                <input type="text" id="ps-custom-ports" class="form-control"
+                       placeholder="22,80,443,1024-2048">
+            </div>
+
+            <!-- Options -->
+            <div style="padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:14px">
+                <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Options</div>
+
+                <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer">
+                        <input type="checkbox" id="opt-nmap" style="width:auto"> Use nmap
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer">
+                        <input type="checkbox" id="opt-svc" style="width:auto"> Service detection (-sV)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer">
+                        <input type="checkbox" id="opt-os" style="width:auto"> OS fingerprint (-O)
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;cursor:pointer">
+                        <input type="checkbox" id="opt-agg" style="width:auto"> Aggressive (-A)
+                    </label>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">Timeout (s)</div>
+                        <input type="number" id="opt-timeout" class="form-control" value="1.0" min="0.1" max="10" step="0.1">
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">Concurrency</div>
+                        <input type="number" id="opt-concurrency" class="form-control" value="200" min="1" max="500">
+                    </div>
+                    <div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:3px">nmap Timing</div>
+                        <select id="opt-timing" class="form-control">
+                            <option value="2">T2 — Polite</option>
+                            <option value="3">T3 — Normal</option>
+                            <option value="4" selected>T4 — Aggressive</option>
+                            <option value="5">T5 — Insane</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px">
+                <button id="ps-start-btn" class="btn btn-primary" style="flex:1" onclick="startScan()">
+                    &#x25B6; Start Scan
+                </button>
+                <button id="ps-cancel-btn" class="btn btn-danger btn-small" style="display:none"
+                        onclick="cancelScan()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Stats Card -->
+        <div class="card" id="stats-card" style="display:none">
+            <h3>Scan Stats</h3>
+            <table style="width:100%;font-size:0.85rem">
+                <tr><td style="color:var(--text-muted);padding:3px 0">Target</td>
+                    <td id="st-target" style="text-align:right;color:var(--accent)"></td></tr>
+                <tr><td style="color:var(--text-muted);padding:3px 0">Ports Scanned</td>
+                    <td id="st-scanned" style="text-align:right"></td></tr>
+                <tr><td style="color:var(--text-muted);padding:3px 0">Open Ports</td>
+                    <td id="st-open" style="text-align:right;color:var(--success);font-weight:700"></td></tr>
+                <tr><td style="color:var(--text-muted);padding:3px 0">Duration</td>
+                    <td id="st-duration" style="text-align:right"></td></tr>
+                <tr id="st-os-row" style="display:none">
+                    <td style="color:var(--text-muted);padding:3px 0">OS Guess</td>
+                    <td id="st-os" style="text-align:right;font-size:0.8rem"></td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── Right Panel — Output + Results ── -->
+    <div>
+        <!-- Progress bar -->
+        <div id="ps-progress-wrap" style="display:none;margin-bottom:1rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span id="ps-progress-label" style="font-size:0.82rem;color:var(--text-secondary)">Initializing...</span>
+                <span id="ps-progress-pct" style="font-size:0.82rem;font-weight:600;color:var(--accent)">0%</span>
+            </div>
+            <div style="background:var(--bg-input);border-radius:4px;height:6px;overflow:hidden">
+                <div id="ps-progress-bar" style="height:100%;background:var(--accent);
+                     transition:width 0.3s;border-radius:4px;width:0%"></div>
+            </div>
+        </div>
+
+        <!-- Live output box -->
+        <div class="card" style="padding:0;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;
+                        padding:10px 16px;border-bottom:1px solid var(--border)">
+                <span style="font-size:0.8rem;font-weight:600;letter-spacing:0.05em">LIVE OUTPUT</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <span id="ps-status-dot" style="width:8px;height:8px;border-radius:50%;
+                          background:var(--text-muted);display:inline-block"></span>
+                    <span id="ps-status-txt" style="font-size:0.75rem;color:var(--text-muted)">Idle</span>
+                    <button class="btn btn-small" style="font-size:0.7rem;padding:3px 8px"
+                            onclick="clearOutput()">Clear</button>
+                </div>
+            </div>
+            <pre id="ps-output" style="background:var(--bg-primary);color:#c8d3f5;
+                 font-family:'Cascadia Code','Fira Code','Consolas',monospace;
+                 font-size:0.78rem;line-height:1.5;padding:14px;margin:0;
+                 height:340px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+        </div>
+
+        <!-- Results table -->
+        <div id="ps-results-wrap" style="display:none;margin-top:1rem">
+            <div class="card" style="padding:0;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                            padding:12px 16px;border-bottom:1px solid var(--border)">
+                    <span style="font-weight:600;font-size:0.9rem">
+                        Open Ports — <span id="res-count" style="color:var(--success)">0</span> found
+                    </span>
+                    <div style="display:flex;gap:6px">
+                        <button class="btn btn-small" onclick="exportResults('txt')">Export TXT</button>
+                        <button class="btn btn-small" onclick="exportResults('json')">Export JSON</button>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:80px">Port</th>
+                            <th style="width:70px">Proto</th>
+                            <th style="width:150px">Service</th>
+                            <th>Banner / Version</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ps-results-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#ps-output .ln-info    { color: #c8d3f5; }
+#ps-output .ln-open    { color: #4ade80; font-weight: 700; }
+#ps-output .ln-warn    { color: #fbbf24; }
+#ps-output .ln-error   { color: #f87171; }
+#ps-output .ln-nmap    { color: #94a3b8; font-size: 0.73rem; }
+#ps-output .ln-prog    { color: #818cf8; }
+#ps-output .ln-done    { color: #34d399; font-weight: 700; }
+#ps-output .ln-muted   { color: #475569; }
+.advanced-toggle { font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;
+                   user-select: none; display: inline-flex; align-items: center; gap: 4px; }
+.advanced-toggle:hover { color: var(--text-primary); }
+</style>
+
+<script>
+let _jobId = null;
+let _es = null;
+let _openPorts = [];
+let _scanResult = null;
+
+function onModeChange() {
+    const mode = document.getElementById('ps-mode').value;
+    document.getElementById('custom-ports-group').style.display =
+        mode === 'custom' ? '' : 'none';
+}
+
+
+function startScan() {
+    const target = document.getElementById('ps-target').value.trim();
+    if (!target) { alert('Enter a target host or IP address'); return; }
+    const mode = document.getElementById('ps-mode').value;
+    if (mode === 'custom' && !document.getElementById('ps-custom-ports').value.trim()) {
+        alert('Enter ports or ranges for custom mode'); return;
+    }
+
+    _openPorts = [];
+    _scanResult = null;
+    clearOutput();
+    document.getElementById('ps-results-wrap').style.display = 'none';
+    document.getElementById('stats-card').style.display = 'none';
+    document.getElementById('ps-progress-wrap').style.display = '';
+
+    const payload = {
+        target,
+        mode,
+        ports: document.getElementById('ps-custom-ports').value.trim(),
+        use_nmap: document.getElementById('opt-nmap').checked,
+        service_detection: document.getElementById('opt-svc').checked,
+        os_detection: document.getElementById('opt-os').checked,
+        aggressive: document.getElementById('opt-agg').checked,
+        timing: document.getElementById('opt-timing').value,
+        timeout: parseFloat(document.getElementById('opt-timeout').value) || 1.0,
+        concurrency: parseInt(document.getElementById('opt-concurrency').value) || 200,
+    };
+
+    fetch('/port-scanner/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { appendLine('error', '✗ ' + d.error); return; }
+        _jobId = d.job_id;
+        setStatus('scanning', 'Scanning...');
+        document.getElementById('ps-start-btn').disabled = true;
+        document.getElementById('ps-cancel-btn').style.display = '';
+        appendLine('info', `► Scan started | job=${d.job_id} | ${d.port_count} ports queued`);
+        openStream(d.job_id);
+        halAnalyze('Port Scanner', JSON.stringify(d, null, 2), 'port scan', 'network');
+    }).catch(e => appendLine('error', '✗ ' + e.message));
+}
+
+function openStream(jobId) {
+    if (_es) { _es.close(); _es = null; }
+    _es = new EventSource('/port-scanner/stream/' + jobId);
+    _es.onmessage = e => handleEvent(JSON.parse(e.data));
+    _es.onerror = () => { setStatus('idle', 'Connection lost'); };
+}
+
+function handleEvent(ev) {
+    switch (ev.type) {
+        case 'start':
+            appendLine('info', `▶ Target: ${ev.target}  |  Ports: ${ev.total_ports}  |  Mode: ${ev.mode}`);
+            setProgress(0, ev.total_ports, '0%', 'Starting...');
+            document.getElementById('st-target').textContent = ev.target;
+            document.getElementById('st-scanned').textContent = ev.total_ports;
+            document.getElementById('stats-card').style.display = '';
+            break;
+        case 'info':
+            appendLine('info', '  ' + ev.msg);
+            break;
+        case 'warning':
+            appendLine('warn', '⚠ ' + ev.msg);
+            break;
+        case 'error':
+            appendLine('error', '✗ ' + ev.msg);
+            scanFinished();
+            break;
+        case 'progress':
+            setProgress(ev.current, ev.total, ev.pct + '%', `Port ${ev.port} | ${ev.open_count} open | ETA ${ev.eta}`);
+            break;
+        case 'port_open':
+            _openPorts.push(ev);
+            const svc = ev.service || 'unknown';
+            const banner = ev.banner ? ` — ${ev.banner.substring(0, 60)}` : '';
+            appendLine('open', `  ✔ ${String(ev.port).padEnd(6)} ${svc.padEnd(18)}${banner}`);
+            addResultRow(ev);
+            document.getElementById('res-count').textContent = _openPorts.length;
+            document.getElementById('st-open').textContent = _openPorts.length;
+            document.getElementById('ps-results-wrap').style.display = '';
+            break;
+        case 'nmap_start':
+            appendLine('info', `  nmap: ${ev.cmd}`);
+            break;
+        case 'nmap_line':
+            if (ev.line.trim()) appendLine('nmap', '  ' + ev.line);
+            break;
+        case 'done':
+            appendLine('done',
+                `\n✔ SCAN COMPLETE — ${ev.open_count} open ports found in ${ev.duration}s ` +
+                `(${ev.ports_scanned} ports scanned)`
+            );
+            if (ev.os_guess) {
+                appendLine('info', `  OS: ${ev.os_guess}`);
+                document.getElementById('st-os-row').style.display = '';
+                document.getElementById('st-os').textContent = ev.os_guess;
+            }
+            document.getElementById('st-duration').textContent = ev.duration + 's';
+            setProgress(100, 100, '100%', 'Complete');
+            scanFinished();
+            break;
+    }
+}
+
+function addResultRow(port) {
+    const tbody = document.getElementById('ps-results-body');
+    const tr = document.createElement('tr');
+    const banner = port.banner
+        ? `<span style="font-family:monospace;font-size:0.75rem;color:var(--text-secondary)">${esc(port.banner.substring(0, 120))}</span>`
+        : '<span style="color:var(--text-muted)">—</span>';
+    tr.innerHTML = `
+        <td><strong style="color:var(--success)">${port.port}</strong></td>
+        <td style="color:var(--text-muted)">${port.protocol}</td>
+        <td>${esc(port.service || '—')}</td>
+        <td>${banner}</td>`;
+    tbody.appendChild(tr);
+}
+
+function cancelScan() {
+    if (!_jobId) return;
+    fetch('/port-scanner/cancel/' + _jobId, { method: 'POST' });
+    appendLine('warn', '⚠ Scan cancelled by user');
+    scanFinished();
+}
+
+function scanFinished() {
+    if (_es) { _es.close(); _es = null; }
+    document.getElementById('ps-start-btn').disabled = false;
+    document.getElementById('ps-cancel-btn').style.display = 'none';
+    setStatus('idle', _openPorts.length + ' open ports');
+    _jobId = null;
+}
+
+function setStatus(state, text) {
+    const dot = document.getElementById('ps-status-dot');
+    const txt = document.getElementById('ps-status-txt');
+    txt.textContent = text;
+    dot.style.background = state === 'scanning' ? 'var(--success)'
+                         : state === 'error' ? 'var(--danger)'
+                         : 'var(--text-muted)';
+    if (state === 'scanning') {
+        dot.style.animation = 'ps-pulse 1.2s ease infinite';
+    } else {
+        dot.style.animation = '';
+    }
+}
+
+function setProgress(current, total, pct, label) {
+    document.getElementById('ps-progress-bar').style.width = (typeof pct === 'string' ? pct : pct + '%');
+    document.getElementById('ps-progress-pct').textContent = (typeof pct === 'string' ? pct : pct + '%');
+    document.getElementById('ps-progress-label').textContent = label;
+}
+
+function appendLine(cls, text) {
+    const out = document.getElementById('ps-output');
+    const el = document.createElement('span');
+    el.className = 'ln-' + cls;
+    el.textContent = text + '\n';
+    out.appendChild(el);
+    out.scrollTop = out.scrollHeight;
+}
+
+function clearOutput() {
+    document.getElementById('ps-output').innerHTML = '';
+}
+
+function exportResults(fmt) {
+    if (!_openPorts.length) { alert('No results to export'); return; }
+    let content, mime, ext;
+    if (fmt === 'json') {
+        content = JSON.stringify({ target: document.getElementById('ps-target').value,
+                                   scan_time: new Date().toISOString(),
+                                   open_ports: _openPorts }, null, 2);
+        mime = 'application/json'; ext = 'json';
+    } else {
+        const target = document.getElementById('ps-target').value;
+        const lines = [`# AUTARCH Port Scan Results`, `# Target: ${target}`,
+                       `# Date: ${new Date().toISOString()}`, `# Open Ports: ${_openPorts.length}`, ''];
+        _openPorts.forEach(p => {
+            lines.push(`${p.port}/tcp\topen\t${p.service || 'unknown'}\t${p.banner || ''}`);
+        });
+        content = lines.join('\n'); mime = 'text/plain'; ext = 'txt';
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([content], { type: mime }));
+    a.download = `scan_${document.getElementById('ps-target').value}_${Date.now()}.${ext}`;
+    a.click();
+}
+
+function esc(s) {
+    return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+}
+</script>
+
+<style>
+@keyframes ps-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+</style>
+
+{% endblock %}

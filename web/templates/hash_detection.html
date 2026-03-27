@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Hash Toolkit - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Hash Toolkit</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Identify unknown hashes, compute file/text digests, and look up threat intelligence.
+        </p>
+    </div>
+    <a href="{{ url_for('analyze.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Analyze</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="hashtool" data-tab="identify" onclick="showTab('hashtool','identify')">Identify</button>
+    <button class="tab" data-tab-group="hashtool" data-tab="filehash" onclick="showTab('hashtool','filehash')">File Hash</button>
+    <button class="tab" data-tab-group="hashtool" data-tab="texthash" onclick="showTab('hashtool','texthash')">Text Hash</button>
+    <button class="tab" data-tab-group="hashtool" data-tab="mutate" onclick="showTab('hashtool','mutate')">Mutate</button>
+    <button class="tab" data-tab-group="hashtool" data-tab="generate" onclick="showTab('hashtool','generate')">Generate</button>
+    <button class="tab" data-tab-group="hashtool" data-tab="reference" onclick="showTab('hashtool','reference')">Reference</button>
+</div>
+
+<!-- ══ Identify Tab ══ -->
+<div class="tab-content active" data-tab-group="hashtool" data-tab="identify">
+<div class="section">
+    <h2>Hash Algorithm Detection</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Paste an unknown hash to identify possible algorithms (supports 40+ hash types).
+    </p>
+    <div class="input-row">
+        <input type="text" id="ht-identify-input" placeholder="Paste hash string here..." style="font-family:monospace">
+        <button id="btn-ht-identify" class="btn btn-primary" onclick="htIdentify()">Identify</button>
+    </div>
+    <pre class="output-panel scrollable" id="ht-identify-output"></pre>
+    <div id="ht-threat-links" style="margin-top:8px;display:none">
+        <h3 style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:6px">Threat Intelligence Lookups</h3>
+        <div id="ht-links-container" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+</div>
+</div>
+
+<!-- ══ File Hash Tab ══ -->
+<div class="tab-content" data-tab-group="hashtool" data-tab="filehash">
+<div class="section">
+    <h2>File Hashing</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Compute CRC32, MD5, SHA1, SHA256, and SHA512 digests for any file.
+    </p>
+    <div class="input-row">
+        <input type="text" id="ht-file-path" placeholder="File path (e.g., /usr/bin/ls)">
+        <button id="btn-ht-file" class="btn btn-primary" onclick="htHashFile()">Hash File</button>
+    </div>
+    <pre class="output-panel scrollable" id="ht-file-output"></pre>
+</div>
+</div>
+
+<!-- ══ Text Hash Tab ══ -->
+<div class="tab-content" data-tab-group="hashtool" data-tab="texthash">
+<div class="section">
+    <h2>Text / String Hashing</h2>
+    <div class="form-group" style="margin-bottom:0.75rem">
+        <textarea id="ht-text-input" rows="4" placeholder="Enter text to hash..." style="width:100%;font-family:monospace"></textarea>
+    </div>
+    <div class="input-row">
+        <select id="ht-text-algo">
+            <option value="md5">MD5</option>
+            <option value="sha1">SHA-1</option>
+            <option value="sha224">SHA-224</option>
+            <option value="sha256" selected>SHA-256</option>
+            <option value="sha384">SHA-384</option>
+            <option value="sha512">SHA-512</option>
+            <option value="sha3-256">SHA3-256</option>
+            <option value="sha3-512">SHA3-512</option>
+            <option value="blake2b">BLAKE2b</option>
+            <option value="blake2s">BLAKE2s</option>
+            <option value="crc32">CRC32</option>
+            <option value="all">ALL algorithms</option>
+        </select>
+        <button id="btn-ht-text" class="btn btn-primary" onclick="htHashText()">Hash</button>
+    </div>
+    <pre class="output-panel scrollable" id="ht-text-output"></pre>
+</div>
+</div>
+
+<!-- ══ Mutate Tab ══ -->
+<div class="tab-content" data-tab-group="hashtool" data-tab="mutate">
+<div class="section">
+    <h2>Change File Hash</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Append bytes to a copy of a file to change its hash. Original file is not modified.
+    </p>
+    <div class="input-row">
+        <input type="text" id="ht-mutate-path" placeholder="File path to mutate">
+        <select id="ht-mutate-method" style="max-width:140px">
+            <option value="random">Random bytes</option>
+            <option value="null">Null bytes</option>
+            <option value="space">Spaces</option>
+            <option value="newline">Newlines</option>
+        </select>
+        <input type="number" id="ht-mutate-bytes" value="4" min="1" max="1024" style="max-width:80px" title="Bytes to append">
+        <button id="btn-ht-mutate" class="btn btn-primary" onclick="htMutate()">Mutate</button>
+    </div>
+    <pre class="output-panel scrollable" id="ht-mutate-output"></pre>
+</div>
+</div>
+
+<!-- ══ Generate Tab ══ -->
+<div class="tab-content" data-tab-group="hashtool" data-tab="generate">
+<div class="section">
+    <h2>Create Dummy Hash Files</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Generate test files with known content for hash verification and testing.
+    </p>
+    <div class="input-row">
+        <input type="text" id="ht-gen-dir" placeholder="Output directory (e.g., /tmp)" value="/tmp">
+        <input type="text" id="ht-gen-name" placeholder="Filename" value="hashtest.bin" style="max-width:180px">
+    </div>
+    <div class="input-row" style="margin-top:6px">
+        <select id="ht-gen-type">
+            <option value="random">Random data</option>
+            <option value="zeros">All zeros (0x00)</option>
+            <option value="ones">All ones (0xFF)</option>
+            <option value="pattern">Repeating pattern (ABCDEF...)</option>
+            <option value="text">Custom text (repeated)</option>
+        </select>
+        <input type="number" id="ht-gen-size" value="1024" min="1" max="10485760" style="max-width:120px" title="Size in bytes">
+        <button id="btn-ht-gen" class="btn btn-primary" onclick="htGenerate()">Generate</button>
+    </div>
+    <div id="ht-gen-custom-row" class="input-row" style="margin-top:6px;display:none">
+        <input type="text" id="ht-gen-custom" placeholder="Custom text to repeat...">
+    </div>
+    <pre class="output-panel scrollable" id="ht-gen-output"></pre>
+</div>
+</div>
+
+<!-- ══ Reference Tab ══ -->
+<div class="tab-content" data-tab-group="hashtool" data-tab="reference">
+<div class="section">
+    <h2>Hash Type Reference</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+        Common hash types, output lengths, and hashcat mode numbers.
+    </p>
+    <div id="ht-reference-table" style="overflow-x:auto"></div>
+</div>
+</div>
+
+<script>
+/* ── Hash Toolkit ─────────────────────────────────────────────────── */
+
+function htIdentify() {
+    var hash = document.getElementById('ht-identify-input').value.trim();
+    if (!hash) return;
+    var btn = document.getElementById('btn-ht-identify');
+    setLoading(btn, true);
+    postJSON('/analyze/hash-detection/identify', {hash: hash}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('ht-identify-output', 'Error: ' + data.error); return; }
+
+        var lines = [];
+        lines.push('Input:  ' + data.hash);
+        lines.push('Length: ' + data.length + ' characters');
+        lines.push('');
+
+        if (data.matches && data.matches.length) {
+            lines.push('Possible Algorithms (' + data.matches.length + ' match' + (data.matches.length > 1 ? 'es' : '') + '):');
+            lines.push('');
+            data.matches.forEach(function(m, i) {
+                var hc = m.hashcat !== null ? '  [hashcat: ' + m.hashcat + ']' : '';
+                lines.push('  ' + (i + 1) + '. ' + m.name + hc);
+                lines.push('     ' + m.description);
+            });
+        } else {
+            lines.push(data.message || 'No matching hash algorithms found.');
+        }
+        renderOutput('ht-identify-output', lines.join('\n'));
+
+        // Show threat intel links for hex hashes of typical lengths
+        var linksDiv = document.getElementById('ht-threat-links');
+        var container = document.getElementById('ht-links-container');
+        var hexLens = [32, 40, 64, 128];
+        if (/^[a-fA-F0-9]+$/.test(hash) && hexLens.indexOf(hash.length) !== -1) {
+            container.innerHTML = '';
+            htGetThreatLinks(hash).forEach(function(link) {
+                var a = document.createElement('a');
+                a.href = link.url;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.className = 'btn btn-sm';
+                a.textContent = link.name;
+                a.style.fontSize = '0.8rem';
+                container.appendChild(a);
+            });
+            linksDiv.style.display = '';
+        } else {
+            linksDiv.style.display = 'none';
+        }
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function htGetThreatLinks(hash) {
+    return [
+        {name: 'VirusTotal',      url: 'https://www.virustotal.com/gui/file/' + hash},
+        {name: 'Hybrid Analysis', url: 'https://www.hybrid-analysis.com/search?query=' + hash},
+        {name: 'MalwareBazaar',   url: 'https://bazaar.abuse.ch/browse.php?search=' + hash},
+        {name: 'AlienVault OTX',  url: 'https://otx.alienvault.com/indicator/file/' + hash},
+        {name: 'Shodan',          url: 'https://www.shodan.io/search?query=' + hash},
+    ];
+}
+
+function htHashFile() {
+    var filepath = document.getElementById('ht-file-path').value.trim();
+    if (!filepath) return;
+    var btn = document.getElementById('btn-ht-file');
+    setLoading(btn, true);
+    postJSON('/analyze/hash-detection/file', {filepath: filepath}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('ht-file-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        lines.push('File:   ' + data.path);
+        lines.push('Size:   ' + data.size + ' bytes');
+        lines.push('');
+        lines.push('Digests:');
+        if (data.hashes) {
+            lines.push('  CRC32:  ' + (data.hashes.crc32 || ''));
+            lines.push('  MD5:    ' + (data.hashes.md5 || ''));
+            lines.push('  SHA1:   ' + (data.hashes.sha1 || ''));
+            lines.push('  SHA256: ' + (data.hashes.sha256 || ''));
+            lines.push('  SHA512: ' + (data.hashes.sha512 || ''));
+        }
+        renderOutput('ht-file-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function htHashText() {
+    var text = document.getElementById('ht-text-input').value;
+    if (!text) return;
+    var algo = document.getElementById('ht-text-algo').value;
+    var btn = document.getElementById('btn-ht-text');
+    setLoading(btn, true);
+    postJSON('/analyze/hash-detection/text', {text: text, algorithm: algo}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('ht-text-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        lines.push('Input length: ' + data.text_length + ' characters');
+        lines.push('');
+        if (data.algorithm === 'all' && data.hashes) {
+            lines.push('All Digests:');
+            Object.keys(data.hashes).sort().forEach(function(name) {
+                var pad = '          '.slice(0, 10 - name.length);
+                lines.push('  ' + name + ':' + pad + data.hashes[name]);
+            });
+        } else {
+            lines.push('Algorithm: ' + data.algorithm.toUpperCase());
+            lines.push('Hash:      ' + data.hash);
+        }
+        renderOutput('ht-text-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function htMutate() {
+    var filepath = document.getElementById('ht-mutate-path').value.trim();
+    if (!filepath) return;
+    var method = document.getElementById('ht-mutate-method').value;
+    var numBytes = document.getElementById('ht-mutate-bytes').value || '4';
+    var btn = document.getElementById('btn-ht-mutate');
+    setLoading(btn, true);
+    postJSON('/analyze/hash-detection/mutate', {filepath: filepath, method: method, num_bytes: numBytes}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('ht-mutate-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        lines.push('Original: ' + data.original_path + ' (' + data.original_size + ' bytes)');
+        lines.push('Mutated:  ' + data.mutated_path + ' (' + data.mutated_size + ' bytes)');
+        lines.push('Method:   ' + data.method + ' (' + data.bytes_appended + ' bytes appended)');
+        lines.push('');
+        lines.push('Before:');
+        lines.push('  MD5:    ' + data.original_hashes.md5);
+        lines.push('  SHA256: ' + data.original_hashes.sha256);
+        lines.push('');
+        lines.push('After:');
+        lines.push('  MD5:    ' + data.new_hashes.md5);
+        lines.push('  SHA256: ' + data.new_hashes.sha256);
+        renderOutput('ht-mutate-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function htGenerate() {
+    var dir = document.getElementById('ht-gen-dir').value.trim();
+    var name = document.getElementById('ht-gen-name').value.trim();
+    var type = document.getElementById('ht-gen-type').value;
+    var size = document.getElementById('ht-gen-size').value || '1024';
+    var custom = document.getElementById('ht-gen-custom').value;
+    if (!dir || !name) return;
+    var btn = document.getElementById('btn-ht-gen');
+    setLoading(btn, true);
+    postJSON('/analyze/hash-detection/generate', {
+        output_dir: dir, filename: name, content_type: type, size: size, custom_text: custom
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('ht-gen-output', 'Error: ' + data.error); return; }
+        var lines = [];
+        lines.push('Created: ' + data.path);
+        lines.push('Size:    ' + data.size + ' bytes');
+        lines.push('Content: ' + data.content_type);
+        lines.push('');
+        lines.push('Digests:');
+        if (data.hashes) {
+            lines.push('  CRC32:  ' + (data.hashes.crc32 || ''));
+            lines.push('  MD5:    ' + (data.hashes.md5 || ''));
+            lines.push('  SHA1:   ' + (data.hashes.sha1 || ''));
+            lines.push('  SHA256: ' + (data.hashes.sha256 || ''));
+            lines.push('  SHA512: ' + (data.hashes.sha512 || ''));
+        }
+        renderOutput('ht-gen-output', lines.join('\n'));
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* Show/hide custom text input when content type changes */
+document.getElementById('ht-gen-type').addEventListener('change', function() {
+    document.getElementById('ht-gen-custom-row').style.display = this.value === 'text' ? '' : 'none';
+});
+
+/* Build static reference table */
+(function() {
+    var el = document.getElementById('ht-reference-table');
+    if (!el) return;
+    var ref = [
+        ['CRC32',         '8',   'Hex',        '11500'],
+        ['MD4',           '32',  'Hex',        '900'],
+        ['MD5',           '32',  'Hex',        '0'],
+        ['NTLM',          '32',  'Hex',        '1000'],
+        ['LM',            '32',  'Hex',        '3000'],
+        ['MySQL323',      '16',  'Hex',        '200'],
+        ['MySQL41',       '41',  '*Hex',       '300'],
+        ['RIPEMD-160',    '40',  'Hex',        '6000'],
+        ['SHA-1',         '40',  'Hex',        '100'],
+        ['Tiger-192',     '48',  'Hex',        '10000'],
+        ['SHA-224',       '56',  'Hex',        '--'],
+        ['SHA-256',       '64',  'Hex',        '1400'],
+        ['SHA-384',       '96',  'Hex',        '10800'],
+        ['SHA-512',       '128', 'Hex',        '1700'],
+        ['SHA3-256',      '64',  'Hex',        '17400'],
+        ['SHA3-512',      '128', 'Hex',        '17600'],
+        ['BLAKE2b',       '128', 'Hex',        '600'],
+        ['BLAKE2s',       '64',  'Hex',        '--'],
+        ['Whirlpool',     '128', 'Hex',        '6100'],
+        ['bcrypt',        '60',  '$2a$...',    '3200'],
+        ['MD5 crypt',     '34',  '$1$...',     '500'],
+        ['SHA-256 crypt', '63',  '$5$...',     '7400'],
+        ['SHA-512 crypt', '98',  '$6$...',     '1800'],
+        ['Argon2',        'var', '$argon2...', '--'],
+        ['PBKDF2',        'var', '$pbkdf2...', '10900'],
+        ['WordPress',     '34',  '$P$...',     '400'],
+        ['Drupal7',       '55',  '$S$...',     '7900'],
+    ];
+    var html = '<table style="width:100%;font-size:0.82rem;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:2px solid var(--border);text-align:left">';
+    html += '<th style="padding:6px 10px">Algorithm</th>';
+    html += '<th style="padding:6px 10px">Length</th>';
+    html += '<th style="padding:6px 10px">Format</th>';
+    html += '<th style="padding:6px 10px">Hashcat Mode</th></tr></thead><tbody>';
+    ref.forEach(function(r) {
+        html += '<tr style="border-bottom:1px solid var(--border)">';
+        r.forEach(function(c) { html += '<td style="padding:5px 10px;font-family:monospace">' + c + '</td>'; });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Modules</div>
+        <div class="stat-value">{{ modules.get('total', 0) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">LLM Backend</div>
+        <div class="stat-value small">{{ llm_backend }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Hostname</div>
+        <div class="stat-value small">{{ system.hostname }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value small">{{ system.uptime }}</div>
+    </div>
+</div>
+
+<div class="category-grid">
+    <a href="{{ url_for('defense.index') }}" class="category-card cat-defense">
+        <h3>Defense</h3>
+        <p>System hardening, audits, monitoring</p>
+        <span class="badge">{{ modules.get('defense', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('offense.index') }}" class="category-card cat-offense">
+        <h3>Offense</h3>
+        <p>Penetration testing, Metasploit</p>
+        <span class="badge">{{ modules.get('offense', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('counter.index') }}" class="category-card cat-counter">
+        <h3>Counter</h3>
+        <p>Threat hunting, anomaly detection</p>
+        <span class="badge">{{ modules.get('counter', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('analyze.index') }}" class="category-card cat-analyze">
+        <h3>Analyze</h3>
+        <p>Forensics, file analysis</p>
+        <span class="badge">{{ modules.get('analyze', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('osint.index') }}" class="category-card cat-osint">
+        <h3>OSINT</h3>
+        <p>Reconnaissance, username search</p>
+        <span class="badge">{{ modules.get('osint', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('simulate.index') }}" class="category-card cat-simulate">
+        <h3>Simulate</h3>
+        <p>Attack simulation, red team</p>
+        <span class="badge">{{ modules.get('simulate', 0) }} modules</span>
+    </a>
+    <a href="{{ url_for('hardware.index') }}" class="category-card cat-hardware">
+        <h3>Hardware</h3>
+        <p>ADB, Fastboot, ESP32 flashing</p>
+        <span class="badge">{{ modules.get('hardware', 0) }} modules</span>
+    </a>
+</div>
+
+<div class="section">
+    <h2>System Tools</h2>
+    <table class="data-table">
+        <thead><tr><th>Tool</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for tool, available in tools.items() %}
+        <tr>
+            <td>{{ tool }}</td>
+            <td><span class="status-dot {{ 'active' if available else 'inactive' }}"></span>{{ 'Available' if available else 'Not found' }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>System Info</h2>
+    <table class="data-table">
+        <tbody>
+        <tr><td>Platform</td><td>{{ system.platform }}</td></tr>
+        <tr><td>Architecture</td><td>{{ system.arch }}</td></tr>
+        <tr><td>Python</td><td>{{ system.python }}</td></tr>
+        <tr><td>IP</td><td>{{ system.ip }}</td></tr>
+        <tr><td>UPnP</td><td><span class="status-dot {{ 'active' if upnp_enabled else 'inactive' }}"></span>{{ 'Enabled' if upnp_enabled else 'Disabled' }}</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

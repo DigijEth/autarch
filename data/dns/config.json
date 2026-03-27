@@ -1,0 +1,10 @@
+{
+  "listen_dns": "",
+  "listen_api": "127.0.0.1:5380",
+  "api_token": "",
+  "upstream": [],
+  "cache_ttl": 300,
+  "zones_dir": "",
+  "dnssec_keys_dir": "",
+  "log_queries": true
+}

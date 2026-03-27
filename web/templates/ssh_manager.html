@@ -1,0 +1,1045 @@
+{% extends "base.html" %}
+{% block title %}SSH Manager — AUTARCH{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <h1>SSH / SSHD Manager</h1>
+    <p class="text-muted" style="font-size:0.85rem;color:var(--text-secondary)">
+        Configure and harden your SSH server — audit settings, manage keys, and apply security best practices
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="ssh" data-tab="status" onclick="sshTab('status')">Status &amp; Scan</button>
+    <button class="tab" data-tab-group="ssh" data-tab="config" onclick="sshTab('config')">Config Editor</button>
+    <button class="tab" data-tab-group="ssh" data-tab="keys" onclick="sshTab('keys')">Keys</button>
+    <button class="tab" data-tab-group="ssh" data-tab="harden" onclick="sshTab('harden')">Quick Harden</button>
+    <button class="tab" data-tab-group="ssh" data-tab="fail2ban" onclick="sshTab('fail2ban')">Fail2Ban</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TAB 1: STATUS & SCAN                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content active" data-tab-group="ssh" data-tab="status">
+    <div class="section">
+        <h2>Service Status</h2>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span id="ssh-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--text-muted);display:inline-block"></span>
+                <span id="ssh-status-text" style="font-weight:600">Checking...</span>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-secondary)">
+                Enabled: <span id="ssh-enabled-text" style="font-weight:600">—</span>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-secondary)">
+                Version: <span id="ssh-version-text" style="font-family:monospace">—</span>
+            </div>
+        </div>
+        <div class="tool-actions" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="sshServiceAction('start')">Start</button>
+            <button class="btn btn-sm" onclick="sshServiceAction('stop')">Stop</button>
+            <button class="btn btn-sm" onclick="sshServiceAction('restart')">Restart</button>
+            <button class="btn btn-sm" onclick="sshServiceAction('enable')">Enable</button>
+            <button class="btn btn-sm" onclick="sshServiceAction('disable')">Disable</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Security Scan</h2>
+        <button class="btn btn-primary" id="btn-ssh-scan" onclick="sshRunScan()">Run Security Scan</button>
+        <div id="ssh-scan-results" style="margin-top:16px"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TAB 2: CONFIG EDITOR                                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ssh" data-tab="config">
+
+    <!-- Form Editor -->
+    <div class="section">
+        <h2>Form Editor</h2>
+
+        <!-- Connection -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Connection</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" id="cfg-Port" class="form-control" value="22" min="1" max="65535">
+                </div>
+                <div class="form-group">
+                    <label>AddressFamily</label>
+                    <select id="cfg-AddressFamily" class="form-control">
+                        <option value="any">any</option>
+                        <option value="inet">inet</option>
+                        <option value="inet6">inet6</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ListenAddress</label>
+                    <input type="text" id="cfg-ListenAddress" class="form-control" placeholder="0.0.0.0">
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Authentication -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Authentication</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>PermitRootLogin</label>
+                    <select id="cfg-PermitRootLogin" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                        <option value="prohibit-password">prohibit-password</option>
+                        <option value="forced-commands-only">forced-commands-only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>PasswordAuthentication</label>
+                    <select id="cfg-PasswordAuthentication" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no">no</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>PubkeyAuthentication</label>
+                    <select id="cfg-PubkeyAuthentication" class="form-control">
+                        <option value="yes" selected>yes</option>
+                        <option value="no">no</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>PermitEmptyPasswords</label>
+                    <select id="cfg-PermitEmptyPasswords" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no" selected>no</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>MaxAuthTries</label>
+                    <input type="number" id="cfg-MaxAuthTries" class="form-control" value="6" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label>LoginGraceTime</label>
+                    <input type="text" id="cfg-LoginGraceTime" class="form-control" placeholder="120" value="120">
+                </div>
+                <div class="form-group">
+                    <label>UsePAM</label>
+                    <select id="cfg-UsePAM" class="form-control">
+                        <option value="yes" selected>yes</option>
+                        <option value="no">no</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Session -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Session</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>MaxSessions</label>
+                    <input type="number" id="cfg-MaxSessions" class="form-control" value="10" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label>ClientAliveInterval</label>
+                    <input type="number" id="cfg-ClientAliveInterval" class="form-control" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>ClientAliveCountMax</label>
+                    <input type="number" id="cfg-ClientAliveCountMax" class="form-control" value="3" min="0">
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Access Control -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Access Control</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>AllowUsers</label>
+                    <input type="text" id="cfg-AllowUsers" class="form-control" placeholder="user1 user2">
+                </div>
+                <div class="form-group">
+                    <label>AllowGroups</label>
+                    <input type="text" id="cfg-AllowGroups" class="form-control" placeholder="sshusers admin">
+                </div>
+                <div class="form-group">
+                    <label>DenyUsers</label>
+                    <input type="text" id="cfg-DenyUsers" class="form-control" placeholder="nobody">
+                </div>
+                <div class="form-group">
+                    <label>DenyGroups</label>
+                    <input type="text" id="cfg-DenyGroups" class="form-control" placeholder="nogroup">
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Forwarding -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Forwarding</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>AllowTcpForwarding</label>
+                    <select id="cfg-AllowTcpForwarding" class="form-control">
+                        <option value="yes" selected>yes</option>
+                        <option value="no">no</option>
+                        <option value="local">local</option>
+                        <option value="remote">remote</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>X11Forwarding</label>
+                    <select id="cfg-X11Forwarding" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no" selected>no</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>GatewayPorts</label>
+                    <select id="cfg-GatewayPorts" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no" selected>no</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Logging -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Logging</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>SyslogFacility</label>
+                    <select id="cfg-SyslogFacility" class="form-control">
+                        <option value="AUTH" selected>AUTH</option>
+                        <option value="AUTHPRIV">AUTHPRIV</option>
+                        <option value="DAEMON">DAEMON</option>
+                        <option value="USER">USER</option>
+                        <option value="LOCAL0">LOCAL0</option>
+                        <option value="LOCAL1">LOCAL1</option>
+                        <option value="LOCAL2">LOCAL2</option>
+                        <option value="LOCAL3">LOCAL3</option>
+                        <option value="LOCAL4">LOCAL4</option>
+                        <option value="LOCAL5">LOCAL5</option>
+                        <option value="LOCAL6">LOCAL6</option>
+                        <option value="LOCAL7">LOCAL7</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>LogLevel</label>
+                    <select id="cfg-LogLevel" class="form-control">
+                        <option value="QUIET">QUIET</option>
+                        <option value="FATAL">FATAL</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="INFO" selected>INFO</option>
+                        <option value="VERBOSE">VERBOSE</option>
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="DEBUG1">DEBUG1</option>
+                        <option value="DEBUG2">DEBUG2</option>
+                        <option value="DEBUG3">DEBUG3</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Security -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Security</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>StrictModes</label>
+                    <select id="cfg-StrictModes" class="form-control">
+                        <option value="yes" selected>yes</option>
+                        <option value="no">no</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label>Ciphers</label>
+                    <input type="text" id="cfg-Ciphers" class="form-control" placeholder="chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com">
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label>MACs</label>
+                    <input type="text" id="cfg-MACs" class="form-control" placeholder="hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com">
+                </div>
+                <div class="form-group" style="grid-column:1/-1">
+                    <label>KexAlgorithms</label>
+                    <input type="text" id="cfg-KexAlgorithms" class="form-control" placeholder="curve25519-sha256,curve25519-sha256@libssh.org">
+                </div>
+            </div>
+        </fieldset>
+
+        <!-- Other -->
+        <fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;background:var(--bg-card)">
+            <legend style="color:var(--accent);font-weight:600;padding:0 8px;font-size:0.9rem">Other</legend>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+                <div class="form-group">
+                    <label>Banner</label>
+                    <input type="text" id="cfg-Banner" class="form-control" placeholder="/etc/ssh/banner.txt">
+                </div>
+                <div class="form-group">
+                    <label>Subsystem</label>
+                    <input type="text" id="cfg-Subsystem" class="form-control" value="sftp /usr/lib/openssh/sftp-server">
+                </div>
+                <div class="form-group">
+                    <label>UseDNS</label>
+                    <select id="cfg-UseDNS" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no" selected>no</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Compression</label>
+                    <select id="cfg-Compression" class="form-control">
+                        <option value="yes">yes</option>
+                        <option value="no" selected>no</option>
+                        <option value="delayed">delayed</option>
+                    </select>
+                </div>
+            </div>
+        </fieldset>
+
+        <button class="btn btn-primary" onclick="sshGenerateConfig()">Generate Config</button>
+    </div>
+
+    <!-- Raw Editor -->
+    <div class="section">
+        <h2>Raw Config Editor</h2>
+        <textarea id="ssh-config-raw" style="width:100%;min-height:400px;background:var(--bg-primary);color:#c8d3f5;
+            border:1px solid var(--border);border-radius:var(--radius);padding:14px;
+            font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.82rem;
+            line-height:1.6;resize:vertical" placeholder="# sshd_config will appear here..."></textarea>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="sshLoadConfig()">Load Current Config</button>
+            <button class="btn btn-primary btn-sm" onclick="sshSaveConfig()">Save Config</button>
+            <span id="ssh-config-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TAB 3: KEYS                                                   -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ssh" data-tab="keys">
+
+    <!-- Host Keys -->
+    <div class="section">
+        <h2>Host Keys</h2>
+        <button class="btn btn-sm" onclick="sshLoadHostKeys()" style="margin-bottom:12px">Refresh</button>
+        <div id="ssh-host-keys">
+            <span class="text-muted">Click Refresh to load host keys.</span>
+        </div>
+    </div>
+
+    <!-- Generate Key Pair -->
+    <div class="section">
+        <h2>Generate Key Pair</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">
+            <div class="form-group">
+                <label>Type</label>
+                <select id="keygen-type" class="form-control" onchange="sshKeygenTypeChanged()">
+                    <option value="ed25519" selected>ed25519</option>
+                    <option value="rsa">rsa</option>
+                </select>
+            </div>
+            <div class="form-group" id="keygen-bits-group" style="display:none">
+                <label>Bits</label>
+                <input type="number" id="keygen-bits" class="form-control" value="4096" min="2048" max="16384" step="1024">
+            </div>
+            <div class="form-group">
+                <label>Comment</label>
+                <input type="text" id="keygen-comment" class="form-control" placeholder="user@hostname">
+            </div>
+            <div class="form-group">
+                <label>Passphrase (optional)</label>
+                <input type="password" id="keygen-passphrase" class="form-control" placeholder="Leave empty for no passphrase">
+            </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="sshGenerateKey()">Generate</button>
+        <div id="ssh-keygen-result" style="margin-top:16px"></div>
+    </div>
+
+    <!-- Authorized Keys -->
+    <div class="section">
+        <h2>Authorized Keys</h2>
+        <div id="ssh-authkeys-list" style="margin-bottom:16px">
+            <span class="text-muted">Loading...</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+            <div class="form-group" style="flex:1;min-width:300px;margin-bottom:0">
+                <label>Add Public Key</label>
+                <input type="text" id="ssh-new-authkey" class="form-control" placeholder="ssh-ed25519 AAAA... user@host" style="font-family:monospace;font-size:0.8rem">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="sshAddAuthKey()">Add Key</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- TAB 4: QUICK HARDEN                                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ssh" data-tab="harden">
+    <div class="section">
+        <h2>Quick Harden</h2>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px">
+            Apply a hardened SSH configuration with security best practices in one click.
+            Review the preview below before applying.
+        </p>
+        <button class="btn btn-primary" onclick="sshPreviewHarden()">Preview Hardened Config</button>
+    </div>
+
+    <div class="section" id="ssh-harden-preview-section" style="display:none">
+        <h2>Hardened Config Preview</h2>
+        <pre id="ssh-harden-preview" style="background:var(--bg-primary);color:#c8d3f5;
+            border:1px solid var(--border);border-radius:var(--radius);padding:14px;
+            font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.82rem;
+            line-height:1.6;overflow-x:auto;max-height:500px;overflow-y:auto"></pre>
+        <div style="margin-top:16px;padding:12px;background:rgba(239,68,68,0.1);border:1px solid var(--danger);border-radius:var(--radius)">
+            <strong style="color:var(--danger)">Warning:</strong>
+            <span style="color:var(--text-secondary);font-size:0.85rem">
+                This will overwrite your current sshd_config. Ensure you have key-based authentication
+                configured before disabling password login, or you may be locked out.
+            </span>
+        </div>
+        <button class="btn btn-primary" style="margin-top:12px;background:var(--danger);border-color:var(--danger)" onclick="sshApplyHarden()">
+            Apply Hardened Config
+        </button>
+        <span id="ssh-harden-status" style="margin-left:12px;font-size:0.85rem;color:var(--text-secondary)"></span>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- FAIL2BAN TAB                                                   -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="tab-content" data-tab-group="ssh" data-tab="fail2ban">
+    <!-- Status -->
+    <div class="section">
+        <h2>Fail2Ban</h2>
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem">
+            <div id="f2b-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--text-muted)"></div>
+            <span id="f2b-status-text" style="font-size:0.85rem">Checking...</span>
+            <button class="btn btn-sm" onclick="f2bService('start')">Start</button>
+            <button class="btn btn-sm" onclick="f2bService('stop')">Stop</button>
+            <button class="btn btn-sm" onclick="f2bService('restart')">Restart</button>
+            <button class="btn btn-sm" onclick="f2bRefresh()">Refresh</button>
+        </div>
+
+        <!-- Jails -->
+        <h3>Active Jails</h3>
+        <div id="f2b-jails" style="margin-bottom:1rem"><p style="color:var(--text-muted)">Click Refresh to load jails.</p></div>
+
+        <!-- Banned IPs -->
+        <h3>Banned IPs</h3>
+        <div id="f2b-banned" style="margin-bottom:1rem"></div>
+
+        <!-- Search -->
+        <h3>IP Search</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem">
+            <input type="text" id="f2b-search-ip" placeholder="Search IP across all jails..." style="flex:1;max-width:300px;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-input);color:inherit;font-size:0.82rem">
+            <button class="btn btn-sm" onclick="f2bSearch()">Search</button>
+        </div>
+        <div id="f2b-search-results"></div>
+
+        <!-- Manual Ban -->
+        <h3>Manual Ban / Unban</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:0.75rem">
+            <input type="text" id="f2b-manual-ip" placeholder="IP address" style="width:180px;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-input);color:inherit;font-size:0.82rem">
+            <input type="text" id="f2b-manual-jail" placeholder="Jail (default: sshd)" value="sshd" style="width:150px;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-input);color:inherit;font-size:0.82rem">
+            <button class="btn btn-sm" style="border-color:var(--danger);color:var(--danger)" onclick="f2bManualBan()">Ban</button>
+            <button class="btn btn-sm" onclick="f2bManualUnban()">Unban</button>
+        </div>
+        <div id="f2b-manual-result" style="font-size:0.82rem"></div>
+    </div>
+
+    <!-- App Scanner & Auto-Config -->
+    <div class="section">
+        <h3>Application Scanner</h3>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">Scan for installed services and auto-generate jails.</p>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="f2bScanApps()">Scan for Applications</button>
+            <button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="f2bAutoConfig(false)">Preview Auto-Config</button>
+            <button class="btn btn-sm" style="border-color:var(--danger);color:var(--danger)" onclick="f2bAutoConfig(true)">Apply Auto-Config</button>
+        </div>
+        <div id="f2b-apps-result"></div>
+    </div>
+
+    <!-- Create Jail -->
+    <div class="section">
+        <h3>Create New Jail</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;font-size:0.82rem">
+            <div class="form-group"><label>Jail Name</label><input type="text" id="f2b-jail-name" placeholder="my-custom-jail"></div>
+            <div class="form-group"><label>Filter</label><input type="text" id="f2b-jail-filter" placeholder="filter name"></div>
+            <div class="form-group"><label>Log Path</label><input type="text" id="f2b-jail-logpath" placeholder="/var/log/..."></div>
+            <div class="form-group"><label>Max Retry</label><input type="number" id="f2b-jail-maxretry" value="5"></div>
+            <div class="form-group"><label>Find Time</label><input type="text" id="f2b-jail-findtime" value="10m"></div>
+            <div class="form-group"><label>Ban Time</label><input type="text" id="f2b-jail-bantime" value="1h"></div>
+            <div class="form-group"><label>
+                <input type="checkbox" id="f2b-jail-enabled" checked style="margin-right:0.3rem">Enabled
+            </label></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="f2bCreateJail()" style="margin-top:0.5rem">Create Jail</button>
+        <div id="f2b-create-result" style="font-size:0.82rem;margin-top:0.5rem"></div>
+    </div>
+</div>
+
+<style>
+.ssh-severity {
+    display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.72rem;
+    font-weight:700;text-transform:uppercase;letter-spacing:0.04em;
+}
+.ssh-severity.critical { background:rgba(239,68,68,0.2);color:#f87171; }
+.ssh-severity.warning  { background:rgba(251,191,36,0.2);color:#fbbf24; }
+.ssh-severity.info     { background:rgba(96,165,250,0.2);color:#60a5fa; }
+.ssh-severity.pass     { background:rgba(74,222,128,0.2);color:#4ade80; }
+.ssh-check-card {
+    padding:12px 16px;background:var(--bg-card);border:1px solid var(--border);
+    border-radius:var(--radius);margin-bottom:8px;
+}
+.ssh-check-card .check-header {
+    display:flex;align-items:center;gap:10px;margin-bottom:4px;
+}
+.ssh-check-card .check-name { font-weight:600;font-size:0.88rem; }
+.ssh-check-card .check-values {
+    font-size:0.8rem;color:var(--text-secondary);font-family:monospace;margin-bottom:2px;
+}
+.ssh-check-card .check-desc {
+    font-size:0.8rem;color:var(--text-muted);
+}
+.ssh-key-output {
+    position:relative;
+}
+.ssh-key-output textarea {
+    width:100%;min-height:80px;background:var(--bg-primary);color:#c8d3f5;
+    border:1px solid var(--border);border-radius:var(--radius);padding:10px;
+    font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:0.78rem;
+    line-height:1.5;resize:vertical;
+}
+.ssh-key-output .copy-btn {
+    position:absolute;top:8px;right:8px;font-size:0.7rem;padding:3px 8px;
+    background:var(--bg-input);border:1px solid var(--border);border-radius:4px;
+    color:var(--text-secondary);cursor:pointer;
+}
+.ssh-key-output .copy-btn:hover { color:var(--accent);border-color:var(--accent); }
+</style>
+
+<script>
+/* ── Tab Switching ── */
+function sshTab(name) {
+    showTab('ssh', name);
+}
+
+/* ── Helpers ── */
+function sshPost(url, body) {
+    return fetch('/ssh' + url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body || {})
+    }).then(function(r) { return r.json(); });
+}
+
+function sshGet(url) {
+    return fetch('/ssh' + url).then(function(r) { return r.json(); });
+}
+
+/* ── Tab 1: Status & Scan ── */
+function sshLoadStatus() {
+    sshGet('/status').then(function(data) {
+        var dot = document.getElementById('ssh-status-dot');
+        var txt = document.getElementById('ssh-status-text');
+        if (data.active) {
+            dot.style.background = '#4ade80';
+            txt.textContent = 'Active (running)';
+            txt.style.color = '#4ade80';
+        } else {
+            dot.style.background = '#f87171';
+            txt.textContent = 'Inactive';
+            txt.style.color = '#f87171';
+        }
+        document.getElementById('ssh-enabled-text').textContent = data.enabled ? 'Yes' : 'No';
+        document.getElementById('ssh-version-text').textContent = data.version || '—';
+    }).catch(function() {
+        document.getElementById('ssh-status-text').textContent = 'Error loading status';
+    });
+}
+
+function sshServiceAction(action) {
+    sshPost('/service/' + action).then(function(data) {
+        if (data.ok) {
+            sshLoadStatus();
+        } else {
+            alert(data.error || 'Action failed');
+        }
+    }).catch(function(e) { alert('Request failed: ' + e.message); });
+}
+
+function sshRunScan() {
+    var btn = document.getElementById('btn-ssh-scan');
+    var results = document.getElementById('ssh-scan-results');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    results.innerHTML = '<span class="text-muted">Running security scan...</span>';
+
+    sshPost('/scan').then(function(data) {
+        btn.disabled = false;
+        btn.textContent = 'Run Security Scan';
+        if (!data.ok && data.error) {
+            results.innerHTML = '<span style="color:var(--danger)">' + escapeHtml(data.error) + '</span>';
+            return;
+        }
+        var checks = data.checks || [];
+        if (!checks.length) {
+            results.innerHTML = '<span class="text-muted">No checks returned.</span>';
+            return;
+        }
+        var h = '';
+        checks.forEach(function(c) {
+            var sev = (c.severity || 'info').toLowerCase();
+            h += '<div class="ssh-check-card">';
+            h += '<div class="check-header">';
+            h += '<span class="ssh-severity ' + sev + '">' + escapeHtml(c.severity || 'INFO') + '</span>';
+            h += '<span class="check-name">' + escapeHtml(c.name || '') + '</span>';
+            h += '</div>';
+            h += '<div class="check-values">Current: <strong>' + escapeHtml(c.current || '—') + '</strong>';
+            if (c.recommended) {
+                h += ' &nbsp;|&nbsp; Recommended: <strong>' + escapeHtml(c.recommended) + '</strong>';
+            }
+            h += '</div>';
+            if (c.description) {
+                h += '<div class="check-desc">' + escapeHtml(c.description) + '</div>';
+            }
+            h += '</div>';
+        });
+        results.innerHTML = h;
+        halAnalyze('SSH Security Scan', JSON.stringify(data, null, 2), 'ssh audit', 'defense');
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Run Security Scan';
+        results.innerHTML = '<span style="color:var(--danger)">Request failed: ' + escapeHtml(e.message) + '</span>';
+    });
+}
+
+/* ── Tab 2: Config Editor ── */
+var sshConfigFields = [
+    'Port','AddressFamily','ListenAddress',
+    'PermitRootLogin','PasswordAuthentication','PubkeyAuthentication','PermitEmptyPasswords',
+    'MaxAuthTries','LoginGraceTime','UsePAM',
+    'MaxSessions','ClientAliveInterval','ClientAliveCountMax',
+    'AllowUsers','AllowGroups','DenyUsers','DenyGroups',
+    'AllowTcpForwarding','X11Forwarding','GatewayPorts',
+    'SyslogFacility','LogLevel',
+    'StrictModes','Ciphers','MACs','KexAlgorithms',
+    'Banner','Subsystem','UseDNS','Compression'
+];
+
+function sshGenerateConfig() {
+    var config = {};
+    sshConfigFields.forEach(function(key) {
+        var el = document.getElementById('cfg-' + key);
+        if (!el) return;
+        var val = el.value.trim();
+        if (val) config[key] = val;
+    });
+
+    sshPost('/config/generate', config).then(function(data) {
+        if (data.config) {
+            document.getElementById('ssh-config-raw').value = data.config;
+            document.getElementById('ssh-config-status').textContent = 'Config generated from form values.';
+            document.getElementById('ssh-config-status').style.color = '#4ade80';
+        } else if (data.error) {
+            document.getElementById('ssh-config-status').textContent = data.error;
+            document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+        }
+    }).catch(function(e) {
+        document.getElementById('ssh-config-status').textContent = 'Request failed: ' + e.message;
+        document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+    });
+}
+
+function sshLoadConfig() {
+    sshGet('/config').then(function(data) {
+        if (data.config !== undefined) {
+            document.getElementById('ssh-config-raw').value = data.config;
+            document.getElementById('ssh-config-status').textContent = 'Config loaded.';
+            document.getElementById('ssh-config-status').style.color = '#4ade80';
+        } else if (data.error) {
+            document.getElementById('ssh-config-status').textContent = data.error;
+            document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+        }
+    }).catch(function(e) {
+        document.getElementById('ssh-config-status').textContent = 'Failed to load: ' + e.message;
+        document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+    });
+}
+
+function sshSaveConfig() {
+    var content = document.getElementById('ssh-config-raw').value;
+    if (!content.trim()) {
+        document.getElementById('ssh-config-status').textContent = 'Config is empty — nothing to save.';
+        document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+        return;
+    }
+    sshPost('/config/save', {config: content}).then(function(data) {
+        if (data.ok) {
+            document.getElementById('ssh-config-status').textContent = 'Config saved successfully.';
+            document.getElementById('ssh-config-status').style.color = '#4ade80';
+        } else {
+            var msg = data.error || 'Save failed';
+            if (data.errors && data.errors.length) {
+                msg += ': ' + data.errors.join('; ');
+            }
+            document.getElementById('ssh-config-status').textContent = msg;
+            document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+        }
+        halAnalyze('SSH Config Save', JSON.stringify(data, null, 2), 'ssh config', 'defense');
+    }).catch(function(e) {
+        document.getElementById('ssh-config-status').textContent = 'Request failed: ' + e.message;
+        document.getElementById('ssh-config-status').style.color = 'var(--danger)';
+    });
+}
+
+/* ── Tab 3: Keys ── */
+function sshLoadHostKeys() {
+    sshGet('/keys/host').then(function(data) {
+        var el = document.getElementById('ssh-host-keys');
+        var keys = data.keys || [];
+        if (!keys.length) {
+            el.innerHTML = '<span class="text-muted">No host keys found.</span>';
+            return;
+        }
+        var h = '<table class="data-table"><thead><tr><th>Type</th><th>Fingerprint</th><th>File</th></tr></thead><tbody>';
+        keys.forEach(function(k) {
+            h += '<tr>';
+            h += '<td><strong>' + escapeHtml(k.type || '') + '</strong></td>';
+            h += '<td style="font-family:monospace;font-size:0.78rem;word-break:break-all">' + escapeHtml(k.fingerprint || '') + '</td>';
+            h += '<td style="font-family:monospace;font-size:0.78rem;color:var(--text-secondary)">' + escapeHtml(k.path || '') + '</td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    }).catch(function() {
+        document.getElementById('ssh-host-keys').innerHTML = '<span style="color:var(--danger)">Failed to load host keys.</span>';
+    });
+}
+
+function sshKeygenTypeChanged() {
+    var type = document.getElementById('keygen-type').value;
+    document.getElementById('keygen-bits-group').style.display = type === 'rsa' ? '' : 'none';
+}
+
+function sshGenerateKey() {
+    var payload = {
+        type: document.getElementById('keygen-type').value,
+        bits: parseInt(document.getElementById('keygen-bits').value) || 4096,
+        comment: document.getElementById('keygen-comment').value.trim(),
+        passphrase: document.getElementById('keygen-passphrase').value
+    };
+    var result = document.getElementById('ssh-keygen-result');
+    result.innerHTML = '<span class="text-muted">Generating key pair...</span>';
+
+    sshPost('/keys/generate', payload).then(function(data) {
+        if (!data.ok) {
+            result.innerHTML = '<span style="color:var(--danger)">' + escapeHtml(data.error || 'Generation failed') + '</span>';
+            return;
+        }
+        var h = '';
+        h += '<div style="margin-bottom:12px"><strong>Public Key</strong></div>';
+        h += '<div class="ssh-key-output">';
+        h += '<textarea readonly id="keygen-pubkey">' + escapeHtml(data.public_key || '') + '</textarea>';
+        h += '<button class="copy-btn" onclick="sshCopyKey(\'keygen-pubkey\')">Copy</button>';
+        h += '</div>';
+        h += '<div style="margin:12px 0"><strong>Private Key</strong></div>';
+        h += '<div class="ssh-key-output">';
+        h += '<textarea readonly id="keygen-privkey" style="min-height:160px">' + escapeHtml(data.private_key || '') + '</textarea>';
+        h += '<button class="copy-btn" onclick="sshCopyKey(\'keygen-privkey\')">Copy</button>';
+        h += '</div>';
+        result.innerHTML = h;
+    }).catch(function(e) {
+        result.innerHTML = '<span style="color:var(--danger)">Request failed: ' + escapeHtml(e.message) + '</span>';
+    });
+}
+
+function sshCopyKey(id) {
+    var el = document.getElementById(id);
+    if (el) {
+        navigator.clipboard.writeText(el.value).then(function() {
+            var btn = el.parentElement.querySelector('.copy-btn');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy'; }, 1500); }
+        });
+    }
+}
+
+function sshLoadAuthKeys() {
+    sshGet('/keys/authorized').then(function(data) {
+        var el = document.getElementById('ssh-authkeys-list');
+        var keys = data.keys || [];
+        if (!keys.length) {
+            el.innerHTML = '<span class="text-muted">No authorized keys found.</span>';
+            return;
+        }
+        var h = '<table class="data-table"><thead><tr><th style="width:80px">Type</th><th>Key (truncated)</th><th>Comment</th><th style="width:80px">Action</th></tr></thead><tbody>';
+        keys.forEach(function(k, i) {
+            var parts = (k.line || '').split(/\s+/);
+            var ktype = parts[0] || '—';
+            var kdata = parts[1] ? (parts[1].substring(0, 32) + '...') : '—';
+            var kcomment = parts.slice(2).join(' ') || '—';
+            h += '<tr>';
+            h += '<td style="font-family:monospace;font-size:0.78rem">' + escapeHtml(ktype) + '</td>';
+            h += '<td style="font-family:monospace;font-size:0.78rem;color:var(--text-secondary)">' + escapeHtml(kdata) + '</td>';
+            h += '<td>' + escapeHtml(kcomment) + '</td>';
+            h += '<td><button class="btn btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="sshRemoveAuthKey(' + i + ')">Remove</button></td>';
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    }).catch(function() {
+        document.getElementById('ssh-authkeys-list').innerHTML = '<span style="color:var(--danger)">Failed to load authorized keys.</span>';
+    });
+}
+
+function sshAddAuthKey() {
+    var key = document.getElementById('ssh-new-authkey').value.trim();
+    if (!key) { alert('Enter a public key to add.'); return; }
+    sshPost('/keys/authorized/add', {key: key}).then(function(data) {
+        if (data.ok) {
+            document.getElementById('ssh-new-authkey').value = '';
+            sshLoadAuthKeys();
+        } else {
+            alert(data.error || 'Failed to add key');
+        }
+    }).catch(function(e) { alert('Request failed: ' + e.message); });
+}
+
+function sshRemoveAuthKey(index) {
+    if (!confirm('Remove this authorized key?')) return;
+    sshPost('/keys/authorized/remove', {index: index}).then(function(data) {
+        if (data.ok) {
+            sshLoadAuthKeys();
+        } else {
+            alert(data.error || 'Failed to remove key');
+        }
+    }).catch(function(e) { alert('Request failed: ' + e.message); });
+}
+
+/* ── Tab 4: Quick Harden ── */
+var sshHardenedConfig = [
+    '# AUTARCH Hardened SSH Configuration',
+    '# Generated: ' + new Date().toISOString(),
+    '',
+    'Protocol 2',
+    '',
+    '# Authentication',
+    'PermitRootLogin no',
+    'PasswordAuthentication no',
+    'PermitEmptyPasswords no',
+    'PubkeyAuthentication yes',
+    'MaxAuthTries 3',
+    'LoginGraceTime 60',
+    'UsePAM yes',
+    '',
+    '# Session',
+    'ClientAliveInterval 300',
+    'ClientAliveCountMax 2',
+    '',
+    '# Forwarding',
+    'AllowTcpForwarding no',
+    'X11Forwarding no',
+    '',
+    '# Security',
+    'StrictModes yes',
+    'UseDNS no',
+    '',
+    '# Cryptography',
+    'Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com',
+    'MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com',
+    'KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org',
+    '',
+    '# Subsystem',
+    'Subsystem sftp /usr/lib/openssh/sftp-server'
+].join('\n');
+
+function sshPreviewHarden() {
+    document.getElementById('ssh-harden-preview-section').style.display = '';
+    document.getElementById('ssh-harden-preview').textContent = sshHardenedConfig;
+    document.getElementById('ssh-harden-status').textContent = '';
+}
+
+function sshApplyHarden() {
+    if (!confirm('This will overwrite your current sshd_config with the hardened version. Are you sure?')) return;
+    var status = document.getElementById('ssh-harden-status');
+    status.textContent = 'Applying...';
+    status.style.color = 'var(--text-secondary)';
+
+    sshPost('/config/save', {config: sshHardenedConfig}).then(function(data) {
+        if (data.ok) {
+            status.textContent = 'Hardened config applied successfully. Restart SSH to activate.';
+            status.style.color = '#4ade80';
+        } else {
+            var msg = data.error || 'Apply failed';
+            if (data.errors && data.errors.length) {
+                msg += ': ' + data.errors.join('; ');
+            }
+            status.textContent = msg;
+            status.style.color = 'var(--danger)';
+        }
+        halAnalyze('SSH Quick Harden', JSON.stringify(data, null, 2), 'ssh hardening', 'defense');
+    }).catch(function(e) {
+        status.textContent = 'Request failed: ' + e.message;
+        status.style.color = 'var(--danger)';
+    });
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+    sshLoadStatus();
+    sshLoadAuthKeys();
+});
+
+/* ── Fail2Ban ── */
+function f2bRefresh() {
+    fetch('/ssh/fail2ban/status').then(function(r){return r.json()}).then(function(d) {
+        var dot = document.getElementById('f2b-status-dot');
+        var text = document.getElementById('f2b-status-text');
+        if (d.ok) {
+            dot.style.background = d.active ? 'var(--success,#34c759)' : 'var(--danger,#ff3b30)';
+            text.textContent = (d.active?'Active':'Inactive') + ' — ' + d.jail_count + ' jails, ' + d.total_banned + ' banned IPs';
+            // Render jails
+            var jhtml = '';
+            (d.jails||[]).forEach(function(j) {
+                jhtml += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.8rem;margin-bottom:0.4rem;background:var(--bg-card);display:flex;justify-content:space-between;align-items:center">'
+                    + '<div><strong style="color:var(--accent)">' + escapeHtml(j.name) + '</strong>'
+                    + ' <span style="font-size:0.75rem;color:var(--text-muted)">' + j.banned + ' banned</span></div>'
+                    + '<div>' + (j.banned_ips||[]).map(function(ip){return '<span style="font-size:0.72rem;background:rgba(255,59,48,0.15);color:#f87171;padding:1px 6px;border-radius:3px;margin-left:4px">' + escapeHtml(ip) + '</span>'}).join('') + '</div>'
+                    + '</div>';
+            });
+            document.getElementById('f2b-jails').innerHTML = jhtml || '<p style="color:var(--text-muted)">No active jails.</p>';
+        } else {
+            dot.style.background = 'var(--text-muted)';
+            text.textContent = d.error || 'Not running';
+            document.getElementById('f2b-jails').innerHTML = '<p style="color:var(--text-muted)">' + escapeHtml(d.error||'') + '</p>';
+        }
+    });
+    // Banned
+    fetch('/ssh/fail2ban/banned').then(function(r){return r.json()}).then(function(d) {
+        if (!d.ok || !d.banned || !d.banned.length) {
+            document.getElementById('f2b-banned').innerHTML = '<p style="color:var(--text-muted)">No banned IPs.</p>';
+            return;
+        }
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr><th>IP</th><th>Jail</th><th>Action</th></tr></thead><tbody>';
+        d.banned.forEach(function(b) {
+            html += '<tr><td>' + escapeHtml(b.ip) + '</td><td>' + escapeHtml(b.jail) + '</td>'
+                + '<td><button class="btn btn-sm" style="font-size:0.65rem;padding:1px 6px" onclick="f2bUnban(\'' + escapeHtml(b.ip) + '\',\'' + escapeHtml(b.jail) + '\')">Unban</button></td></tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('f2b-banned').innerHTML = html;
+    });
+}
+function f2bService(action) {
+    fetch('/ssh/fail2ban/service/' + action, {method:'POST'}).then(function(r){return r.json()}).then(function(d) {
+        f2bRefresh();
+    });
+}
+function f2bUnban(ip, jail) {
+    fetch('/ssh/fail2ban/unban', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:ip, jail:jail})})
+        .then(function(r){return r.json()}).then(function(d) { f2bRefresh(); });
+}
+function f2bManualBan() {
+    var ip = document.getElementById('f2b-manual-ip').value.trim();
+    var jail = document.getElementById('f2b-manual-jail').value.trim() || 'sshd';
+    if (!ip) return;
+    fetch('/ssh/fail2ban/ban', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:ip, jail:jail})})
+        .then(function(r){return r.json()}).then(function(d) {
+            document.getElementById('f2b-manual-result').innerHTML = d.ok ? '<span style="color:var(--success)">Banned ' + escapeHtml(ip) + ' in ' + escapeHtml(jail) + '</span>' : '<span style="color:var(--danger)">' + escapeHtml(d.error||d.output||'Failed') + '</span>';
+            f2bRefresh();
+        });
+}
+function f2bManualUnban() {
+    var ip = document.getElementById('f2b-manual-ip').value.trim();
+    if (!ip) return;
+    fetch('/ssh/fail2ban/unban', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:ip})})
+        .then(function(r){return r.json()}).then(function(d) {
+            document.getElementById('f2b-manual-result').innerHTML = d.ok ? '<span style="color:var(--success)">Unbanned ' + escapeHtml(ip) + '</span>' : '<span style="color:var(--danger)">' + escapeHtml(d.error||'Failed') + '</span>';
+            f2bRefresh();
+        });
+}
+function f2bSearch() {
+    var ip = document.getElementById('f2b-search-ip').value.trim();
+    if (!ip) return;
+    var el = document.getElementById('f2b-search-results');
+    el.innerHTML = '<p style="color:var(--text-muted)">Searching...</p>';
+    fetch('/ssh/fail2ban/search', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ip:ip})})
+        .then(function(r){return r.json()}).then(function(d) {
+            if (!d.ok) { el.textContent = d.error; return; }
+            var html = '<strong>Results for ' + escapeHtml(ip) + ':</strong><br>';
+            if (d.active_bans.length) {
+                html += '<div style="margin:0.4rem 0">Currently banned in: ' + d.active_bans.map(function(b){return '<span style="color:var(--danger)">' + escapeHtml(b.jail) + '</span>'}).join(', ') + '</div>';
+            } else {
+                html += '<div style="margin:0.4rem 0;color:var(--text-muted)">Not currently banned in any jail.</div>';
+            }
+            if (d.log_entries.length) {
+                html += '<div style="margin-top:0.5rem"><strong>Log history:</strong></div><pre style="font-size:0.72rem;max-height:150px;overflow-y:auto;background:var(--bg-card);padding:0.5rem;border-radius:var(--radius);border:1px solid var(--border)">';
+                d.log_entries.forEach(function(l) { html += escapeHtml(l) + '\n'; });
+                html += '</pre>';
+            }
+            el.innerHTML = html;
+            halAnalyze('Fail2Ban: IP Search', JSON.stringify(d, null, 2), 'fail2ban search', 'defense');
+        });
+}
+function f2bScanApps() {
+    var el = document.getElementById('f2b-apps-result');
+    el.innerHTML = '<p style="color:var(--text-muted)">Scanning installed applications...</p>';
+    fetch('/ssh/fail2ban/scan-apps', {method:'POST'}).then(function(r){return r.json()}).then(function(d) {
+        if (!d.ok) { el.textContent = d.error; return; }
+        var html = '<table class="data-table" style="font-size:0.82rem"><thead><tr><th>Service</th><th>Installed</th><th>Log Exists</th><th>Has Jail</th><th>Filter</th></tr></thead><tbody>';
+        (d.apps||[]).forEach(function(a) {
+            var ic = a.installed ? 'var(--success)' : 'var(--text-muted)';
+            var lc = a.log_exists ? 'var(--success)' : 'var(--text-muted)';
+            var jc = a.has_jail ? 'var(--success)' : a.installed ? 'var(--danger)' : 'var(--text-muted)';
+            html += '<tr><td><strong>' + escapeHtml(a.service) + '</strong></td>'
+                + '<td style="color:' + ic + '">' + (a.installed?'Yes':'No') + '</td>'
+                + '<td style="color:' + lc + '">' + (a.log_exists?'Yes':'No') + '</td>'
+                + '<td style="color:' + jc + '">' + (a.has_jail?'Yes':'No') + '</td>'
+                + '<td style="font-family:monospace;font-size:0.75rem">' + escapeHtml(a.filter) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+        halAnalyze('Fail2Ban: App Scan', JSON.stringify(d, null, 2), 'fail2ban app detection', 'defense');
+    });
+}
+function f2bAutoConfig(apply) {
+    if (apply && !confirm('This will generate and apply fail2ban jails for all detected services. Continue?')) return;
+    var el = document.getElementById('f2b-apps-result');
+    el.innerHTML = '<p style="color:var(--text-muted)">' + (apply?'Applying':'Generating preview') + '...</p>';
+    fetch('/ssh/fail2ban/auto-config', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({apply:apply})})
+        .then(function(r){return r.json()}).then(function(d) {
+            var html = '<strong>' + d.count + ' jail(s) ' + (d.applied?'applied':'generated') + ':</strong>';
+            (d.generated||[]).forEach(function(g) {
+                html += '<pre style="font-size:0.72rem;background:var(--bg-card);padding:0.5rem;border-radius:var(--radius);border:1px solid var(--border);margin:0.4rem 0">' + escapeHtml(g.config) + '</pre>';
+            });
+            if (d.applied) { html += '<div style="color:var(--success);margin-top:0.5rem">Applied and reloaded fail2ban.</div>'; f2bRefresh(); }
+            el.innerHTML = html;
+        });
+}
+function f2bCreateJail() {
+    var data = {
+        name: document.getElementById('f2b-jail-name').value.trim(),
+        filter: document.getElementById('f2b-jail-filter').value.trim(),
+        logpath: document.getElementById('f2b-jail-logpath').value.trim(),
+        maxretry: document.getElementById('f2b-jail-maxretry').value,
+        findtime: document.getElementById('f2b-jail-findtime').value,
+        bantime: document.getElementById('f2b-jail-bantime').value,
+        enabled: document.getElementById('f2b-jail-enabled').checked,
+    };
+    if (!data.name) { alert('Jail name required'); return; }
+    fetch('/ssh/fail2ban/jail/create', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(function(r){return r.json()}).then(function(d) {
+            var el = document.getElementById('f2b-create-result');
+            el.innerHTML = d.ok ? '<span style="color:var(--success)">Jail created and fail2ban reloaded.</span><pre style="font-size:0.72rem;margin-top:0.3rem">' + escapeHtml(d.config) + '</pre>' : '<span style="color:var(--danger)">' + escapeHtml(d.error) + '</span>';
+            if (d.ok) f2bRefresh();
+        });
+}
+</script>
+
+{% endblock %}

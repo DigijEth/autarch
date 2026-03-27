@@ -1,0 +1,135 @@
+; ============================================================================
+; AUTARCH PIAP Template (Platform Integration & Access Profile)
+; ============================================================================
+;
+; HOW TO USE THIS TEMPLATE:
+;
+; 1. Copy this file and rename it to something meaningful, like:
+;       myrouter.piap
+;       alfa_adapter.piap
+;       home_pineapple.piap
+;
+; 2. Fill in your device's information below. Everything with CHANGEME
+;    needs your input. Everything else can be left as-is or customized.
+;
+; 3. Save it in this folder (/data/piap/)
+;
+; 4. It will automatically appear in the AUTARCH Remote Monitoring Station
+;    dropdown menu.
+;
+; TIPS:
+;   - You can add as many [radio_N] sections as your device has radios
+;   - You can add or remove features in [features]
+;   - Commands use {variables} that get replaced at runtime:
+;       {phy}        = phy device name from the radio section
+;       {interface}   = default interface name
+;       {mon}         = monitor interface name
+;       {channel}     = selected channel number
+;       {timestamp}   = current timestamp (YYYYMMDD_HHMMSS)
+;       {bssid}       = target BSSID (from UI input)
+;       {count}       = count/number (from UI input)
+;       {channels}    = channel list from the radio section
+;
+; ============================================================================
+
+[device]
+; Name shown in the AUTARCH dropdown menu
+name = CHANGEME
+; Device model / description
+model = CHANGEME
+; Chipset info (for reference)
+chipset = CHANGEME
+; WiFi chipset
+wifi_chipset = CHANGEME
+; Icon (optional, filename in /web/static/img/)
+icon =
+; Operating system running on the device
+os = CHANGEME
+
+[connection]
+; SSH connection details
+host = CHANGEME
+port = 22
+user = root
+; Auth method: key or password
+auth = key
+; Path to SSH key (leave blank to use default ~/.ssh/id_ed25519)
+key_path =
+; Password (only used if auth = password)
+password =
+; Connection timeout in seconds
+timeout = 10
+
+[radio_0]
+; ── First radio ───────────────────────────────────────────────────────────
+; Add more [radio_N] sections for additional radios (radio_1, radio_2, etc)
+name = CHANGEME
+phy = phy0
+interface = wlan0
+monitor_interface = mon0
+band = 2.4GHz
+; List all channels your device supports on this radio
+channels = 1,2,3,4,5,6,7,8,9,10,11
+default_channel = 6
+; List all modes your device supports (managed, monitor, ap, mesh, etc)
+modes = managed,monitor
+; Commands — customize for your device's driver/firmware
+; Use {variables} that get replaced at runtime
+cmd_monitor_on = iw dev {interface} del 2>/dev/null; iw phy {phy} interface add {mon} type monitor && ip link set {mon} up && iw dev {mon} set channel {channel}
+cmd_monitor_off = ip link set {mon} down 2>/dev/null; iw dev {mon} del 2>/dev/null
+cmd_set_channel = iw dev {mon} set channel {channel}
+cmd_status = iw dev 2>/dev/null
+; Does this radio support frame injection? (true/false)
+injection = false
+; Does this radio output radiotap headers in monitor mode? (true/false)
+radiotap = true
+
+; ── Uncomment and fill in for a second radio ──────────────────────────────
+; [radio_1]
+; name = 5GHz Radio
+; phy = phy1
+; interface = wlan1
+; monitor_interface = mon1
+; band = 5GHz
+; channels = 36,40,44,48,149,153,157,161,165
+; default_channel = 36
+; modes = managed,monitor
+; cmd_monitor_on = iw dev {interface} del 2>/dev/null; iw phy {phy} interface add {mon} type monitor && ip link set {mon} up && iw dev {mon} set channel {channel}
+; cmd_monitor_off = ip link set {mon} down 2>/dev/null; iw dev {mon} del 2>/dev/null
+; cmd_set_channel = iw dev {mon} set channel {channel}
+; cmd_status = iw dev 2>/dev/null
+; injection = false
+; radiotap = true
+
+[features]
+; ── Available features ────────────────────────────────────────────────────
+; Set to true/false to enable/disable. Customize commands for your device.
+; Add your own features — they automatically appear as sub-tabs.
+
+capture = true
+cmd_capture_start = tcpdump -i {mon} -w /tmp/capture_{timestamp}.pcap &
+cmd_capture_stop = killall tcpdump 2>/dev/null
+cmd_capture_pull = cat /tmp/capture_*.pcap
+
+wifi_scan = true
+cmd_wifi_scan = tcpdump -i {mon} -c 100 -e 2>&1 | grep Beacon
+
+; Uncomment if your device has aircrack-ng installed
+; aircrack = true
+; cmd_airodump = airodump-ng {mon}
+; cmd_aireplay = aireplay-ng {mon}
+
+; Uncomment if you want deauth capability
+; deauth = true
+; cmd_deauth = aireplay-ng --deauth {count} -a {bssid} {mon}
+
+channel_hop = true
+cmd_channel_hop = for ch in {channels}; do iw dev {mon} set channel $ch; sleep 0.5; done
+
+[info]
+; ── Device info commands (shown in the info panel) ────────────────────────
+cmd_uptime = uptime
+cmd_memory = free -m
+cmd_disk = df -h /
+cmd_kernel = uname -a
+cmd_wifi_info = iw dev

@@ -1,0 +1,1613 @@
+{% extends "base.html" %}
+{% block title %}DNS Server — AUTARCH{% endblock %}
+{% block content %}
+<h1>DNS Server</h1>
+<p style="color:var(--text-secondary);margin-bottom:1.5rem">
+    Authoritative DNS &amp; nameserver with zone management, DNSSEC, import/export, and mail record automation.
+</p>
+
+<!-- Server Controls -->
+<div class="card" style="padding:1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div id="dns-status" style="font-size:0.9rem">Status: <span style="color:var(--text-muted)">Checking...</span></div>
+    <button class="btn btn-primary" onclick="startDNS()">Start Server</button>
+    <button class="btn btn-danger" onclick="stopDNS()">Stop Server</button>
+    <button class="btn" onclick="checkDNS()">Refresh</button>
+    <div id="dns-metrics" style="margin-left:auto;font-size:0.82rem;color:var(--text-secondary)"></div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+    <button class="tab-btn active" onclick="dnsTab('zones',this)">Zones</button>
+    <button class="tab-btn" onclick="dnsTab('records',this)">Records</button>
+    <button class="tab-btn" onclick="dnsTab('ezlocal',this)">EZ-Local</button>
+    <button class="tab-btn" onclick="dnsTab('reverseproxy',this)">Reverse Proxy</button>
+    <button class="tab-btn" onclick="dnsTab('import-export',this)">Import / Export</button>
+    <button class="tab-btn" onclick="dnsTab('templates',this)">Templates</button>
+    <button class="tab-btn" onclick="dnsTab('config',this)">Config</button>
+</div>
+
+<!-- ═══════════════════ ZONES TAB ═══════════════════ -->
+<div id="tab-zones" class="tab-pane">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Create Zone</h3>
+            <label class="form-label">Domain</label>
+            <input id="z-domain" class="form-input" placeholder="example.local">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="createZone()">Create Zone</button>
+            <div id="z-create-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.5rem">Clone Zone</h4>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">Duplicate an existing zone to a new domain name.</p>
+            <label class="form-label">Source Zone</label>
+            <select id="z-clone-src" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">New Domain</label>
+            <input id="z-clone-dst" class="form-input" placeholder="new-domain.local">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="cloneZone()">Clone Zone</button>
+            <div id="z-clone-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.5rem">Quick Mail Setup</h4>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">Auto-create MX, SPF, DKIM, DMARC records for a zone.</p>
+            <label class="form-label">Zone</label>
+            <select id="z-mail-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">MX Host</label>
+            <input id="z-mail-mx" class="form-input" placeholder="mail.example.local">
+            <label class="form-label" style="margin-top:0.5rem">SPF Allow</label>
+            <input id="z-mail-spf" class="form-input" value="ip4:127.0.0.1" placeholder="ip4:192.168.1.100">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="mailSetup()">Setup Mail Records</button>
+            <div id="z-mail-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <div class="card" style="padding:1.25rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Zones</h3>
+                <button class="btn btn-small" onclick="loadZones()">Refresh</button>
+            </div>
+            <div id="z-list" style="font-size:0.85rem">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ RECORDS TAB ═══════════════════ -->
+<div id="tab-records" class="tab-pane" style="display:none">
+    <div class="card" style="padding:1.25rem">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem">
+            <h3>Records for:</h3>
+            <select id="r-zone" class="form-input zone-select" style="width:auto;min-width:200px" onchange="loadRecords()"></select>
+            <button class="btn btn-small" onclick="loadRecords()">Refresh</button>
+        </div>
+
+        <!-- Add record form -->
+        <div style="display:grid;grid-template-columns:100px 1fr 1fr 80px 80px auto;gap:0.5rem;align-items:end;margin-bottom:1rem">
+            <div>
+                <label class="form-label">Type</label>
+                <select id="r-type" class="form-input">
+                    <option>A</option><option>AAAA</option><option>CNAME</option>
+                    <option>MX</option><option>TXT</option><option>NS</option>
+                    <option>SRV</option><option>PTR</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Name</label>
+                <input id="r-name" class="form-input" placeholder="subdomain.example.local.">
+            </div>
+            <div>
+                <label class="form-label">Value</label>
+                <input id="r-value" class="form-input" placeholder="192.168.1.100">
+            </div>
+            <div>
+                <label class="form-label">TTL</label>
+                <input id="r-ttl" class="form-input" value="300" type="number">
+            </div>
+            <div>
+                <label class="form-label">Priority</label>
+                <input id="r-priority" class="form-input" value="0" type="number">
+            </div>
+            <button class="btn btn-primary" onclick="addRecord()">Add</button>
+        </div>
+        <div id="r-add-status" style="font-size:0.82rem;margin-bottom:0.75rem"></div>
+
+        <!-- Bulk add toggle -->
+        <div style="margin-bottom:1rem">
+            <button class="btn btn-small" onclick="toggleBulkAdd()">Bulk Add Records</button>
+            <div id="bulk-add-panel" style="display:none;margin-top:0.75rem">
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">
+                    Add multiple records at once. JSON array format:
+                </p>
+                <textarea id="bulk-json" class="form-input" style="height:140px;font-family:monospace;font-size:0.78rem" placeholder='[
+  {"type":"A","name":"www","value":"192.168.1.100","ttl":300},
+  {"type":"A","name":"mail","value":"192.168.1.101","ttl":300},
+  {"type":"MX","name":"@","value":"mail.example.local.","ttl":300,"priority":10}
+]'></textarea>
+                <button class="btn btn-primary" style="margin-top:0.5rem" onclick="bulkAddRecords()">Add All</button>
+                <span id="bulk-add-status" style="font-size:0.82rem;margin-left:0.5rem"></span>
+            </div>
+        </div>
+
+        <!-- Records table -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <label class="form-label" style="margin:0">Filter:</label>
+                <select id="r-filter-type" class="form-input" style="width:auto;padding:0.3rem 0.5rem;font-size:0.8rem" onchange="filterRecords()">
+                    <option value="">All Types</option>
+                    <option>A</option><option>AAAA</option><option>CNAME</option>
+                    <option>MX</option><option>TXT</option><option>NS</option>
+                    <option>SRV</option><option>PTR</option><option>SOA</option>
+                </select>
+                <input id="r-filter-search" class="form-input" style="width:200px;padding:0.3rem 0.5rem;font-size:0.8rem" placeholder="Search name/value..." oninput="filterRecords()">
+            </div>
+            <span id="r-count" style="font-size:0.78rem;color:var(--text-muted)"></span>
+        </div>
+        <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border);text-align:left">
+                    <th style="padding:6px;cursor:pointer" onclick="sortRecords('type')">Type</th>
+                    <th style="padding:6px;cursor:pointer" onclick="sortRecords('name')">Name</th>
+                    <th style="padding:6px;cursor:pointer" onclick="sortRecords('value')">Value</th>
+                    <th style="padding:6px">TTL</th>
+                    <th style="padding:6px">Pri</th>
+                    <th style="padding:6px">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="r-table"></tbody>
+        </table>
+    </div>
+
+    <!-- DNSSEC -->
+    <div class="card" style="padding:1.25rem;margin-top:1.25rem">
+        <h3 style="margin-bottom:0.75rem">DNSSEC</h3>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            Enable DNSSEC signing for a zone to protect against DNS spoofing.
+        </p>
+        <div style="display:flex;gap:0.75rem;align-items:center">
+            <select id="dnssec-zone" class="form-input zone-select" style="width:auto;min-width:200px"></select>
+            <button class="btn btn-primary" onclick="enableDNSSEC()">Enable DNSSEC</button>
+            <button class="btn btn-danger" onclick="disableDNSSEC()">Disable DNSSEC</button>
+            <span id="dnssec-status" style="font-size:0.82rem"></span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ EZ-LOCAL TAB ═══════════════════ -->
+<div id="tab-ezlocal" class="tab-pane" style="display:none">
+    <div class="card" style="padding:1.25rem;margin-bottom:1.25rem;border:2px solid var(--accent);background:linear-gradient(135deg,var(--bg-card) 0%,rgba(99,102,241,0.05) 100%)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <div>
+                <h3 style="margin:0">EZ-Local Setup</h3>
+                <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.25rem">
+                    One-click local intranet domain. Network is auto-scanned — just review and deploy.
+                </p>
+            </div>
+            <button class="btn btn-primary" onclick="ezScanNetwork()">Scan Network</button>
+        </div>
+        <div id="ez-scan-status" style="font-size:0.82rem"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Domain Setup -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Domain Configuration</h3>
+
+            <label class="form-label">Local Domain Name</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input id="ez-domain" class="form-input" value="home.local" placeholder="mynet.local" style="flex:1">
+                <select id="ez-tld" class="form-input" style="width:auto" onchange="ezUpdateDomain()">
+                    <option value=".local">.local</option>
+                    <option value=".lan">.lan</option>
+                    <option value=".internal">.internal</option>
+                    <option value=".home">.home</option>
+                    <option value="">(custom)</option>
+                </select>
+            </div>
+
+            <label class="form-label" style="margin-top:0.75rem">Nameserver IP (this machine)</label>
+            <input id="ez-ns-ip" class="form-input" placeholder="Auto-detected...">
+
+            <label class="form-label" style="margin-top:0.75rem">Gateway / Router IP</label>
+            <input id="ez-gateway" class="form-input" placeholder="Auto-detected...">
+
+            <label class="form-label" style="margin-top:0.75rem">Subnet</label>
+            <input id="ez-subnet" class="form-input" placeholder="192.168.1.0/24">
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+
+            <h4 style="margin-bottom:0.5rem">Auto-Create Records</h4>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-ns-record" checked> NS record (this machine as nameserver)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-gateway-record" checked> gateway.domain → router IP
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-server-record" checked> server.domain → this machine
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-dashboard-record" checked> dashboard.domain → AUTARCH web UI
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-wildcard-record"> *.domain → this machine (catch-all)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-reverse-zone"> Create reverse DNS zone (PTR records)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin-bottom:0.4rem">
+                <input type="checkbox" id="ez-arp-hosts" checked> Add records for discovered ARP hosts
+            </label>
+        </div>
+
+        <!-- Discovered Hosts -->
+        <div class="card" style="padding:1.25rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Discovered Hosts</h3>
+                <span id="ez-host-count" style="font-size:0.78rem;color:var(--text-muted)"></span>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Hosts found on your network via ARP scan. Edit hostnames to use as DNS names.
+            </p>
+            <div id="ez-hosts" style="max-height:400px;overflow-y:auto;font-size:0.82rem">
+                <div style="color:var(--text-muted)">Click "Scan Network" to discover hosts</div>
+            </div>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <h4 style="margin-bottom:0.5rem">Custom Hosts</h4>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">Add hosts not found by scan:</p>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem">
+                <input id="ez-custom-name" class="form-input" placeholder="hostname" style="flex:1">
+                <input id="ez-custom-ip" class="form-input" placeholder="192.168.1.x" style="width:140px">
+                <button class="btn btn-small" onclick="ezAddCustomHost()">Add</button>
+            </div>
+            <div id="ez-custom-list"></div>
+        </div>
+    </div>
+
+    <!-- Preview & Deploy -->
+    <div class="card" style="padding:1.25rem;margin-top:1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Preview & Deploy</h3>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn" onclick="ezPreview()">Preview Records</button>
+                <button class="btn btn-primary" onclick="ezDeploy()">Deploy Zone</button>
+            </div>
+        </div>
+        <div id="ez-preview" style="display:none">
+            <pre id="ez-preview-text" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:0.78rem;max-height:300px;overflow-y:auto;white-space:pre-wrap;font-family:monospace"></pre>
+        </div>
+        <div id="ez-deploy-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+        <hr style="border-color:var(--border);margin:1.25rem 0">
+        <h4>Client Configuration</h4>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem">
+            After deploying, configure your devices to use this machine as their DNS server:
+        </p>
+        <div id="ez-client-instructions" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-family:monospace;font-size:0.8rem">
+            Set DNS server to: <strong id="ez-my-dns-ip">127.0.0.1</strong>
+            <div style="margin-top:0.75rem;font-size:0.78rem;color:var(--text-secondary)">
+                <div><strong>Windows:</strong> Settings → Network → Change adapter options → IPv4 → DNS = <span class="ez-dns-ip"></span></div>
+                <div><strong>Linux:</strong> Edit /etc/resolv.conf → nameserver <span class="ez-dns-ip"></span></div>
+                <div><strong>macOS:</strong> System Preferences → Network → Advanced → DNS = <span class="ez-dns-ip"></span></div>
+                <div><strong>Router:</strong> Set DHCP DNS to <span class="ez-dns-ip"></span> for entire network</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ REVERSE PROXY TAB ═══════════════════ -->
+<div id="tab-reverseproxy" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- DDNS Setup -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Dynamic DNS (DDNS)</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Keep a DNS record updated with your changing public IP. AUTARCH will auto-detect your IP and update the zone record periodically.
+            </p>
+
+            <label class="form-label">Zone</label>
+            <select id="rp-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">Hostname</label>
+            <input id="rp-hostname" class="form-input" placeholder="home" value="@">
+            <label class="form-label" style="margin-top:0.5rem">Current Public IP</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <input id="rp-public-ip" class="form-input" placeholder="Detecting..." style="flex:1" readonly>
+                <button class="btn btn-small" onclick="rpDetectIP()">Detect</button>
+            </div>
+            <label class="form-label" style="margin-top:0.5rem">Update Interval (minutes)</label>
+            <input id="rp-interval" class="form-input" type="number" value="5" min="1" max="60">
+
+            <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                <button class="btn btn-primary" onclick="rpUpdateDDNS()">Update Now</button>
+                <button class="btn" onclick="rpStartDDNS()">Start Auto-Update</button>
+                <button class="btn btn-danger" onclick="rpStopDDNS()">Stop</button>
+            </div>
+            <div id="rp-ddns-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Reverse Proxy Config -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Reverse Proxy Generator</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Generate reverse proxy configs for nginx, Caddy, or Apache to route traffic from a domain to your local services.
+            </p>
+
+            <label class="form-label">Domain</label>
+            <input id="rp-domain" class="form-input" placeholder="mysite.example.com">
+            <label class="form-label" style="margin-top:0.5rem">Backend (local service)</label>
+            <input id="rp-backend" class="form-input" placeholder="http://127.0.0.1:8080" value="http://127.0.0.1:8080">
+            <label class="form-label" style="margin-top:0.5rem">SSL/TLS</label>
+            <select id="rp-ssl" class="form-input">
+                <option value="letsencrypt">Let's Encrypt (auto)</option>
+                <option value="selfsigned">Self-Signed</option>
+                <option value="none">None (HTTP only)</option>
+            </select>
+            <label class="form-label" style="margin-top:0.5rem">Proxy Type</label>
+            <select id="rp-type" class="form-input" onchange="rpGenerate()">
+                <option value="nginx">nginx</option>
+                <option value="caddy">Caddy</option>
+                <option value="apache">Apache</option>
+            </select>
+
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="rpGenerate()">Generate Config</button>
+        </div>
+    </div>
+
+    <!-- Generated Config -->
+    <div id="rp-config-panel" class="card" style="padding:1.25rem;margin-top:1.25rem;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+            <h3>Generated Configuration</h3>
+            <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-small" onclick="rpCopyConfig()">Copy</button>
+                <button class="btn btn-small" onclick="rpDownloadConfig()">Download</button>
+            </div>
+        </div>
+        <pre id="rp-config-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:0.8rem;white-space:pre-wrap;font-family:monospace;max-height:400px;overflow-y:auto"></pre>
+    </div>
+
+    <!-- Port Forwarding Guide -->
+    <div class="card" style="padding:1.25rem;margin-top:1.25rem">
+        <h3 style="margin-bottom:0.75rem">Port Forwarding Requirements</h3>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            For external access with a DHCP/dynamic WAN IP, you need:
+        </p>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem 1rem;font-size:0.82rem">
+            <span style="font-weight:600;color:var(--accent)">1.</span>
+            <span><strong>Port forwarding</strong> on your router: Forward ports 80 and 443 (and 53 for DNS) to this machine's LAN IP (<span id="rp-lan-ip" style="font-family:monospace">detecting...</span>)</span>
+
+            <span style="font-weight:600;color:var(--accent)">2.</span>
+            <span><strong>Dynamic DNS</strong> — Use the DDNS panel above to keep your DNS record pointing to your changing IP</span>
+
+            <span style="font-weight:600;color:var(--accent)">3.</span>
+            <span><strong>Reverse proxy</strong> — nginx/Caddy/Apache on this machine to route incoming traffic to your local services</span>
+
+            <span style="font-weight:600;color:var(--accent)">4.</span>
+            <span><strong>Firewall</strong> — Allow ports 80, 443, 53 through your OS firewall</span>
+        </div>
+
+        <hr style="border-color:var(--border);margin:1rem 0">
+        <h4 style="margin-bottom:0.5rem">UPnP Auto-Forward</h4>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem">
+            If your router supports UPnP, AUTARCH can auto-create port forwarding rules.
+        </p>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <button class="btn" onclick="rpUPnPForward(80)">Forward Port 80</button>
+            <button class="btn" onclick="rpUPnPForward(443)">Forward Port 443</button>
+            <button class="btn" onclick="rpUPnPForward(53)">Forward Port 53 (DNS)</button>
+        </div>
+        <div id="rp-upnp-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════ IMPORT / EXPORT TAB ═══════════════════ -->
+<div id="tab-import-export" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Export -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Export Zone File</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Export a zone in BIND format for backup or transfer to another DNS server.
+            </p>
+            <label class="form-label">Zone</label>
+            <select id="exp-zone" class="form-input zone-select"></select>
+            <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+                <button class="btn btn-primary" onclick="exportZone()">Export</button>
+                <button class="btn" onclick="copyExport()">Copy to Clipboard</button>
+                <button class="btn" onclick="downloadExport()">Download .zone</button>
+            </div>
+            <div id="exp-output" style="display:none;margin-top:1rem">
+                <textarea id="exp-text" class="form-input" style="height:300px;font-family:monospace;font-size:0.78rem;white-space:pre" readonly></textarea>
+            </div>
+        </div>
+
+        <!-- Import -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Import Zone File</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Import a BIND-format zone file. The zone must already exist — records will be added.
+            </p>
+            <label class="form-label">Target Zone</label>
+            <select id="imp-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.75rem">Zone File Contents</label>
+            <textarea id="imp-text" class="form-input" style="height:250px;font-family:monospace;font-size:0.78rem;white-space:pre" placeholder="$ORIGIN example.local.
+$TTL 300
+
+@  IN  SOA  ns1.example.local. admin.example.local. (
+    2024010101  ; serial
+    3600        ; refresh
+    900         ; retry
+    604800      ; expire
+    86400       ; minimum
+)
+
+@       IN  NS   ns1.example.local.
+@       IN  A    192.168.1.100
+www     IN  A    192.168.1.100
+mail    IN  A    192.168.1.101
+@       IN  MX   10 mail.example.local."></textarea>
+            <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+                <button class="btn btn-primary" onclick="importZone()">Import</button>
+                <label class="btn" style="cursor:pointer;margin:0">
+                    Upload .zone File
+                    <input type="file" id="imp-file" accept=".zone,.txt,.db" style="display:none" onchange="loadZoneFile(this)">
+                </label>
+            </div>
+            <div id="imp-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+    </div>
+
+    <!-- Zone File Editor -->
+    <div class="card" style="padding:1.25rem;margin-top:1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+            <h3>Zone File Editor</h3>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <select id="edit-zone" class="form-input zone-select" style="width:auto;min-width:200px"></select>
+                <button class="btn" onclick="loadZoneEditor()">Load</button>
+                <button class="btn btn-primary" onclick="saveZoneEditor()">Save</button>
+            </div>
+        </div>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            Edit zone records directly in BIND format. Changes are parsed and applied on save.
+        </p>
+        <div style="position:relative">
+            <div id="editor-line-nums" style="position:absolute;left:0;top:0;bottom:0;width:35px;background:var(--bg-card);border-right:1px solid var(--border);font-family:monospace;font-size:0.78rem;color:var(--text-muted);padding:0.5rem 0;text-align:right;overflow:hidden;user-select:none"></div>
+            <textarea id="zone-editor" class="form-input" style="height:350px;font-family:monospace;font-size:0.78rem;white-space:pre;padding-left:45px;resize:vertical" oninput="updateLineNums()" onscroll="syncLineScroll()"></textarea>
+        </div>
+        <div id="editor-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+    </div>
+</div>
+
+<!-- ═══════════════════ TEMPLATES TAB ═══════════════════ -->
+<div id="tab-templates" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Web Server Template -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Web Server</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Create records for a typical web server setup (A, www CNAME, optional AAAA).
+            </p>
+            <label class="form-label">Zone</label>
+            <select id="tpl-web-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">Server IP (v4)</label>
+            <input id="tpl-web-ip" class="form-input" placeholder="192.168.1.100">
+            <label class="form-label" style="margin-top:0.5rem">Server IP (v6, optional)</label>
+            <input id="tpl-web-ip6" class="form-input" placeholder="2001:db8::1">
+            <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;font-size:0.85rem">
+                <input id="tpl-web-www" type="checkbox" checked> Add www CNAME
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem;font-size:0.85rem">
+                <input id="tpl-web-wildcard" type="checkbox"> Add wildcard *.domain
+            </label>
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="applyWebTemplate()">Apply Web Server Records</button>
+            <div id="tpl-web-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Mail Server Template -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Mail Server</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Full mail setup: A, MX, SPF, DKIM, DMARC, and optional autoconfig records.
+            </p>
+            <label class="form-label">Zone</label>
+            <select id="tpl-mail-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">Mail Server IP</label>
+            <input id="tpl-mail-ip" class="form-input" placeholder="192.168.1.101">
+            <label class="form-label" style="margin-top:0.5rem">Mail Hostname</label>
+            <input id="tpl-mail-host" class="form-input" placeholder="mail.example.local">
+            <label class="form-label" style="margin-top:0.5rem">SPF Additional Sources</label>
+            <input id="tpl-mail-spf" class="form-input" placeholder="ip4:10.0.0.0/24" value="">
+            <label class="form-label" style="margin-top:0.5rem">DKIM Public Key (optional)</label>
+            <textarea id="tpl-mail-dkim" class="form-input" style="height:60px;font-family:monospace;font-size:0.75rem" placeholder="v=DKIM1; k=rsa; p=MIGfMA0G..."></textarea>
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="applyMailTemplate()">Apply Mail Records</button>
+            <div id="tpl-mail-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Reverse DNS Template -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Reverse DNS (PTR)</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Create reverse lookup zone and PTR records for an IP range.
+            </p>
+            <label class="form-label">Network</label>
+            <input id="tpl-ptr-net" class="form-input" placeholder="192.168.1">
+            <label class="form-label" style="margin-top:0.5rem">Hostnames (one per line: IP FQDN)</label>
+            <textarea id="tpl-ptr-hosts" class="form-input" style="height:100px;font-family:monospace;font-size:0.78rem" placeholder="100 server.example.local
+101 mail.example.local
+102 ns1.example.local"></textarea>
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="applyPTRTemplate()">Create PTR Zone + Records</button>
+            <div id="tpl-ptr-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Subdomain Delegation Template -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.5rem">Subdomain Delegation</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+                Delegate a subdomain to another nameserver.
+            </p>
+            <label class="form-label">Parent Zone</label>
+            <select id="tpl-del-zone" class="form-input zone-select"></select>
+            <label class="form-label" style="margin-top:0.5rem">Subdomain</label>
+            <input id="tpl-del-sub" class="form-input" placeholder="lab">
+            <label class="form-label" style="margin-top:0.5rem">NS Server</label>
+            <input id="tpl-del-ns" class="form-input" placeholder="ns1.lab.example.local">
+            <label class="form-label" style="margin-top:0.5rem">NS Server IP (glue)</label>
+            <input id="tpl-del-ip" class="form-input" placeholder="10.0.0.1">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="applyDelegationTemplate()">Apply Delegation Records</button>
+            <div id="tpl-del-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ CONFIG TAB ═══════════════════ -->
+<div id="tab-config" class="tab-pane" style="display:none">
+    <!-- Network Settings -->
+    <div class="card" style="padding:1.25rem;max-width:700px">
+        <h3 style="margin-bottom:1rem">Network Settings</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem 1rem">
+            <div>
+                <label class="form-label">DNS Listen Address</label>
+                <input id="cfg-dns-listen" class="form-input" value="0.0.0.0:53">
+            </div>
+            <div>
+                <label class="form-label">API Listen Address</label>
+                <input id="cfg-api-listen" class="form-input" value="127.0.0.1:5380">
+            </div>
+            <div style="grid-column:span 2">
+                <label class="form-label">Upstream DNS Servers (comma-separated, leave empty for pure recursive)</label>
+                <input id="cfg-upstream" class="form-input" value="" placeholder="Optional fallback: 8.8.8.8:53, 1.1.1.1:53">
+            </div>
+        </div>
+    </div>
+
+    <!-- Cache & Performance -->
+    <div class="card" style="padding:1.25rem;max-width:700px;margin-top:1rem">
+        <h3 style="margin-bottom:1rem">Cache & Performance</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem 1rem">
+            <div>
+                <label class="form-label">Cache TTL (seconds)</label>
+                <input id="cfg-cache-ttl" class="form-input" type="number" value="300">
+            </div>
+            <div>
+                <label class="form-label">Negative Cache TTL (NXDOMAIN)</label>
+                <input id="cfg-neg-cache-ttl" class="form-input" type="number" value="60">
+            </div>
+            <div>
+                <label class="form-label">SERVFAIL Cache TTL</label>
+                <input id="cfg-servfail-ttl" class="form-input" type="number" value="30">
+            </div>
+            <div>
+                <label class="form-label">Query Log Max Entries</label>
+                <input id="cfg-querylog-max" class="form-input" type="number" value="1000">
+            </div>
+            <div>
+                <label class="form-label">Max UDP Size (bytes)</label>
+                <input id="cfg-max-udp" class="form-input" type="number" value="1232">
+            </div>
+            <div>
+                <label class="form-label">Rate Limit (queries/sec/IP)</label>
+                <input id="cfg-rate-limit" class="form-input" type="number" value="100" placeholder="0 = unlimited">
+            </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.75rem;font-size:0.85rem">
+            <input id="cfg-prefetch" type="checkbox"> Prefetch expiring cache entries
+        </label>
+    </div>
+
+    <!-- Security -->
+    <div class="card" style="padding:1.25rem;max-width:700px;margin-top:1rem">
+        <h3 style="margin-bottom:1rem">Security</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem 2rem">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+                <input id="cfg-log-queries" type="checkbox" checked> Log all queries
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+                <input id="cfg-refuse-any" type="checkbox" checked> Refuse ANY queries (anti-amplification)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+                <input id="cfg-minimal" type="checkbox" checked> Minimal responses (hide server info)
+            </label>
+        </div>
+        <div style="margin-top:0.75rem">
+            <label class="form-label">Allowed Zone Transfer IPs (comma-separated, empty = deny all)</label>
+            <input id="cfg-allow-transfer" class="form-input" value="" placeholder="Leave empty to deny all AXFR/IXFR">
+        </div>
+    </div>
+
+    <!-- Encryption -->
+    <div class="card" style="padding:1.25rem;max-width:700px;margin-top:1rem">
+        <h3 style="margin-bottom:1rem">Encryption (Upstream)</h3>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            When upstream forwarders are configured, encrypt queries using DoT or DoH.
+            Recursive resolution from root hints always uses plain DNS (root servers don't support encryption).
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:1rem 2rem">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+                <input id="cfg-enable-doh" type="checkbox" checked> DNS-over-HTTPS (DoH)
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem">
+                <input id="cfg-enable-dot" type="checkbox" checked> DNS-over-TLS (DoT)
+            </label>
+        </div>
+        <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.5rem">
+            Priority: DoH (if available) > DoT > Plain. Auto-detected for Google, Cloudflare, Quad9, OpenDNS, AdGuard.
+        </p>
+    </div>
+
+    <!-- Hosts File -->
+    <div class="card" style="padding:1.25rem;max-width:700px;margin-top:1rem">
+        <h3 style="margin-bottom:1rem">Hosts File</h3>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem 1rem;align-items:end">
+            <div>
+                <label class="form-label">Hosts File Path (loaded on startup)</label>
+                <input id="cfg-hosts-file" class="form-input" value="" placeholder="/etc/hosts or C:\Windows\System32\drivers\etc\hosts">
+            </div>
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;padding-bottom:0.25rem">
+                <input id="cfg-hosts-autoload" type="checkbox"> Auto-load on start
+            </label>
+        </div>
+    </div>
+
+    <!-- Save Button -->
+    <div style="max-width:700px;margin-top:1rem">
+        <button class="btn btn-primary" style="font-size:1rem;padding:0.6rem 2rem" onclick="saveConfig()">Save All Settings</button>
+        <div id="cfg-status" style="font-size:0.82rem;margin-top:0.5rem;display:inline-block;margin-left:1rem"></div>
+    </div>
+
+    <!-- Resolver Mode Info -->
+    <div class="card" style="padding:1.25rem;max-width:700px;margin-top:1.25rem">
+        <h3 style="margin-bottom:0.75rem">Resolver Mode</h3>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            AUTARCH DNS operates as a fully recursive resolver by default, walking from the 13 IANA root servers through
+            the delegation chain to resolve any domain independently. No upstream forwarders are required.
+        </p>
+        <div style="display:flex;gap:1rem">
+            <div class="card" style="padding:0.75rem;flex:1;border:2px solid var(--accent)">
+                <strong style="font-size:0.85rem;color:var(--accent)">Recursive (Default)</strong>
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.25rem">
+                    Full independence. Resolves from root hints. Zero reliance on third-party DNS.
+                </p>
+            </div>
+            <div class="card" style="padding:0.75rem;flex:1">
+                <strong style="font-size:0.85rem">Hybrid</strong>
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.25rem">
+                    Recursive first, falls back to upstream forwarders on failure. Add upstream servers above.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn{padding:0.6rem 1.2rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab-btn:hover{color:var(--text-primary)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.form-label{display:block;font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.25rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.form-input{width:100%;padding:0.5rem 0.65rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:0.85rem}
+.form-input:focus{outline:none;border-color:var(--accent)}
+.btn-danger{background:var(--danger);color:#fff}
+.zone-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:0.5rem;transition:border-color 0.2s}
+.zone-card:hover{border-color:var(--accent)}
+</style>
+
+<script>
+let _currentZone = '';
+let _allRecords = [];
+let _sortField = '';
+let _sortAsc = true;
+
+function dnsTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = '';
+    btn.classList.add('active');
+    if (name === 'zones') loadZones();
+    if (name === 'records') loadRecords();
+    if (name === 'config') loadConfig();
+}
+
+// ── Server control ──
+function checkDNS() {
+    fetch('/dns/status').then(r => r.json()).then(d => {
+        const el = document.getElementById('dns-status');
+        if (d.running) {
+            el.innerHTML = `Status: <span style="color:#4ade80;font-weight:600">RUNNING</span> &bull; DNS: ${d.listen_dns} &bull; API: ${d.listen_api}`;
+            if (d.queries !== undefined) {
+                document.getElementById('dns-metrics').textContent = `Queries: ${d.queries} | Zones: ${d.zones || 0}`;
+            }
+        } else {
+            el.innerHTML = 'Status: <span style="color:var(--text-muted);font-weight:600">STOPPED</span>';
+            document.getElementById('dns-metrics').textContent = '';
+        }
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    });
+}
+
+function startDNS() {
+    document.getElementById('dns-status').innerHTML = 'Status: <span style="color:var(--accent)">Starting...</span>';
+    fetch('/dns/start', {method:'POST'}).then(r => r.json()).then(d => {
+        if (!d.ok) alert(d.error);
+        checkDNS();
+    });
+}
+
+function stopDNS() {
+    fetch('/dns/stop', {method:'POST'}).then(r => r.json()).then(() => checkDNS());
+}
+
+// ── Zones ──
+function loadZones() {
+    fetch('/dns/zones').then(r => r.json()).then(d => {
+        const el = document.getElementById('z-list');
+        const selects = document.querySelectorAll('.zone-select');
+
+        if (!d.ok || !d.zones || !d.zones.length) {
+            el.textContent = 'No zones. Create one to get started.';
+            selects.forEach(s => s.innerHTML = '<option value="">No zones</option>');
+            return;
+        }
+
+        el.innerHTML = d.zones.map(z => `<div class="zone-card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <strong>${z.domain}</strong>
+                <div style="display:flex;gap:0.4rem;align-items:center">
+                    ${z.dnssec ? '<span style="color:#4ade80;font-size:0.75rem;font-weight:600">DNSSEC</span>' : ''}
+                    <span style="color:var(--text-muted);font-size:0.8rem">${z.records || 0} records</span>
+                    <button class="btn btn-small" onclick="_currentZone='${z.domain}';dnsTab('records',document.querySelectorAll('.tab-btn')[1])">Edit</button>
+                    <button class="btn btn-small" onclick="quickExport('${z.domain}')">Export</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteZone('${z.domain}')">Delete</button>
+                </div>
+            </div>
+        </div>`).join('');
+
+        const opts = d.zones.map(z => `<option value="${z.domain}">${z.domain}</option>`).join('');
+        selects.forEach(s => {
+            s.innerHTML = opts;
+            if (_currentZone) s.value = _currentZone;
+        });
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    });
+}
+
+function createZone() {
+    const domain = document.getElementById('z-domain').value.trim();
+    if (!domain) return;
+    const el = document.getElementById('z-create-status');
+    fetch('/dns/zones', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">Zone ${domain} created</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) { document.getElementById('z-domain').value = ''; loadZones(); }
+        });
+}
+
+function deleteZone(domain) {
+    if (!confirm(`Delete zone ${domain} and all its records?`)) return;
+    fetch(`/dns/zones/${domain}`, {method:'DELETE'}).then(() => loadZones());
+}
+
+function cloneZone() {
+    const src = document.getElementById('z-clone-src').value;
+    const dst = document.getElementById('z-clone-dst').value.trim();
+    if (!src || !dst) return;
+    const el = document.getElementById('z-clone-status');
+    el.innerHTML = '<span style="color:var(--text-muted)">Cloning...</span>';
+    fetch('/dns/zone-clone', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({source: src, target: dst})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">Cloned ${src} → ${dst}</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) { document.getElementById('z-clone-dst').value = ''; loadZones(); }
+        });
+}
+
+function mailSetup() {
+    const zone = document.getElementById('z-mail-zone').value;
+    if (!zone) return;
+    const data = {
+        mx_host: document.getElementById('z-mail-mx').value,
+        spf_allow: document.getElementById('z-mail-spf').value,
+    };
+    const el = document.getElementById('z-mail-status');
+    fetch(`/dns/zones/${zone}/mail-setup`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">${d.message}</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+        });
+}
+
+// ── Records ──
+function loadRecords() {
+    const zone = document.getElementById('r-zone').value || _currentZone;
+    if (!zone) { document.getElementById('r-table').innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--text-muted)">Select a zone</td></tr>'; return; }
+    _currentZone = zone;
+    fetch(`/dns/zones/${zone}/records`).then(r => r.json()).then(d => {
+        _allRecords = (d.ok && d.records) ? d.records : [];
+        filterRecords();
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    });
+}
+
+function filterRecords() {
+    const typeFilter = document.getElementById('r-filter-type').value;
+    const search = document.getElementById('r-filter-search').value.toLowerCase();
+    let recs = _allRecords;
+
+    if (typeFilter) recs = recs.filter(r => r.type === typeFilter);
+    if (search) recs = recs.filter(r => (r.name || '').toLowerCase().includes(search) || (r.value || '').toLowerCase().includes(search));
+
+    if (_sortField) {
+        recs = [...recs].sort((a, b) => {
+            const va = (a[_sortField] || '').toString().toLowerCase();
+            const vb = (b[_sortField] || '').toString().toLowerCase();
+            return _sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+    }
+
+    const zone = _currentZone;
+    document.getElementById('r-count').textContent = `${recs.length} of ${_allRecords.length} records`;
+    const el = document.getElementById('r-table');
+    if (!recs.length) {
+        el.innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--text-muted)">No records</td></tr>';
+        return;
+    }
+    el.innerHTML = recs.map(r => `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:5px"><span style="background:var(--bg-input);padding:2px 6px;border-radius:3px;font-size:0.75rem;font-weight:600">${r.type}</span></td>
+        <td style="padding:5px;font-family:monospace;font-size:0.8rem">${r.name}</td>
+        <td style="padding:5px;font-family:monospace;font-size:0.8rem;max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.value)}">${r.value}</td>
+        <td style="padding:5px">${r.ttl}</td>
+        <td style="padding:5px">${r.priority || ''}</td>
+        <td style="padding:5px"><button class="btn btn-small btn-danger" onclick="deleteRecord('${zone}','${r.id}')">Delete</button></td>
+    </tr>`).join('');
+}
+
+function sortRecords(field) {
+    if (_sortField === field) _sortAsc = !_sortAsc;
+    else { _sortField = field; _sortAsc = true; }
+    filterRecords();
+}
+
+function addRecord() {
+    const zone = document.getElementById('r-zone').value || _currentZone;
+    if (!zone) return;
+    const data = {
+        type: document.getElementById('r-type').value,
+        name: document.getElementById('r-name').value,
+        value: document.getElementById('r-value').value,
+        ttl: parseInt(document.getElementById('r-ttl').value),
+        priority: parseInt(document.getElementById('r-priority').value),
+    };
+    const el = document.getElementById('r-add-status');
+    fetch(`/dns/zones/${zone}/records`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? '<span style="color:#4ade80">Record added</span>' : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) loadRecords();
+        });
+}
+
+function deleteRecord(zone, id) {
+    fetch(`/dns/zones/${zone}/records/${id}`, {method:'DELETE'}).then(() => loadRecords());
+}
+
+function toggleBulkAdd() {
+    const p = document.getElementById('bulk-add-panel');
+    p.style.display = p.style.display === 'none' ? '' : 'none';
+}
+
+function bulkAddRecords() {
+    const zone = document.getElementById('r-zone').value || _currentZone;
+    if (!zone) return;
+    let records;
+    try { records = JSON.parse(document.getElementById('bulk-json').value); }
+    catch(e) { document.getElementById('bulk-add-status').innerHTML = `<span style="color:var(--danger)">Invalid JSON: ${e.message}</span>`; return; }
+    const el = document.getElementById('bulk-add-status');
+    el.innerHTML = '<span style="color:var(--text-muted)">Adding...</span>';
+    fetch(`/dns/zone-bulk-records/${zone}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({records})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">${d.added || records.length} records added</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) loadRecords();
+        });
+}
+
+// ── DNSSEC ──
+function enableDNSSEC() {
+    const zone = document.getElementById('dnssec-zone').value;
+    if (!zone) return;
+    fetch(`/dns/zones/${zone}/dnssec/enable`, {method:'POST'}).then(r => r.json()).then(d => {
+        document.getElementById('dnssec-status').innerHTML = d.ok ? `<span style="color:#4ade80">${d.message}</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+        loadZones();
+    });
+}
+
+function disableDNSSEC() {
+    const zone = document.getElementById('dnssec-zone').value;
+    if (!zone) return;
+    fetch(`/dns/zones/${zone}/dnssec/disable`, {method:'POST'}).then(r => r.json()).then(d => {
+        document.getElementById('dnssec-status').innerHTML = d.ok ? `<span style="color:#4ade80">${d.message}</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+        loadZones();
+    });
+}
+
+// ── Import / Export ──
+function exportZone() {
+    const zone = document.getElementById('exp-zone').value;
+    if (!zone) return;
+    fetch(`/dns/zone-export/${zone}`).then(r => r.json()).then(d => {
+        if (!d.ok) { alert(d.error); return; }
+        document.getElementById('exp-output').style.display = '';
+        document.getElementById('exp-text').value = d.zone_file || d.data || JSON.stringify(d, null, 2);
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    });
+}
+
+function quickExport(domain) {
+    _currentZone = domain;
+    dnsTab('import-export', document.querySelectorAll('.tab-btn')[2]);
+    document.getElementById('exp-zone').value = domain;
+    setTimeout(() => exportZone(), 100);
+}
+
+function copyExport() {
+    const text = document.getElementById('exp-text').value;
+    navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+}
+
+function downloadExport() {
+    const text = document.getElementById('exp-text').value;
+    const zone = document.getElementById('exp-zone').value || 'zone';
+    const blob = new Blob([text], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = zone + '.zone';
+    a.click();
+}
+
+function importZone() {
+    const zone = document.getElementById('imp-zone').value;
+    if (!zone) return;
+    const text = document.getElementById('imp-text').value;
+    if (!text.trim()) return;
+    const el = document.getElementById('imp-status');
+    el.innerHTML = '<span style="color:var(--text-muted)">Importing...</span>';
+    fetch(`/dns/zone-import/${zone}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zone_file: text})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">${d.message || 'Import successful'}</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) loadZones();
+        });
+}
+
+function loadZoneFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { document.getElementById('imp-text').value = reader.result; };
+    reader.readAsText(file);
+}
+
+// ── Zone File Editor ──
+function loadZoneEditor() {
+    const zone = document.getElementById('edit-zone').value;
+    if (!zone) return;
+    fetch(`/dns/zone-export/${zone}`).then(r => r.json()).then(d => {
+        if (!d.ok) { alert(d.error); return; }
+        document.getElementById('zone-editor').value = d.zone_file || d.data || '';
+        updateLineNums();
+    });
+}
+
+function saveZoneEditor() {
+    const zone = document.getElementById('edit-zone').value;
+    if (!zone) return;
+    const text = document.getElementById('zone-editor').value;
+    const el = document.getElementById('editor-status');
+    el.innerHTML = '<span style="color:var(--text-muted)">Saving...</span>';
+    fetch(`/dns/zone-import/${zone}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({zone_file: text})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">Saved</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) loadZones();
+        });
+}
+
+function updateLineNums() {
+    const ta = document.getElementById('zone-editor');
+    const lines = ta.value.split('\n').length;
+    const nums = Array.from({length: lines}, (_, i) => i + 1).join('\n');
+    document.getElementById('editor-line-nums').textContent = nums;
+}
+
+function syncLineScroll() {
+    const ta = document.getElementById('zone-editor');
+    document.getElementById('editor-line-nums').scrollTop = ta.scrollTop;
+}
+
+// ── Templates ──
+function _bulkAdd(zone, records, statusEl) {
+    const el = document.getElementById(statusEl);
+    el.innerHTML = '<span style="color:var(--text-muted)">Applying...</span>';
+    fetch(`/dns/zone-bulk-records/${zone}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({records})})
+        .then(r => r.json()).then(d => {
+            el.innerHTML = d.ok ? `<span style="color:#4ade80">${d.added || records.length} records created</span>` : `<span style="color:var(--danger)">${d.error}</span>`;
+            if (d.ok) loadZones();
+        });
+}
+
+function applyWebTemplate() {
+    const zone = document.getElementById('tpl-web-zone').value;
+    const ip = document.getElementById('tpl-web-ip').value.trim();
+    if (!zone || !ip) return;
+    const ip6 = document.getElementById('tpl-web-ip6').value.trim();
+    const www = document.getElementById('tpl-web-www').checked;
+    const wild = document.getElementById('tpl-web-wildcard').checked;
+
+    const recs = [{type:'A', name:'@', value:ip, ttl:300}];
+    if (ip6) recs.push({type:'AAAA', name:'@', value:ip6, ttl:300});
+    if (www) recs.push({type:'CNAME', name:'www', value:zone + '.', ttl:300});
+    if (wild) recs.push({type:'A', name:'*', value:ip, ttl:300});
+    _bulkAdd(zone, recs, 'tpl-web-status');
+}
+
+function applyMailTemplate() {
+    const zone = document.getElementById('tpl-mail-zone').value;
+    const ip = document.getElementById('tpl-mail-ip').value.trim();
+    const host = document.getElementById('tpl-mail-host').value.trim();
+    if (!zone || !ip || !host) return;
+    const spf = document.getElementById('tpl-mail-spf').value.trim();
+    const dkim = document.getElementById('tpl-mail-dkim').value.trim();
+
+    const recs = [
+        {type:'A', name:'mail', value:ip, ttl:300},
+        {type:'MX', name:'@', value:host + '.', ttl:300, priority:10},
+        {type:'TXT', name:'@', value:`v=spf1 a mx ip4:${ip} ${spf} -all`, ttl:300},
+        {type:'TXT', name:'_dmarc', value:'v=DMARC1; p=quarantine; rua=mailto:dmarc@' + zone, ttl:300},
+    ];
+    if (dkim) recs.push({type:'TXT', name:'default._domainkey', value:dkim, ttl:300});
+    // Autoconfig
+    recs.push({type:'CNAME', name:'autoconfig', value:host + '.', ttl:300});
+    recs.push({type:'SRV', name:'_submission._tcp', value:host + '.', ttl:300, priority:0});
+    recs.push({type:'SRV', name:'_imap._tcp', value:host + '.', ttl:300, priority:0});
+
+    _bulkAdd(zone, recs, 'tpl-mail-status');
+}
+
+function applyPTRTemplate() {
+    const net = document.getElementById('tpl-ptr-net').value.trim();
+    const hosts = document.getElementById('tpl-ptr-hosts').value.trim();
+    if (!net || !hosts) return;
+    const el = document.getElementById('tpl-ptr-status');
+
+    // Create reverse zone first
+    const parts = net.split('.');
+    const revZone = parts.reverse().join('.') + '.in-addr.arpa';
+    el.innerHTML = '<span style="color:var(--text-muted)">Creating reverse zone...</span>';
+
+    fetch('/dns/zones', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain: revZone})})
+        .then(r => r.json()).then(d => {
+            if (!d.ok && !d.error?.includes('exists')) { el.innerHTML = `<span style="color:var(--danger)">${d.error}</span>`; return; }
+            // Now add PTR records
+            const recs = hosts.split('\n').filter(l => l.trim()).map(line => {
+                const [lastOctet, ...fqdnParts] = line.trim().split(/\s+/);
+                return {type:'PTR', name:lastOctet, value:fqdnParts.join(' ') + '.', ttl:300};
+            });
+            _bulkAdd(revZone, recs, 'tpl-ptr-status');
+        });
+}
+
+function applyDelegationTemplate() {
+    const zone = document.getElementById('tpl-del-zone').value;
+    const sub = document.getElementById('tpl-del-sub').value.trim();
+    const ns = document.getElementById('tpl-del-ns').value.trim();
+    const ip = document.getElementById('tpl-del-ip').value.trim();
+    if (!zone || !sub || !ns) return;
+
+    const recs = [{type:'NS', name:sub, value:ns + '.', ttl:300}];
+    if (ip) recs.push({type:'A', name:ns.split('.')[0], value:ip, ttl:300});
+    _bulkAdd(zone, recs, 'tpl-del-status');
+}
+
+// ── Config ──
+function loadConfig() {
+    fetch('/dns/config').then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        const c = d.config;
+        // Network
+        document.getElementById('cfg-dns-listen').value = c.listen_dns || '0.0.0.0:53';
+        document.getElementById('cfg-api-listen').value = c.listen_api || '127.0.0.1:5380';
+        document.getElementById('cfg-upstream').value = (c.upstream || []).join(', ');
+        // Cache & Performance
+        document.getElementById('cfg-cache-ttl').value = c.cache_ttl || 300;
+        document.getElementById('cfg-neg-cache-ttl').value = c.negative_cache_ttl || 60;
+        document.getElementById('cfg-servfail-ttl').value = c.servfail_cache_ttl || 30;
+        document.getElementById('cfg-querylog-max').value = c.querylog_max || 1000;
+        document.getElementById('cfg-max-udp').value = c.max_udp_size || 1232;
+        document.getElementById('cfg-rate-limit').value = c.rate_limit || 100;
+        document.getElementById('cfg-prefetch').checked = c.prefetch_enabled === true;
+        // Security
+        document.getElementById('cfg-log-queries').checked = c.log_queries !== false;
+        document.getElementById('cfg-refuse-any').checked = c.refuse_any !== false;
+        document.getElementById('cfg-minimal').checked = c.minimal_responses !== false;
+        document.getElementById('cfg-allow-transfer').value = (c.allow_transfer || []).join(', ');
+        // Encryption
+        document.getElementById('cfg-enable-doh').checked = c.enable_doh !== false;
+        document.getElementById('cfg-enable-dot').checked = c.enable_dot !== false;
+        // Hosts
+        document.getElementById('cfg-hosts-file').value = c.hosts_file || '';
+        document.getElementById('cfg-hosts-autoload').checked = c.hosts_auto_load === true;
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    });
+}
+
+function saveConfig() {
+    const data = {
+        // Network
+        listen_dns: document.getElementById('cfg-dns-listen').value,
+        listen_api: document.getElementById('cfg-api-listen').value,
+        upstream: document.getElementById('cfg-upstream').value.split(',').map(s => s.trim()).filter(Boolean),
+        // Cache & Performance
+        cache_ttl: parseInt(document.getElementById('cfg-cache-ttl').value) || 300,
+        negative_cache_ttl: parseInt(document.getElementById('cfg-neg-cache-ttl').value) || 60,
+        servfail_cache_ttl: parseInt(document.getElementById('cfg-servfail-ttl').value) || 30,
+        querylog_max: parseInt(document.getElementById('cfg-querylog-max').value) || 1000,
+        max_udp_size: parseInt(document.getElementById('cfg-max-udp').value) || 1232,
+        rate_limit: parseInt(document.getElementById('cfg-rate-limit').value) || 0,
+        prefetch_enabled: document.getElementById('cfg-prefetch').checked,
+        // Security
+        log_queries: document.getElementById('cfg-log-queries').checked,
+        refuse_any: document.getElementById('cfg-refuse-any').checked,
+        minimal_responses: document.getElementById('cfg-minimal').checked,
+        allow_transfer: document.getElementById('cfg-allow-transfer').value.split(',').map(s => s.trim()).filter(Boolean),
+        // Encryption
+        enable_doh: document.getElementById('cfg-enable-doh').checked,
+        enable_dot: document.getElementById('cfg-enable-dot').checked,
+        // Hosts
+        hosts_file: document.getElementById('cfg-hosts-file').value.trim(),
+        hosts_auto_load: document.getElementById('cfg-hosts-autoload').checked,
+    };
+    fetch('/dns/config', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            document.getElementById('cfg-status').innerHTML = d.ok ? '<span style="color:#4ade80">All settings saved</span>' : `<span style="color:var(--danger)">${d.error}</span>`;
+        });
+}
+
+// ── EZ-Local ──
+let _ezHosts = [];
+let _ezCustomHosts = [];
+let _ezNetInfo = {};
+
+function ezScanNetwork() {
+    document.getElementById('ez-scan-status').innerHTML = '<span style="color:var(--accent)">Scanning network...</span>';
+    fetch('/dns/network-info').then(r => r.json()).then(d => {
+        _ezNetInfo = d;
+        document.getElementById('ez-ns-ip').value = d.default_ip || '';
+        document.getElementById('ez-gateway').value = d.gateway || '';
+        document.getElementById('ez-subnet').value = d.subnet || '';
+
+        // Update client instructions
+        document.getElementById('ez-my-dns-ip').textContent = d.default_ip || '127.0.0.1';
+        document.querySelectorAll('.ez-dns-ip').forEach(el => el.textContent = d.default_ip || '127.0.0.1');
+
+        // Suggest domain based on hostname
+        if (d.hostname && !document.getElementById('ez-domain').value.includes('.')) {
+            document.getElementById('ez-domain').value = d.hostname.toLowerCase().split('.')[0] + '.local';
+        }
+
+        // Show discovered hosts
+        _ezHosts = (d.hosts || []).map(h => ({
+            ip: h.ip,
+            mac: h.mac || '',
+            name: h.name || '',
+            hostname: h.name ? h.name.split('.')[0].toLowerCase() : '',
+            include: true
+        }));
+        ezRenderHosts();
+
+        document.getElementById('ez-scan-status').innerHTML = `<span style="color:#4ade80">Found ${_ezHosts.length} hosts on ${d.subnet || 'network'}</span>`;
+        halAnalyze('DNS Service', JSON.stringify(d, null, 2), 'dns query', 'network');
+    }).catch(e => {
+        document.getElementById('ez-scan-status').innerHTML = `<span style="color:var(--danger)">Scan failed: ${e.message}</span>`;
+    });
+}
+
+function ezRenderHosts() {
+    const el = document.getElementById('ez-hosts');
+    document.getElementById('ez-host-count').textContent = `${_ezHosts.filter(h => h.include).length} of ${_ezHosts.length} selected`;
+    if (!_ezHosts.length) { el.innerHTML = '<div style="color:var(--text-muted)">No hosts discovered</div>'; return; }
+
+    el.innerHTML = _ezHosts.map((h, i) => `<div style="display:grid;grid-template-columns:auto 130px 1fr 120px;gap:0.5rem;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" ${h.include ? 'checked' : ''} onchange="_ezHosts[${i}].include=this.checked;ezRenderHosts()">
+        <span style="font-family:monospace;font-size:0.8rem">${h.ip}</span>
+        <input class="form-input" style="padding:0.25rem 0.4rem;font-size:0.8rem" value="${esc(h.hostname)}" onchange="_ezHosts[${i}].hostname=this.value" placeholder="hostname">
+        <span style="font-size:0.72rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis" title="${esc(h.mac)}">${h.mac || ''}</span>
+    </div>`).join('');
+}
+
+function ezAddCustomHost() {
+    const name = document.getElementById('ez-custom-name').value.trim();
+    const ip = document.getElementById('ez-custom-ip').value.trim();
+    if (!name || !ip) return;
+    _ezCustomHosts.push({hostname: name, ip});
+    document.getElementById('ez-custom-name').value = '';
+    document.getElementById('ez-custom-ip').value = '';
+    const el = document.getElementById('ez-custom-list');
+    el.innerHTML = _ezCustomHosts.map((h, i) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.82rem">
+        <span><span style="font-family:monospace">${esc(h.hostname)}</span> → ${h.ip}</span>
+        <button class="btn btn-small" onclick="_ezCustomHosts.splice(${i},1);ezAddCustomHost.__render()" style="font-size:0.7rem;padding:1px 4px">x</button>
+    </div>`).join('');
+    ezAddCustomHost.__render = () => { document.getElementById('ez-custom-list').innerHTML = _ezCustomHosts.map((h, i) => `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.82rem"><span><span style="font-family:monospace">${esc(h.hostname)}</span> → ${h.ip}</span><button class="btn btn-small" onclick="_ezCustomHosts.splice(${i},1);ezAddCustomHost.__render()" style="font-size:0.7rem;padding:1px 4px">x</button></div>`).join(''); };
+}
+
+function ezUpdateDomain() {
+    const tld = document.getElementById('ez-tld').value;
+    if (tld) {
+        const current = document.getElementById('ez-domain').value;
+        const base = current.split('.')[0] || 'home';
+        document.getElementById('ez-domain').value = base + tld;
+    }
+}
+
+function _ezBuildRecords() {
+    const domain = document.getElementById('ez-domain').value.trim();
+    const nsIp = document.getElementById('ez-ns-ip').value.trim();
+    const gwIp = document.getElementById('ez-gateway').value.trim();
+    const records = [];
+
+    if (document.getElementById('ez-ns-record').checked && nsIp) {
+        records.push({type:'A', name:'ns1', value:nsIp, ttl:300});
+        records.push({type:'NS', name:'@', value:`ns1.${domain}.`, ttl:300});
+    }
+    if (document.getElementById('ez-gateway-record').checked && gwIp) {
+        records.push({type:'A', name:'gateway', value:gwIp, ttl:300});
+        records.push({type:'A', name:'router', value:gwIp, ttl:300});
+    }
+    if (document.getElementById('ez-server-record').checked && nsIp) {
+        records.push({type:'A', name:'server', value:nsIp, ttl:300});
+        records.push({type:'A', name:(_ezNetInfo.hostname || 'autarch').toLowerCase().split('.')[0], value:nsIp, ttl:300});
+    }
+    if (document.getElementById('ez-dashboard-record').checked && nsIp) {
+        records.push({type:'A', name:'dashboard', value:nsIp, ttl:300});
+        records.push({type:'A', name:'autarch', value:nsIp, ttl:300});
+    }
+    if (document.getElementById('ez-wildcard-record').checked && nsIp) {
+        records.push({type:'A', name:'*', value:nsIp, ttl:300});
+    }
+
+    // ARP-discovered hosts
+    if (document.getElementById('ez-arp-hosts').checked) {
+        _ezHosts.filter(h => h.include && h.hostname).forEach(h => {
+            records.push({type:'A', name:h.hostname, value:h.ip, ttl:300});
+        });
+    }
+
+    // Custom hosts
+    _ezCustomHosts.forEach(h => {
+        records.push({type:'A', name:h.hostname, value:h.ip, ttl:300});
+    });
+
+    return {domain, records};
+}
+
+function ezPreview() {
+    const {domain, records} = _ezBuildRecords();
+    if (!domain) return;
+
+    let text = `; Zone: ${domain}\n; Generated by AUTARCH EZ-Local\n;\n$ORIGIN ${domain}.\n$TTL 300\n\n`;
+    records.forEach(r => {
+        const pad = ' '.repeat(Math.max(1, 16 - r.name.length));
+        text += `${r.name}${pad}IN  ${r.type.padEnd(6)} ${r.value}\n`;
+    });
+
+    if (document.getElementById('ez-reverse-zone').checked) {
+        const prefix = document.getElementById('ez-subnet').value.split('.').slice(0, 3);
+        text += `\n; Reverse zone: ${prefix.reverse().join('.')}.in-addr.arpa\n`;
+        records.filter(r => r.type === 'A').forEach(r => {
+            const lastOctet = r.value.split('.')[3];
+            text += `${lastOctet}   IN  PTR  ${r.name}.${domain}.\n`;
+        });
+    }
+
+    document.getElementById('ez-preview').style.display = '';
+    document.getElementById('ez-preview-text').textContent = text;
+}
+
+function ezDeploy() {
+    const {domain, records} = _ezBuildRecords();
+    if (!domain || !records.length) return;
+    const el = document.getElementById('ez-deploy-status');
+    el.innerHTML = '<span style="color:var(--accent)">Creating zone...</span>';
+
+    // Create zone, then bulk add records
+    fetch('/dns/zones', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain})})
+        .then(r => r.json()).then(d => {
+            if (!d.ok && !d.error?.includes('exists')) { el.innerHTML = `<span style="color:var(--danger)">${d.error}</span>`; return; }
+            el.innerHTML = '<span style="color:var(--accent)">Adding records...</span>';
+            return fetch(`/dns/zone-bulk-records/${domain}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({records})});
+        })
+        .then(r => r?.json())
+        .then(d => {
+            if (!d) return;
+            if (d.ok) {
+                el.innerHTML = `<span style="color:#4ade80">Zone ${domain} deployed with ${records.length} records!</span>`;
+                loadZones();
+
+                // Handle reverse zone
+                if (document.getElementById('ez-reverse-zone').checked) {
+                    const prefix = document.getElementById('ez-subnet').value.split('.').slice(0, 3);
+                    const revZone = prefix.slice().reverse().join('.') + '.in-addr.arpa';
+                    const ptrRecs = records.filter(r => r.type === 'A').map(r => ({
+                        type:'PTR', name:r.value.split('.')[3], value:`${r.name}.${domain}.`, ttl:300
+                    }));
+                    fetch('/dns/zones', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({domain: revZone})})
+                        .then(() => fetch(`/dns/zone-bulk-records/${revZone}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({records: ptrRecs})}))
+                        .then(() => { el.innerHTML += ' + reverse zone created'; });
+                }
+            } else {
+                el.innerHTML = `<span style="color:var(--danger)">${d.error}</span>`;
+            }
+        });
+}
+
+// ── Reverse Proxy ──
+let _rpDDNSInterval = null;
+
+function rpDetectIP() {
+    document.getElementById('rp-public-ip').value = 'Detecting...';
+    fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => {
+        document.getElementById('rp-public-ip').value = d.ip || '';
+    }).catch(() => { document.getElementById('rp-public-ip').value = 'Detection failed'; });
+}
+
+function rpUpdateDDNS() {
+    const zone = document.getElementById('rp-zone').value;
+    const hostname = document.getElementById('rp-hostname').value.trim() || '@';
+    const el = document.getElementById('rp-ddns-status');
+    el.innerHTML = '<span style="color:var(--text-muted)">Detecting IP and updating...</span>';
+
+    fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => {
+        const ip = d.ip;
+        document.getElementById('rp-public-ip').value = ip;
+        if (!zone || !ip) { el.innerHTML = '<span style="color:var(--danger)">Zone and IP required</span>'; return; }
+
+        // Add/update A record in zone
+        return fetch(`/dns/zones/${zone}/records`, {method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({type:'A', name:hostname, value:ip, ttl:60})
+        }).then(r => r.json()).then(d => {
+            const now = new Date().toLocaleTimeString();
+            el.innerHTML = `<span style="color:#4ade80">Updated ${hostname}.${zone} → ${ip} at ${now}</span>`;
+        });
+    }).catch(e => {
+        el.innerHTML = `<span style="color:var(--danger)">Failed: ${e.message}</span>`;
+    });
+}
+
+function rpStartDDNS() {
+    const interval = parseInt(document.getElementById('rp-interval').value) || 5;
+    rpUpdateDDNS();
+    _rpDDNSInterval = setInterval(rpUpdateDDNS, interval * 60 * 1000);
+    document.getElementById('rp-ddns-status').innerHTML += ' — <span style="color:var(--accent)">Auto-update active</span>';
+}
+
+function rpStopDDNS() {
+    if (_rpDDNSInterval) { clearInterval(_rpDDNSInterval); _rpDDNSInterval = null; }
+    document.getElementById('rp-ddns-status').innerHTML = '<span style="color:var(--text-muted)">Auto-update stopped</span>';
+}
+
+function rpGenerate() {
+    const domain = document.getElementById('rp-domain').value.trim();
+    const backend = document.getElementById('rp-backend').value.trim();
+    const ssl = document.getElementById('rp-ssl').value;
+    const type = document.getElementById('rp-type').value;
+    if (!domain || !backend) return;
+
+    let config = '';
+    if (type === 'nginx') {
+        if (ssl === 'letsencrypt') {
+            config = `# nginx reverse proxy — ${domain}
+# Requires: certbot --nginx -d ${domain}
+
+server {
+    listen 80;
+    server_name ${domain};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${domain};
+
+    ssl_certificate     /etc/letsencrypt/live/${domain}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass ${backend};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}`;
+        } else if (ssl === 'selfsigned') {
+            config = `# nginx reverse proxy — ${domain} (self-signed)
+# Generate cert: openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
+#   -keyout /etc/ssl/private/${domain}.key \\
+#   -out /etc/ssl/certs/${domain}.crt \\
+#   -subj "/CN=${domain}"
+
+server {
+    listen 80;
+    server_name ${domain};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${domain};
+
+    ssl_certificate     /etc/ssl/certs/${domain}.crt;
+    ssl_certificate_key /etc/ssl/private/${domain}.key;
+
+    location / {
+        proxy_pass ${backend};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}`;
+        } else {
+            config = `# nginx reverse proxy — ${domain} (HTTP only)
+
+server {
+    listen 80;
+    server_name ${domain};
+
+    location / {
+        proxy_pass ${backend};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}`;
+        }
+    } else if (type === 'caddy') {
+        if (ssl === 'none') {
+            config = `# Caddyfile — ${domain} (HTTP only)
+
+http://${domain} {
+    reverse_proxy ${backend}
+}`;
+        } else if (ssl === 'selfsigned') {
+            config = `# Caddyfile — ${domain} (self-signed TLS)
+
+${domain} {
+    tls internal
+    reverse_proxy ${backend}
+}`;
+        } else {
+            config = `# Caddyfile — ${domain} (auto Let's Encrypt)
+# Caddy handles TLS automatically
+
+${domain} {
+    reverse_proxy ${backend}
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+
+    log {
+        output file /var/log/caddy/${domain}.log
+    }
+}`;
+        }
+    } else if (type === 'apache') {
+        if (ssl === 'letsencrypt') {
+            config = `# Apache reverse proxy — ${domain}
+# Requires: certbot --apache -d ${domain}
+# Enable modules: a2enmod proxy proxy_http ssl headers
+
+<VirtualHost *:80>
+    ServerName ${domain}
+    Redirect permanent / https://${domain}/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName ${domain}
+
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/${domain}/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/${domain}/privkey.pem
+
+    ProxyPreserveHost On
+    ProxyPass / ${backend}/
+    ProxyPassReverse / ${backend}/
+
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}e"
+</VirtualHost>`;
+        } else {
+            config = `# Apache reverse proxy — ${domain}
+# Enable modules: a2enmod proxy proxy_http headers
+
+<VirtualHost *:80>
+    ServerName ${domain}
+
+    ProxyPreserveHost On
+    ProxyPass / ${backend}/
+    ProxyPassReverse / ${backend}/
+
+    RequestHeader set X-Real-IP "%{REMOTE_ADDR}e"
+</VirtualHost>`;
+        }
+    }
+
+    document.getElementById('rp-config-panel').style.display = '';
+    document.getElementById('rp-config-output').textContent = config;
+}
+
+function rpCopyConfig() {
+    navigator.clipboard.writeText(document.getElementById('rp-config-output').textContent).then(() => alert('Copied!'));
+}
+
+function rpDownloadConfig() {
+    const text = document.getElementById('rp-config-output').textContent;
+    const type = document.getElementById('rp-type').value;
+    const domain = document.getElementById('rp-domain').value.trim() || 'site';
+    const ext = type === 'caddy' ? 'Caddyfile' : (type + '.conf');
+    const blob = new Blob([text], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${domain}.${ext}`;
+    a.click();
+}
+
+function rpUPnPForward(port) {
+    const el = document.getElementById('rp-upnp-status');
+    el.innerHTML = `<span style="color:var(--text-muted)">Requesting UPnP forward for port ${port}...</span>`;
+    // This would call a UPnP backend — placeholder for now
+    fetch('/api/upnp/forward', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({external_port: port, internal_port: port, protocol:'TCP'})
+    }).then(r => r.json()).then(d => {
+        el.innerHTML = d.ok ? `<span style="color:#4ade80">Port ${port} forwarded via UPnP</span>` : `<span style="color:var(--danger)">${d.error || 'UPnP not available'}</span>`;
+    }).catch(() => {
+        el.innerHTML = `<span style="color:var(--danger)">UPnP forward failed — configure manually on your router</span>`;
+    });
+}
+
+function esc(s) {
+    return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    checkDNS();
+    loadZones();
+    // Auto-detect LAN IP for reverse proxy panel
+    fetch('/dns/network-info').then(r => r.json()).then(d => {
+        const lanEl = document.getElementById('rp-lan-ip');
+        if (lanEl) lanEl.textContent = d.default_ip || '127.0.0.1';
+    }).catch(() => {});
+    rpDetectIP();
+});
+</script>
+{% endblock %}

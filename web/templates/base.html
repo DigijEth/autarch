@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AUTARCH{% endblock %}</title>
+    <!-- Critical inline CSS — prevents white flash / FOUC if external sheet delays -->
+    <style>
+        :root{--bg-primary:#0f1117;--bg-secondary:#1a1d27;--bg-card:#222536;--bg-input:#2a2d3e;--border:#333650;--text-primary:#e4e6f0;--text-secondary:#8b8fa8;--text-muted:#5c6078;--accent:#6366f1;--accent-hover:#818cf8;--danger:#ef4444;--radius:8px}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.6}
+        .layout{display:flex;min-height:100vh}
+        .sidebar{width:240px;background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;height:100vh;overflow-y:auto}
+        .content{flex:1;margin-left:240px;padding:32px;max-width:1200px}
+        .login-wrapper{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+        a{color:var(--accent);text-decoration:none}
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if session.get('user') %}
+    <div class="layout">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>AUTARCH</h2>
+                <span class="subtitle">Security Platform</span>
+            </div>
+            <div class="nav-section">
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('dashboard.index') }}" class="{% if request.endpoint == 'dashboard.index' %}active{% endif %}">Dashboard</a></li>
+                    <li><a href="{{ url_for('port_scanner.index') }}" class="{% if request.blueprint == 'port_scanner' %}active{% endif %}">&#x1F50D; Port Scanner</a></li>
+                    <li><a href="{{ url_for('targets.index') }}" class="{% if request.blueprint == 'targets' %}active{% endif %}">Investigations</a></li>
+                </ul>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Categories</div>
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('autonomy.index') }}" class="{% if request.blueprint == 'autonomy' %}active{% endif %}" style="color:var(--accent)">Autonomy</a></li>
+                    <li><a href="{{ url_for('defense.index') }}" class="{% if request.blueprint == 'defense' and request.endpoint not in ('defense.linux_index', 'defense.windows_index', 'defense.monitor_index') %}active{% endif %}">Defense</a></li>
+                    <li><a href="{{ url_for('defense.linux_index') }}" class="{% if request.endpoint == 'defense.linux_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Linux</a></li>
+                    <li><a href="{{ url_for('defense.windows_index') }}" class="{% if request.endpoint == 'defense.windows_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows</a></li>
+                    <li><a href="{{ url_for('defense.monitor_index') }}" class="{% if request.endpoint == 'defense.monitor_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Threat Monitor</a></li>
+                    <li><a href="{{ url_for('threat_intel.index') }}" class="{% if request.blueprint == 'threat_intel' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Threat Intel</a></li>
+                    <li><a href="{{ url_for('log_correlator.index') }}" class="{% if request.blueprint == 'log_correlator' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Log Correlator</a></li>
+                    <li><a href="{{ url_for('container_sec.index') }}" class="{% if request.blueprint == 'container_sec' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Container Sec</a></li>
+                    <li><a href="{{ url_for('email_sec.index') }}" class="{% if request.blueprint == 'email_sec' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Email Sec</a></li>
+                    <li><a href="{{ url_for('offense.index') }}" class="{% if request.blueprint == 'offense' %}active{% endif %}">Offense</a></li>
+                    <li><a href="{{ url_for('loadtest.index') }}" class="{% if request.blueprint == 'loadtest' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Load Test</a></li>
+                    <li><a href="{{ url_for('phishmail.index') }}" class="{% if request.blueprint == 'phishmail' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Gone Fishing</a></li>
+                    <li><a href="{{ url_for('social_eng.index') }}" class="{% if request.blueprint == 'social_eng' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Social Eng</a></li>
+                    <li><a href="{{ url_for('hack_hijack.index') }}" class="{% if request.blueprint == 'hack_hijack' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Hack Hijack</a></li>
+                    <li><a href="{{ url_for('webapp_scanner.index') }}" class="{% if request.blueprint == 'webapp_scanner' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Web Scanner</a></li>
+                    <li><a href="{{ url_for('c2_framework.index') }}" class="{% if request.blueprint == 'c2_framework' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; C2 Framework</a></li>
+                    <li><a href="{{ url_for('api_fuzzer.index') }}" class="{% if request.blueprint == 'api_fuzzer' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; API Fuzzer</a></li>
+                    <li><a href="{{ url_for('cloud_scan.index') }}" class="{% if request.blueprint == 'cloud_scan' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Cloud Scan</a></li>
+                    <li><a href="{{ url_for('vuln_scanner.index') }}" class="{% if request.blueprint == 'vuln_scanner' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Vuln Scanner</a></li>
+                    <li><a href="{{ url_for('exploit_dev.index') }}" class="{% if request.blueprint == 'exploit_dev' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Exploit Dev</a></li>
+                    <li><a href="{{ url_for('ad_audit.index') }}" class="{% if request.blueprint == 'ad_audit' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; AD Audit</a></li>
+                    <li><a href="{{ url_for('counter.index') }}" class="{% if request.blueprint == 'counter' %}active{% endif %}">Counter</a></li>
+                    <li><a href="{{ url_for('steganography.index') }}" class="{% if request.blueprint == 'steganography' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Steganography</a></li>
+                    <li><a href="{{ url_for('anti_forensics.index') }}" class="{% if request.blueprint == 'anti_forensics' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Anti-Forensics</a></li>
+                    <li><a href="{{ url_for('analyze.index') }}" class="{% if request.blueprint == 'analyze' and request.endpoint != 'analyze.hash_detection' %}active{% endif %}">Analyze</a></li>
+                    <li><a href="{{ url_for('analyze.hash_detection') }}" class="{% if request.endpoint == 'analyze.hash_detection' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Hash Toolkit</a></li>
+                    <li><a href="{{ url_for('llm_trainer.index') }}" class="{% if request.blueprint == 'llm_trainer' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Trainer</a></li>
+                    <li><a href="{{ url_for('password_toolkit.index') }}" class="{% if request.blueprint == 'password_toolkit' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Password Toolkit</a></li>
+                    <li><a href="{{ url_for('report_engine.index') }}" class="{% if request.blueprint == 'report_engine' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Reports</a></li>
+                    <li><a href="{{ url_for('ble_scanner.index') }}" class="{% if request.blueprint == 'ble_scanner' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; BLE Scanner</a></li>
+                    <li><a href="{{ url_for('forensics.index') }}" class="{% if request.blueprint == 'forensics' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Forensics</a></li>
+                    <li><a href="{{ url_for('rfid_tools.index') }}" class="{% if request.blueprint == 'rfid_tools' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; RFID/NFC</a></li>
+                    <li><a href="{{ url_for('malware_sandbox.index') }}" class="{% if request.blueprint == 'malware_sandbox' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Malware Sandbox</a></li>
+                    <li><a href="{{ url_for('reverse_eng.index') }}" class="{% if request.blueprint == 'reverse_eng' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Reverse Eng</a></li>
+                    <li><a href="{{ url_for('osint.index') }}" class="{% if request.blueprint == 'osint' %}active{% endif %}">OSINT</a></li>
+                    <li><a href="{{ url_for('ipcapture.index') }}" class="{% if request.blueprint == 'ipcapture' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; IP Capture</a></li>
+                    <li><a href="{{ url_for('simulate.index') }}" class="{% if request.blueprint == 'simulate' and request.endpoint != 'simulate.legendary_creator' %}active{% endif %}">Simulate</a></li>
+                    <li><a href="{{ url_for('simulate.legendary_creator') }}" class="{% if request.endpoint == 'simulate.legendary_creator' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Legendary Creator</a></li>
+                </ul>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Network</div>
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('network.index') }}" class="{% if request.blueprint == 'network' %}active{% endif %}">&#x1F6E1; Network Security</a></li>
+                    <li><a href="{{ url_for('wireshark.index') }}" class="{% if request.blueprint == 'wireshark' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Wireshark</a></li>
+                    <li><a href="{{ url_for('net_mapper.index') }}" class="{% if request.blueprint == 'net_mapper' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Net Mapper</a></li>
+                    <li><a href="{{ url_for('wifi_audit.index') }}" class="{% if request.blueprint == 'wifi_audit' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; WiFi Audit</a></li>
+                    <li><a href="{{ url_for('deauth.index') }}" class="{% if request.blueprint == 'deauth' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem;color:var(--danger,#f55)">&#x2514; Deauth</a></li>
+                    <li><a href="{{ url_for('pineapple.index') }}" class="{% if request.blueprint == 'pineapple' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem;color:var(--danger,#f55)">&#x2514; Evil Twin / Pineapple</a></li>
+                    <li><a href="{{ url_for('mitm_proxy.index') }}" class="{% if request.blueprint == 'mitm_proxy' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem;color:var(--danger,#f55)">&#x2514; MITM Proxy</a></li>
+                    <li><a href="{{ url_for('remote_monitor.index') }}" class="{% if request.blueprint == 'remote_monitor' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Remote Monitor</a></li>
+                </ul>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('module_creator.index') }}" class="{% if request.blueprint == 'module_creator' %}active{% endif %}" style="color:var(--accent)">&#x2795; Create Module</a></li>
+                    <li><a href="{{ url_for('encmodules.index') }}" class="{% if request.blueprint == 'encmodules' %}active{% endif %}" style="color:var(--danger,#f55)">&#x1F512; Enc Modules</a></li>
+                    <li><a href="{{ url_for('hardware.index') }}" class="{% if request.blueprint == 'hardware' %}active{% endif %}">Hardware</a></li>
+                    <li><a href="{{ url_for('android_exploit.index') }}" class="{% if request.blueprint == 'android_exploit' %}active{% endif %}">Android Exploit</a></li>
+                    <li><a href="{{ url_for('sms_forge.index') }}" class="{% if request.blueprint == 'sms_forge' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; SMS Forge</a></li>
+                    <li><a href="{{ url_for('rcs_tools.index') }}" class="{% if request.blueprint == 'rcs_tools' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; RCS Tools</a></li>
+                    <li><a href="{{ url_for('iphone_exploit.index') }}" class="{% if request.blueprint == 'iphone_exploit' %}active{% endif %}">iPhone Exploit</a></li>
+                    <li><a href="{{ url_for('android_protect.index') }}" class="{% if request.blueprint == 'android_protect' %}active{% endif %}">Shield</a></li>
+                    <li><a href="{{ url_for('revshell.index') }}" class="{% if request.blueprint == 'revshell' %}active{% endif %}">Reverse Shell</a></li>
+                    <li><a href="{{ url_for('archon.index') }}" class="{% if request.blueprint == 'archon' %}active{% endif %}">Archon</a></li>
+                    <li><a href="{{ url_for('sdr_tools.index') }}" class="{% if request.blueprint == 'sdr_tools' %}active{% endif %}">SDR/RF Tools</a></li>
+                    <li><a href="{{ url_for('starlink_hack.index') }}" class="{% if request.blueprint == 'starlink_hack' %}active{% endif %}">Starlink Hack</a></li>
+                </ul>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">System</div>
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('ssh_manager.index') }}" class="{% if request.blueprint == 'ssh_manager' %}active{% endif %}">SSH / SSHD</a></li>
+                    <li><a href="{{ url_for('upnp.index') }}" class="{% if request.blueprint == 'upnp' %}active{% endif %}">UPnP</a></li>
+                    <li><a href="{{ url_for('wireguard.index') }}" class="{% if request.blueprint == 'wireguard' %}active{% endif %}">WireGuard</a></li>
+                    <li><a href="{{ url_for('msf.index') }}" class="{% if request.blueprint == 'msf' %}active{% endif %}">MSF Console</a></li>
+                    <li><a href="{{ url_for('dns_service.index') }}" class="{% if request.blueprint == 'dns_service' and request.endpoint != 'dns_service.nameserver' %}active{% endif %}">DNS Server</a></li>
+                    <li><a href="{{ url_for('dns_service.nameserver') }}" class="{% if request.endpoint == 'dns_service.nameserver' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Nameserver</a></li>
+                    <li><a href="{{ url_for('settings.index') }}" class="{% if request.blueprint == 'settings' and request.endpoint not in ('settings.llm_settings', 'settings.deps_index') %}active{% endif %}">Settings</a></li>
+                    <li><a href="{{ url_for('settings.llm_settings') }}" class="{% if request.endpoint == 'settings.llm_settings' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; LLM Config</a></li>
+                    <li><a href="{{ url_for('settings.mcp_settings') }}" class="{% if request.endpoint == 'settings.mcp_settings' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; MCP Server</a></li>
+                    <li><a href="{{ url_for('settings.deps_index') }}" class="{% if request.endpoint == 'settings.deps_index' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Dependencies</a></li>
+                    <li><a href="{{ url_for('dashboard.manual') }}" class="{% if request.endpoint == 'dashboard.manual' %}active{% endif %}">User Manual</a></li>
+                    <li><a href="{{ url_for('dashboard.manual_windows') }}" class="{% if request.endpoint == 'dashboard.manual_windows' %}active{% endif %}" style="padding-left:1.5rem;font-size:0.85rem">&#x2514; Windows Guide</a></li>
+                </ul>
+            </div>
+            <div style="padding:6px 12px">
+                <button id="btn-reload-modules" onclick="reloadModules()" class="btn btn-small"
+                    style="width:100%;font-size:0.75rem;padding:5px 0;background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary)"
+                    title="Re-scan modules/ directory for new or changed modules">
+                    &#x21BB; Refresh Modules
+                </button>
+            </div>
+            <div class="sidebar-footer">
+                <span class="admin-name">{{ session.get('user', 'admin') }}</span>
+                <a href="{{ url_for('auth.logout') }}" class="logout-link">Logout</a>
+                <div style="margin-top:0.55rem;padding:0.4rem 0.5rem;border-top:1px solid rgba(255,255,255,0.06);
+                            font-size:0.62rem;color:#555;line-height:1.4;text-align:center">
+                    &#x1F512; RESTRICTED PUBLIC RELEASE<br>
+                    Certain features are limited or disabled.<br>
+                    Authorized use only — activity is logged.
+                </div>
+            </div>
+        </nav>
+        <main class="content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% else %}
+    <div class="login-wrapper">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% block login_content %}{% endblock %}
+    </div>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/lib/adb-bundle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/fastboot-bundle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/esptool-bundle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/hardware-direct.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+    <!-- Agent Hal Global Chat Panel -->
+    {% if session.get('user') %}
+    <div id="hal-panel" class="hal-panel" style="display:none">
+        <div class="hal-header">
+            <span>&#x25cf; Hal</span>
+            <label class="hal-mode-switch" title="Toggle Agent mode (tools) vs Direct chat">
+                <input type="checkbox" id="hal-mode-toggle" onchange="halModeChanged(this)">
+                <span class="hal-mode-slider"></span>
+                <span class="hal-mode-label" id="hal-mode-label">Chat</span>
+            </label>
+            <button onclick="halToggleFeedback()" id="hal-feedback-btn" class="hal-feedback-btn"
+                    title="Toggle auto-analysis feedback on tool results"
+                    style="font-size:0.6rem;padding:1px 5px;border-radius:3px;border:1px solid var(--accent);color:var(--accent);background:transparent;cursor:pointer">FB</button>
+            <button onclick="halToggle()" class="hal-close" title="Close">&#x2715;</button>
+        </div>
+        <div id="hal-messages" class="hal-messages"></div>
+        <div class="hal-footer">
+            <input id="hal-input" type="text" placeholder="Ask Hal..." onkeypress="if(event.key==='Enter')halSend()">
+            <button onclick="halSend()" class="btn btn-sm btn-primary" id="hal-send-btn">Send</button>
+            <button onclick="halStop()" class="btn btn-sm" id="hal-stop-btn" title="Stop generation" style="display:none;background:var(--danger,#ff3b30);color:#fff">Stop</button>
+            <button onclick="halClear()" class="btn btn-sm" title="Clear history">&#x21BA;</button>
+        </div>
+    </div>
+    <button id="hal-toggle-btn" class="hal-toggle-btn" onclick="halToggle()">HAL</button>
+
+    <!-- Debug Console Window -->
+    <div id="debug-panel" class="debug-panel" style="display:none">
+        <div class="debug-header" id="debug-drag-handle">
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                <span id="debug-live-dot" class="debug-live-dot"></span>
+                <span style="font-weight:700;letter-spacing:0.08em;font-size:0.8rem">AUTARCH DEBUG</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                <span id="debug-msg-count" style="font-size:0.7rem;color:#666;font-family:monospace">0 msgs</span>
+                <button class="debug-btn" onclick="debugClear()" title="Clear output">&#x232B;</button>
+                <button class="debug-btn" onclick="debugClose()" title="Close">&#x2715;</button>
+            </div>
+        </div>
+        <div id="debug-output" class="debug-output"></div>
+        <div class="debug-controls">
+            <span style="font-size:0.7rem;color:#555;margin-right:0.5rem;font-weight:600">FILTER:</span>
+            <label class="debug-check-label"><input type="checkbox" name="dbg-mode" value="warn"    checked onchange="debugSetMode(this)"> Warnings &amp; Errors</label>
+            <label class="debug-check-label"><input type="checkbox" name="dbg-mode" value="verbose"         onchange="debugSetMode(this)"> Full Verbose</label>
+            <label class="debug-check-label"><input type="checkbox" name="dbg-mode" value="debug"           onchange="debugSetMode(this)"> Full Debug + Symbols</label>
+            <label class="debug-check-label"><input type="checkbox" name="dbg-mode" value="output"          onchange="debugSetMode(this)"> Output Only</label>
+            <label class="debug-check-label"><input type="checkbox" name="dbg-mode" value="all"             onchange="debugSetMode(this)"> Show Everything</label>
+        </div>
+    </div>
+    <button id="debug-toggle-btn" class="debug-toggle-btn" style="display:none" onclick="debugOpen()" title="Open Debug Console">DBG</button>
+    {% endif %}
+</body>
+</html>

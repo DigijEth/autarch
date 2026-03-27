@@ -1,0 +1,930 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — SMS Forge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>SMS/MMS Backup Forge</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Create and modify SMS/MMS backup XML files (SMS Backup &amp; Restore format).
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="forge" data-tab="messages" onclick="showTab('forge','messages')">Messages <span id="msg-badge" class="badge" style="display:none">0</span></button>
+    <button class="tab" data-tab-group="forge" data-tab="conversations" onclick="showTab('forge','conversations')">Conversations</button>
+    <button class="tab" data-tab-group="forge" data-tab="importexport" onclick="showTab('forge','importexport')">Import / Export</button>
+    <button class="tab" data-tab-group="forge" data-tab="templates" onclick="showTab('forge','templates')">Templates</button>
+</div>
+
+<!-- ==================== TAB 1: MESSAGES ==================== -->
+<div class="tab-content active" data-tab-group="forge" data-tab="messages">
+<div class="section">
+    <h2>Message List</h2>
+    <div class="form-row" style="margin-bottom:12px;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group" style="min-width:150px;flex:1">
+            <label>Contact Filter</label>
+            <select id="filter-contact" onchange="forgeLoadMessages()">
+                <option value="">All contacts</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width:150px;flex:1">
+            <label>Keyword</label>
+            <input type="text" id="filter-keyword" placeholder="Search messages..." onkeydown="if(event.key==='Enter')forgeLoadMessages()">
+        </div>
+        <div class="form-group" style="min-width:130px;flex:0.7">
+            <label>Date From</label>
+            <input type="datetime-local" id="filter-date-from">
+        </div>
+        <div class="form-group" style="min-width:130px;flex:0.7">
+            <label>Date To</label>
+            <input type="datetime-local" id="filter-date-to">
+        </div>
+        <div style="display:flex;gap:6px;padding-bottom:2px">
+            <button class="btn btn-small" onclick="forgeLoadMessages()">Filter</button>
+            <button class="btn btn-small" onclick="forgeClearFilters()">Clear</button>
+        </div>
+    </div>
+
+    <!-- Chat bubble view -->
+    <div id="forge-chat" class="forge-chat-container" style="max-height:500px;overflow-y:auto;padding:12px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border);min-height:120px">
+        <div style="color:var(--text-muted);text-align:center;padding:40px 0">No messages loaded</div>
+    </div>
+
+    <div class="tool-actions" style="margin-top:12px">
+        <button class="btn btn-primary btn-small" onclick="forgeShowAddSMS()">+ Add SMS</button>
+        <button class="btn btn-small" onclick="forgeShowAddMMS()">+ Add MMS</button>
+        <button class="btn btn-small" style="margin-left:auto;color:var(--danger)" onclick="forgeClearAll()">Clear All</button>
+    </div>
+</div>
+</div>
+
+<!-- ==================== TAB 2: CONVERSATIONS ==================== -->
+<div class="tab-content" data-tab-group="forge" data-tab="conversations">
+
+<div class="section">
+    <h2>Generate from Template</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Generate a realistic conversation from a built-in or custom template.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="gen-address" placeholder="+15551234567">
+        </div>
+        <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" id="gen-contact" placeholder="John Smith">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Template</label>
+            <select id="gen-template" onchange="forgeTemplateChanged()">
+                <option value="">-- Select template --</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Start Date/Time</label>
+            <input type="datetime-local" id="gen-start">
+        </div>
+    </div>
+    <div id="gen-variables" style="margin-bottom:12px"></div>
+    <div class="tool-actions">
+        <button class="btn btn-primary" id="btn-generate" onclick="forgeGenerate()">Generate Conversation</button>
+    </div>
+    <pre class="output-panel" id="gen-output" style="display:none"></pre>
+</div>
+
+<div class="section">
+    <h2>Manual Conversation Builder</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Build a conversation message by message with custom delays.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="conv-address" placeholder="+15551234567">
+        </div>
+        <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" id="conv-contact" placeholder="Jane Doe">
+        </div>
+        <div class="form-group">
+            <label>Start Date/Time</label>
+            <input type="datetime-local" id="conv-start">
+        </div>
+    </div>
+    <div id="conv-builder-messages" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button class="btn btn-small" onclick="convAddMsg(1)">+ Received</button>
+        <button class="btn btn-small" onclick="convAddMsg(2)">+ Sent</button>
+    </div>
+    <div id="conv-preview" class="forge-chat-container" style="max-height:300px;overflow-y:auto;padding:12px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border);min-height:60px;display:none"></div>
+    <div class="tool-actions" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="convSubmit()">Add Conversation</button>
+        <button class="btn btn-small" onclick="convClear()">Clear</button>
+    </div>
+    <pre class="output-panel" id="conv-output" style="display:none"></pre>
+</div>
+
+<div class="section">
+    <h2>Bulk Contact Replace</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Old Address</label>
+            <input type="text" id="replace-old" placeholder="+15551234567">
+        </div>
+        <div class="form-group">
+            <label>New Address</label>
+            <input type="text" id="replace-new" placeholder="+15559876543">
+        </div>
+        <div class="form-group">
+            <label>New Name (optional)</label>
+            <input type="text" id="replace-name" placeholder="New Contact Name">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="forgeReplaceContact()">Replace Contact</button>
+    </div>
+    <pre class="output-panel" id="replace-output" style="display:none"></pre>
+</div>
+
+<div class="section">
+    <h2>Timestamp Shift</h2>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Address (blank = all messages)</label>
+            <input type="text" id="shift-address" placeholder="+15551234567">
+        </div>
+        <div class="form-group" style="max-width:180px">
+            <label>Offset (minutes)</label>
+            <input type="number" id="shift-offset" placeholder="60" value="0">
+        </div>
+    </div>
+    <p style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">
+        Positive = forward in time, negative = backward.
+        E.g. -1440 shifts back 1 day, 60 shifts forward 1 hour.
+    </p>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="forgeShiftTimestamps()">Shift Timestamps</button>
+    </div>
+    <pre class="output-panel" id="shift-output" style="display:none"></pre>
+</div>
+
+</div>
+
+<!-- ==================== TAB 3: IMPORT / EXPORT ==================== -->
+<div class="tab-content" data-tab-group="forge" data-tab="importexport">
+
+<div class="section">
+    <h2>Import</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Import an existing SMS Backup &amp; Restore XML file or a CSV file.
+    </p>
+    <div class="form-group">
+        <label>Upload File (XML or CSV)</label>
+        <input type="file" id="import-file" accept=".xml,.csv" style="padding:8px">
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-small" onclick="forgeValidate()">Validate XML</button>
+        <button class="btn btn-primary" onclick="forgeImport()">Import</button>
+    </div>
+    <pre class="output-panel" id="import-output" style="display:none"></pre>
+</div>
+
+<div class="section">
+    <h2>Merge Multiple Backups</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Upload multiple XML backups to merge. Duplicates are automatically removed.
+    </p>
+    <div class="form-group">
+        <label>Upload Files (multiple XML)</label>
+        <input type="file" id="merge-files" accept=".xml" multiple style="padding:8px">
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary" onclick="forgeMerge()">Merge Backups</button>
+    </div>
+    <pre class="output-panel" id="merge-output" style="display:none"></pre>
+</div>
+
+<div class="section">
+    <h2>Export</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Download the current message set as an SMS Backup &amp; Restore XML or CSV file.
+    </p>
+    <div class="form-row" style="align-items:flex-end">
+        <div class="form-group" style="max-width:200px">
+            <label>Format</label>
+            <select id="export-format">
+                <option value="xml">XML (SMS Backup &amp; Restore)</option>
+                <option value="csv">CSV</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="forgeExport()">Download Export</button>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Backup Statistics</h2>
+    <div id="stats-panel" style="color:var(--text-secondary)">
+        <em>Click Refresh to load stats.</em>
+    </div>
+    <div class="tool-actions" style="margin-top:8px">
+        <button class="btn btn-small" onclick="forgeLoadStats()">Refresh Stats</button>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== TAB 4: TEMPLATES ==================== -->
+<div class="tab-content" data-tab-group="forge" data-tab="templates">
+
+<div class="section">
+    <h2>Conversation Templates</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Built-in and custom templates for generating realistic SMS conversations.
+    </p>
+    <div id="templates-list"></div>
+</div>
+
+<div class="section">
+    <h2>Custom Template Editor</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Create a custom template in JSON format. Fields: name, description, variables (array), messages (array of {body, type, delay_minutes}).
+    </p>
+    <div class="form-group" style="max-width:300px">
+        <label>Template Key</label>
+        <input type="text" id="tmpl-key" placeholder="my_template">
+    </div>
+    <div class="form-group">
+        <label>Template JSON</label>
+        <textarea id="tmpl-json" rows="12" placeholder='{
+  "name": "My Template",
+  "description": "A custom conversation template",
+  "variables": ["contact", "topic"],
+  "messages": [
+    {"body": "Hey {contact}, want to discuss {topic}?", "type": 2, "delay_minutes": 0},
+    {"body": "Sure, what about it?", "type": 1, "delay_minutes": 5}
+  ]
+}'></textarea>
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary" onclick="forgeSaveTemplate()">Save Template</button>
+    </div>
+    <pre class="output-panel" id="tmpl-output" style="display:none"></pre>
+</div>
+
+</div>
+
+<!-- ==================== ADD SMS MODAL ==================== -->
+<div id="modal-sms" class="forge-modal" style="display:none">
+    <div class="forge-modal-content">
+        <div class="forge-modal-header">
+            <h3 id="modal-sms-title">Add SMS</h3>
+            <button onclick="forgeCloseModal('modal-sms')" style="background:none;border:none;color:var(--text-secondary);font-size:1.2rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="sms-address" placeholder="+15551234567">
+        </div>
+        <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" id="sms-contact" placeholder="John Smith">
+        </div>
+        <div class="form-group">
+            <label>Message Body</label>
+            <textarea id="sms-body" rows="4" placeholder="Enter message text..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Type</label>
+                <select id="sms-type">
+                    <option value="1">Received</option>
+                    <option value="2">Sent</option>
+                    <option value="3">Draft</option>
+                    <option value="4">Outbox</option>
+                    <option value="5">Failed</option>
+                    <option value="6">Queued</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Timestamp</label>
+                <input type="datetime-local" id="sms-timestamp">
+            </div>
+        </div>
+        <input type="hidden" id="sms-edit-index" value="">
+        <div class="tool-actions">
+            <button class="btn btn-primary" id="btn-sms-save" onclick="forgeSaveSMS()">Add SMS</button>
+            <button class="btn btn-small" onclick="forgeCloseModal('modal-sms')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== ADD MMS MODAL ==================== -->
+<div id="modal-mms" class="forge-modal" style="display:none">
+    <div class="forge-modal-content">
+        <div class="forge-modal-header">
+            <h3>Add MMS</h3>
+            <button onclick="forgeCloseModal('modal-mms')" style="background:none;border:none;color:var(--text-secondary);font-size:1.2rem;cursor:pointer">&times;</button>
+        </div>
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="mms-address" placeholder="+15551234567">
+        </div>
+        <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" id="mms-contact" placeholder="John Smith">
+        </div>
+        <div class="form-group">
+            <label>Message Body</label>
+            <textarea id="mms-body" rows="3" placeholder="Enter MMS text..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Type</label>
+                <select id="mms-type">
+                    <option value="1">Received</option>
+                    <option value="2">Sent</option>
+                    <option value="3">Draft</option>
+                    <option value="4">Outbox</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Timestamp</label>
+                <input type="datetime-local" id="mms-timestamp">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Attachment (base64 data, optional)</label>
+            <textarea id="mms-attachment-data" rows="2" placeholder="Paste base64 data or leave empty"></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Attachment Filename</label>
+                <input type="text" id="mms-attachment-name" placeholder="image.jpg">
+            </div>
+            <div class="form-group">
+                <label>Content Type</label>
+                <input type="text" id="mms-attachment-ct" placeholder="image/jpeg">
+            </div>
+        </div>
+        <div class="tool-actions">
+            <button class="btn btn-primary" onclick="forgeSaveMMS()">Add MMS</button>
+            <button class="btn btn-small" onclick="forgeCloseModal('modal-mms')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Chat Bubble Styles ─────────────────────────────────────────── */
+.forge-chat-container{display:flex;flex-direction:column;gap:6px}
+.forge-bubble{max-width:75%;padding:8px 12px;border-radius:12px;font-size:0.85rem;line-height:1.45;word-wrap:break-word;position:relative}
+.forge-bubble .bubble-meta{font-size:0.65rem;color:var(--text-muted);margin-top:4px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.forge-bubble .bubble-actions{display:none;gap:4px}
+.forge-bubble:hover .bubble-actions{display:flex}
+.forge-bubble .bubble-actions button{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.7rem;padding:1px 4px;border-radius:3px}
+.forge-bubble .bubble-actions button:hover{background:rgba(255,255,255,0.1);color:var(--text-primary)}
+.forge-bubble-received{align-self:flex-start;background:#2a2d3e;border-bottom-left-radius:4px;color:var(--text-primary)}
+.forge-bubble-sent{align-self:flex-end;background:var(--accent);border-bottom-right-radius:4px;color:#fff}
+.forge-bubble-sent .bubble-meta{color:rgba(255,255,255,0.6)}
+.forge-bubble-sent .bubble-actions button{color:rgba(255,255,255,0.5)}
+.forge-bubble-sent .bubble-actions button:hover{color:#fff;background:rgba(255,255,255,0.15)}
+.forge-bubble-mms{border:1px solid var(--border)}
+.forge-bubble-mms .mms-tag{display:inline-block;background:rgba(255,255,255,0.1);border-radius:3px;padding:0 4px;font-size:0.65rem;margin-right:4px;vertical-align:middle}
+.forge-contact-label{font-size:0.7rem;color:var(--text-muted);margin-bottom:2px;padding-left:4px}
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.forge-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center}
+.forge-modal-content{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:90%;max-width:520px;max-height:90vh;overflow-y:auto}
+.forge-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.forge-modal-header h3{margin:0;font-size:1.1rem}
+
+/* ── Template cards ─────────────────────────────────────────────── */
+.tmpl-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.tmpl-card h4{margin:0 0 4px 0;font-size:0.95rem;color:var(--text-primary)}
+.tmpl-card .tmpl-desc{font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px}
+.tmpl-card .tmpl-vars{font-size:0.75rem;color:var(--text-muted)}
+.tmpl-card .tmpl-preview{margin-top:8px;padding:8px;background:var(--bg-primary);border-radius:6px;font-size:0.78rem;color:var(--text-secondary);max-height:120px;overflow-y:auto}
+.tmpl-card .tmpl-tag{display:inline-block;background:var(--accent);color:#fff;border-radius:3px;padding:1px 6px;font-size:0.65rem;margin-left:6px;vertical-align:middle}
+.tmpl-card .tmpl-tag.custom{background:var(--danger)}
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px}
+.stat-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+.stat-card .stat-value{font-size:1.6rem;font-weight:700;color:var(--accent)}
+.stat-card .stat-label{font-size:0.75rem;color:var(--text-muted);margin-top:2px}
+
+/* ── Badge ──────────────────────────────────────────────────────── */
+.badge{background:var(--accent);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.7rem;margin-left:4px;vertical-align:middle}
+
+/* ── Conversation builder messages ──────────────────────────────── */
+.conv-msg-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;padding:6px 8px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)}
+.conv-msg-row textarea{flex:1;min-height:32px;resize:vertical;font-size:0.82rem}
+.conv-msg-row select,.conv-msg-row input[type="number"]{width:80px;font-size:0.82rem}
+.conv-msg-row button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;padding:2px 6px}
+</style>
+
+<script>
+/* ── State ──────────────────────────────────────────────────────── */
+var forgeMessages = [];
+var forgeTemplates = {};
+var convBuilderMsgs = [];
+
+/* ── Init ───────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+    forgeLoadMessages();
+    forgeLoadTemplatesList();
+    forgeLoadTemplateDropdown();
+});
+
+/* ── Message Loading ────────────────────────────────────────────── */
+function forgeLoadMessages() {
+    var params = new URLSearchParams();
+    var addr = document.getElementById('filter-contact').value;
+    var kw = document.getElementById('filter-keyword').value;
+    var df = document.getElementById('filter-date-from').value;
+    var dt = document.getElementById('filter-date-to').value;
+    if (addr) params.set('address', addr);
+    if (kw) params.set('keyword', kw);
+    if (df) params.set('date_from', String(new Date(df).getTime()));
+    if (dt) params.set('date_to', String(new Date(dt).getTime()));
+    var qs = params.toString();
+    fetchJSON('/sms-forge/messages' + (qs ? '?' + qs : '')).then(function(data) {
+        forgeMessages = data.messages || [];
+        forgeRenderChat();
+        forgeUpdateContactFilter();
+        var badge = document.getElementById('msg-badge');
+        if (badge) { badge.textContent = forgeMessages.length; badge.style.display = forgeMessages.length ? 'inline' : 'none'; }
+    });
+}
+
+function forgeClearFilters() {
+    document.getElementById('filter-contact').value = '';
+    document.getElementById('filter-keyword').value = '';
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    forgeLoadMessages();
+}
+
+function forgeUpdateContactFilter() {
+    var sel = document.getElementById('filter-contact');
+    var cur = sel.value;
+    var contacts = {};
+    forgeMessages.forEach(function(m) {
+        if (m.address && !contacts[m.address]) contacts[m.address] = m.contact_name || m.address;
+    });
+    var html = '<option value="">All contacts</option>';
+    Object.keys(contacts).sort().forEach(function(addr) {
+        var selected = addr === cur ? ' selected' : '';
+        html += '<option value="' + escapeHtml(addr) + '"' + selected + '>' + escapeHtml(contacts[addr]) + ' (' + escapeHtml(addr) + ')</option>';
+    });
+    sel.innerHTML = html;
+}
+
+/* ── Chat Rendering ─────────────────────────────────────────────── */
+function forgeRenderChat() {
+    var container = document.getElementById('forge-chat');
+    if (!forgeMessages.length) {
+        container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:40px 0">No messages loaded</div>';
+        return;
+    }
+    var html = '';
+    var lastContact = '';
+    forgeMessages.forEach(function(m, vi) {
+        var idx = (m.index !== undefined) ? m.index : vi;
+        var isSent = (m.msg_kind === 'mms') ? (m.msg_box === 2) : (m.type === 2);
+        var cls = isSent ? 'forge-bubble-sent' : 'forge-bubble-received';
+        var body = m.body || '';
+        if (m.msg_kind === 'mms' && !body) {
+            (m.parts || []).forEach(function(p) { if (p.ct === 'text/plain' && p.text !== 'null') body = p.text; });
+        }
+        var contactLabel = '';
+        if (!isSent && m.contact_name && m.contact_name !== lastContact) {
+            contactLabel = '<div class="forge-contact-label">' + escapeHtml(m.contact_name || m.address) + '</div>';
+            lastContact = m.contact_name;
+        } else if (isSent) {
+            lastContact = '';
+        }
+        var mmsTag = m.msg_kind === 'mms' ? '<span class="mms-tag">MMS</span>' : '';
+        var mmsCls = m.msg_kind === 'mms' ? ' forge-bubble-mms' : '';
+        var date = m.readable_date || '';
+        html += contactLabel;
+        html += '<div class="forge-bubble ' + cls + mmsCls + '" data-idx="' + idx + '">';
+        html += mmsTag + escapeHtml(body);
+        html += '<div class="bubble-meta"><span>' + escapeHtml(date) + '</span>';
+        html += '<span class="bubble-actions">';
+        html += '<button onclick="forgeEditMsg(' + idx + ')" title="Edit">edit</button>';
+        html += '<button onclick="forgeDeleteMsg(' + idx + ')" title="Delete">del</button>';
+        html += '</span></div></div>';
+    });
+    container.innerHTML = html;
+    container.scrollTop = container.scrollHeight;
+}
+
+/* ── Add SMS ────────────────────────────────────────────────────── */
+function forgeShowAddSMS() {
+    document.getElementById('sms-address').value = '';
+    document.getElementById('sms-contact').value = '';
+    document.getElementById('sms-body').value = '';
+    document.getElementById('sms-type').value = '1';
+    document.getElementById('sms-timestamp').value = '';
+    document.getElementById('sms-edit-index').value = '';
+    document.getElementById('modal-sms-title').textContent = 'Add SMS';
+    document.getElementById('btn-sms-save').textContent = 'Add SMS';
+    document.getElementById('modal-sms').style.display = 'flex';
+}
+
+function forgeEditMsg(idx) {
+    fetchJSON('/sms-forge/messages').then(function(data) {
+        var msg = null;
+        (data.messages || []).forEach(function(m) { if (m.index === idx) msg = m; });
+        if (!msg) return;
+        document.getElementById('sms-address').value = msg.address || '';
+        document.getElementById('sms-contact').value = msg.contact_name || '';
+        document.getElementById('sms-body').value = msg.body || '';
+        document.getElementById('sms-type').value = String(msg.type || msg.msg_box || 1);
+        if (msg.date) {
+            var d = new Date(msg.date);
+            var iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + 'T' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+            document.getElementById('sms-timestamp').value = iso;
+        }
+        document.getElementById('sms-edit-index').value = String(idx);
+        document.getElementById('modal-sms-title').textContent = 'Edit Message #' + idx;
+        document.getElementById('btn-sms-save').textContent = 'Save Changes';
+        document.getElementById('modal-sms').style.display = 'flex';
+    });
+}
+
+function forgeSaveSMS() {
+    var editIdx = document.getElementById('sms-edit-index').value;
+    var ts = document.getElementById('sms-timestamp').value;
+    var timestamp = ts ? new Date(ts).getTime() : null;
+
+    if (editIdx !== '') {
+        var payload = {};
+        payload.body = document.getElementById('sms-body').value;
+        payload.contact_name = document.getElementById('sms-contact').value;
+        if (timestamp) payload.timestamp = timestamp;
+        fetchJSON('/sms-forge/message/' + editIdx, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        }).then(function(r) {
+            forgeCloseModal('modal-sms');
+            forgeLoadMessages();
+        });
+    } else {
+        var data = {
+            address: document.getElementById('sms-address').value,
+            body: document.getElementById('sms-body').value,
+            type: parseInt(document.getElementById('sms-type').value),
+            contact_name: document.getElementById('sms-contact').value,
+        };
+        if (timestamp) data.timestamp = timestamp;
+        postJSON('/sms-forge/sms', data).then(function(r) {
+            forgeCloseModal('modal-sms');
+            forgeLoadMessages();
+        });
+    }
+}
+
+function forgeCloseModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+/* ── Add MMS ────────────────────────────────────────────────────── */
+function forgeShowAddMMS() {
+    document.getElementById('mms-address').value = '';
+    document.getElementById('mms-contact').value = '';
+    document.getElementById('mms-body').value = '';
+    document.getElementById('mms-type').value = '1';
+    document.getElementById('mms-timestamp').value = '';
+    document.getElementById('mms-attachment-data').value = '';
+    document.getElementById('mms-attachment-name').value = '';
+    document.getElementById('mms-attachment-ct').value = 'image/jpeg';
+    document.getElementById('modal-mms').style.display = 'flex';
+}
+
+function forgeSaveMMS() {
+    var ts = document.getElementById('mms-timestamp').value;
+    var timestamp = ts ? new Date(ts).getTime() : null;
+    var attachments = [];
+    var attData = document.getElementById('mms-attachment-data').value.trim();
+    var attName = document.getElementById('mms-attachment-name').value.trim();
+    var attCt = document.getElementById('mms-attachment-ct').value.trim();
+    if (attData && attName) {
+        attachments.push({data: attData, filename: attName, content_type: attCt || 'application/octet-stream'});
+    }
+    var data = {
+        address: document.getElementById('mms-address').value,
+        body: document.getElementById('mms-body').value,
+        msg_box: parseInt(document.getElementById('mms-type').value),
+        contact_name: document.getElementById('mms-contact').value,
+        attachments: attachments,
+    };
+    if (timestamp) data.timestamp = timestamp;
+    postJSON('/sms-forge/mms', data).then(function(r) {
+        forgeCloseModal('modal-mms');
+        forgeLoadMessages();
+    });
+}
+
+/* ── Delete ──────────────────────────────────────────────────────── */
+function forgeDeleteMsg(idx) {
+    if (!confirm('Delete message #' + idx + '?')) return;
+    fetchJSON('/sms-forge/message/' + idx, {method: 'DELETE'}).then(function(r) {
+        forgeLoadMessages();
+    });
+}
+
+function forgeClearAll() {
+    if (!confirm('Clear ALL messages? This cannot be undone.')) return;
+    postJSON('/sms-forge/clear', {}).then(function() {
+        forgeLoadMessages();
+    });
+}
+
+/* ── Generate from Template ─────────────────────────────────────── */
+function forgeLoadTemplateDropdown() {
+    fetchJSON('/sms-forge/templates').then(function(data) {
+        forgeTemplates = data;
+        var sel = document.getElementById('gen-template');
+        var html = '<option value="">-- Select template --</option>';
+        Object.keys(data).forEach(function(key) {
+            html += '<option value="' + escapeHtml(key) + '">' + escapeHtml(data[key].name) + '</option>';
+        });
+        sel.innerHTML = html;
+    });
+}
+
+function forgeTemplateChanged() {
+    var key = document.getElementById('gen-template').value;
+    var container = document.getElementById('gen-variables');
+    if (!key || !forgeTemplates[key]) { container.innerHTML = ''; return; }
+    var tmpl = forgeTemplates[key];
+    var vars = tmpl.variables || [];
+    if (!vars.length) { container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-muted)">No variables for this template.</p>'; return; }
+    var html = '<div class="form-row" style="flex-wrap:wrap;gap:8px">';
+    vars.forEach(function(v) {
+        html += '<div class="form-group" style="min-width:140px;flex:1"><label>' + escapeHtml(v) + '</label>';
+        html += '<input type="text" id="gen-var-' + escapeHtml(v) + '" placeholder="' + escapeHtml(v) + '"></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function forgeGenerate() {
+    var btn = document.getElementById('btn-generate');
+    setLoading(btn, true);
+    var key = document.getElementById('gen-template').value;
+    if (!key) { renderOutput('gen-output', 'Please select a template.'); document.getElementById('gen-output').style.display='block'; setLoading(btn,false); return; }
+    var tmpl = forgeTemplates[key];
+    var variables = {};
+    (tmpl.variables || []).forEach(function(v) {
+        var el = document.getElementById('gen-var-' + v);
+        if (el) variables[v] = el.value;
+    });
+    var ts = document.getElementById('gen-start').value;
+    var data = {
+        address: document.getElementById('gen-address').value,
+        contact_name: document.getElementById('gen-contact').value,
+        template: key,
+        variables: variables,
+    };
+    if (ts) data.start_timestamp = new Date(ts).getTime();
+    postJSON('/sms-forge/generate', data).then(function(r) {
+        setLoading(btn, false);
+        var out = document.getElementById('gen-output');
+        out.style.display = 'block';
+        out.textContent = r.ok ? 'Generated ' + (r.added || 0) + ' messages.' : 'Error: ' + (r.error || 'unknown');
+        forgeLoadMessages();
+    }).catch(function(e) { setLoading(btn, false); });
+}
+
+/* ── Manual Conversation Builder ────────────────────────────────── */
+function convAddMsg(type) {
+    convBuilderMsgs.push({body: '', type: type, delay_minutes: 5});
+    convRender();
+}
+
+function convRender() {
+    var container = document.getElementById('conv-builder-messages');
+    var html = '';
+    convBuilderMsgs.forEach(function(m, i) {
+        var typeLabel = m.type === 2 ? 'Sent' : 'Received';
+        html += '<div class="conv-msg-row">';
+        html += '<select onchange="convBuilderMsgs[' + i + '].type=parseInt(this.value);convRenderPreview()">';
+        html += '<option value="1"' + (m.type===1?' selected':'') + '>IN</option>';
+        html += '<option value="2"' + (m.type===2?' selected':'') + '>OUT</option></select>';
+        html += '<textarea placeholder="Message text..." oninput="convBuilderMsgs[' + i + '].body=this.value;convRenderPreview()">' + escapeHtml(m.body) + '</textarea>';
+        html += '<input type="number" value="' + m.delay_minutes + '" min="0" placeholder="min" title="Delay (minutes)" onchange="convBuilderMsgs[' + i + '].delay_minutes=parseInt(this.value)||0">';
+        html += '<button onclick="convBuilderMsgs.splice(' + i + ',1);convRender()" title="Remove">&times;</button>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+    convRenderPreview();
+}
+
+function convRenderPreview() {
+    var preview = document.getElementById('conv-preview');
+    if (!convBuilderMsgs.length) { preview.style.display = 'none'; return; }
+    preview.style.display = 'block';
+    var html = '';
+    convBuilderMsgs.forEach(function(m) {
+        if (!m.body) return;
+        var cls = m.type === 2 ? 'forge-bubble-sent' : 'forge-bubble-received';
+        html += '<div class="forge-bubble ' + cls + '">' + escapeHtml(m.body) + '</div>';
+    });
+    preview.innerHTML = html || '<div style="color:var(--text-muted);padding:12px;text-align:center">Type messages above to preview</div>';
+}
+
+function convSubmit() {
+    if (!convBuilderMsgs.length) return;
+    var ts = document.getElementById('conv-start').value;
+    var data = {
+        address: document.getElementById('conv-address').value,
+        contact_name: document.getElementById('conv-contact').value,
+        messages: convBuilderMsgs,
+    };
+    if (ts) data.start_timestamp = new Date(ts).getTime();
+    postJSON('/sms-forge/conversation', data).then(function(r) {
+        var out = document.getElementById('conv-output');
+        out.style.display = 'block';
+        out.textContent = r.ok ? 'Added ' + (r.added || 0) + ' messages.' : 'Error: ' + (r.error || 'unknown');
+        forgeLoadMessages();
+    });
+}
+
+function convClear() {
+    convBuilderMsgs = [];
+    convRender();
+    document.getElementById('conv-output').style.display = 'none';
+}
+
+/* ── Replace Contact ────────────────────────────────────────────── */
+function forgeReplaceContact() {
+    var data = {
+        old_address: document.getElementById('replace-old').value,
+        new_address: document.getElementById('replace-new').value,
+        new_name: document.getElementById('replace-name').value || null,
+    };
+    postJSON('/sms-forge/replace-contact', data).then(function(r) {
+        var out = document.getElementById('replace-output');
+        out.style.display = 'block';
+        out.textContent = r.ok ? 'Updated ' + r.updated + ' messages.' : 'Error: ' + (r.error || 'unknown');
+        forgeLoadMessages();
+    });
+}
+
+/* ── Shift Timestamps ───────────────────────────────────────────── */
+function forgeShiftTimestamps() {
+    var data = {
+        address: document.getElementById('shift-address').value || null,
+        offset_minutes: parseInt(document.getElementById('shift-offset').value) || 0,
+    };
+    postJSON('/sms-forge/shift-timestamps', data).then(function(r) {
+        var out = document.getElementById('shift-output');
+        out.style.display = 'block';
+        out.textContent = r.ok ? 'Shifted ' + r.shifted + ' messages by ' + r.offset_minutes + ' minutes.' : 'Error: ' + (r.error || 'unknown');
+        forgeLoadMessages();
+    });
+}
+
+/* ── Import / Export ────────────────────────────────────────────── */
+function forgeImport() {
+    var input = document.getElementById('import-file');
+    if (!input.files.length) { renderOutput('import-output', 'No file selected.'); document.getElementById('import-output').style.display='block'; return; }
+    var fd = new FormData();
+    fd.append('file', input.files[0]);
+    fetch('/sms-forge/import', {method: 'POST', body: fd}).then(function(r){return r.json();}).then(function(r) {
+        var out = document.getElementById('import-output');
+        out.style.display = 'block';
+        if (r.ok) {
+            out.textContent = 'Imported ' + (r.added || r.count || 0) + ' messages. Total: ' + (r.total || '?');
+        } else {
+            out.textContent = 'Error: ' + (r.error || 'unknown');
+        }
+        forgeLoadMessages();
+    });
+}
+
+function forgeValidate() {
+    var input = document.getElementById('import-file');
+    if (!input.files.length) { renderOutput('import-output', 'No file selected.'); document.getElementById('import-output').style.display='block'; return; }
+    var fd = new FormData();
+    fd.append('file', input.files[0]);
+    fetch('/sms-forge/validate', {method: 'POST', body: fd}).then(function(r){return r.json();}).then(function(r) {
+        var out = document.getElementById('import-output');
+        out.style.display = 'block';
+        if (r.valid) {
+            out.textContent = 'Valid SMS Backup & Restore XML (' + r.element_count + ' elements).';
+        } else {
+            var txt = 'Validation issues:\n';
+            (r.issues || []).forEach(function(iss) { txt += '  - ' + iss + '\n'; });
+            if (r.error) txt += '\nError: ' + r.error;
+            out.textContent = txt;
+        }
+    });
+}
+
+function forgeMerge() {
+    var input = document.getElementById('merge-files');
+    if (!input.files.length) { renderOutput('merge-output', 'No files selected.'); document.getElementById('merge-output').style.display='block'; return; }
+    var fd = new FormData();
+    for (var i = 0; i < input.files.length; i++) fd.append('files', input.files[i]);
+    fetch('/sms-forge/merge', {method: 'POST', body: fd}).then(function(r){return r.json();}).then(function(r) {
+        var out = document.getElementById('merge-output');
+        out.style.display = 'block';
+        if (r.ok) {
+            out.textContent = 'Merged: ' + r.total + ' total messages (' + r.added + ' new).';
+            if (r.errors) r.errors.forEach(function(e) { out.textContent += '\n  Warning: ' + e; });
+        } else {
+            out.textContent = 'Error: ' + (r.error || 'unknown');
+        }
+        forgeLoadMessages();
+    });
+}
+
+function forgeExport() {
+    var fmt = document.getElementById('export-format').value;
+    window.location.href = '/sms-forge/export/' + fmt;
+}
+
+/* ── Stats ──────────────────────────────────────────────────────── */
+function forgeLoadStats() {
+    fetchJSON('/sms-forge/stats').then(function(s) {
+        var html = '<div class="stats-grid">';
+        html += '<div class="stat-card"><div class="stat-value">' + s.total + '</div><div class="stat-label">Total Messages</div></div>';
+        html += '<div class="stat-card"><div class="stat-value">' + s.sms_count + '</div><div class="stat-label">SMS</div></div>';
+        html += '<div class="stat-card"><div class="stat-value">' + s.mms_count + '</div><div class="stat-label">MMS</div></div>';
+        html += '<div class="stat-card"><div class="stat-value">' + s.sent + '</div><div class="stat-label">Sent</div></div>';
+        html += '<div class="stat-card"><div class="stat-value">' + s.received + '</div><div class="stat-label">Received</div></div>';
+        html += '<div class="stat-card"><div class="stat-value">' + (s.contacts ? s.contacts.length : 0) + '</div><div class="stat-label">Contacts</div></div>';
+        html += '</div>';
+        if (s.date_range) {
+            html += '<p style="font-size:0.8rem;color:var(--text-secondary)"><strong>Date range:</strong> ' + escapeHtml(s.date_range.earliest_readable) + ' &mdash; ' + escapeHtml(s.date_range.latest_readable) + '</p>';
+        }
+        if (s.contacts && s.contacts.length) {
+            html += '<table style="width:100%;font-size:0.8rem;margin-top:8px"><thead><tr style="color:var(--text-muted)"><th style="text-align:left">Address</th><th style="text-align:left">Name</th><th style="text-align:right">Count</th></tr></thead><tbody>';
+            s.contacts.forEach(function(c) {
+                html += '<tr><td>' + escapeHtml(c.address) + '</td><td>' + escapeHtml(c.name) + '</td><td style="text-align:right">' + c.count + '</td></tr>';
+            });
+            html += '</tbody></table>';
+        }
+        document.getElementById('stats-panel').innerHTML = html;
+    });
+}
+
+/* ── Templates List (Tab 4) ─────────────────────────────────────── */
+function forgeLoadTemplatesList() {
+    fetchJSON('/sms-forge/templates').then(function(data) {
+        var container = document.getElementById('templates-list');
+        var html = '';
+        Object.keys(data).forEach(function(key) {
+            var t = data[key];
+            var tag = t.builtin ? '<span class="tmpl-tag">built-in</span>' : '<span class="tmpl-tag custom">custom</span>';
+            html += '<div class="tmpl-card">';
+            html += '<h4>' + escapeHtml(t.name) + tag + '</h4>';
+            html += '<div class="tmpl-desc">' + escapeHtml(t.description) + '</div>';
+            if (t.variables && t.variables.length) {
+                html += '<div class="tmpl-vars">Variables: ' + t.variables.map(function(v){return '<code>{'+ escapeHtml(v) +'}</code>';}).join(', ') + '</div>';
+            }
+            if (t.messages && t.messages.length) {
+                html += '<div class="tmpl-preview">';
+                t.messages.forEach(function(m) {
+                    var dir = m.type === 2 ? '&rarr;' : '&larr;';
+                    var delay = m.delay_minutes ? ' <span style="color:var(--text-muted)">(+' + m.delay_minutes + 'min)</span>' : '';
+                    html += '<div>' + dir + ' ' + escapeHtml(m.body) + delay + '</div>';
+                });
+                html += '</div>';
+            }
+            html += '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:6px">' + t.message_count + ' messages</div>';
+            html += '</div>';
+        });
+        container.innerHTML = html || '<p style="color:var(--text-muted)">No templates available.</p>';
+    });
+}
+
+function forgeSaveTemplate() {
+    var key = document.getElementById('tmpl-key').value.trim();
+    var jsonStr = document.getElementById('tmpl-json').value.trim();
+    var out = document.getElementById('tmpl-output');
+    out.style.display = 'block';
+    if (!key) { out.textContent = 'Please enter a template key.'; return; }
+    var tmpl;
+    try { tmpl = JSON.parse(jsonStr); } catch(e) { out.textContent = 'Invalid JSON: ' + e.message; return; }
+    postJSON('/sms-forge/templates/save', {key: key, template: tmpl}).then(function(r) {
+        if (r.ok) {
+            out.textContent = 'Template "' + key + '" saved. Use it in the Conversations tab.';
+            forgeLoadTemplatesList();
+            forgeLoadTemplateDropdown();
+        } else {
+            out.textContent = 'Error: ' + (r.error || 'unknown');
+        }
+    }).catch(function(e) {
+        out.textContent = 'Error saving template: ' + e.message;
+    });
+}
+</script>
+{% endblock %}

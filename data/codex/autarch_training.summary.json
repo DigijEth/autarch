@@ -1,0 +1,15 @@
+{
+  "generated": "2026-03-20T04:55:33.762570",
+  "total_pairs": 294,
+  "modules": 72,
+  "routes": 63,
+  "templates": 72,
+  "core_api": 87,
+  "output_bytes": 5335678,
+  "types": {
+    "module_creation": 72,
+    "route_creation": 63,
+    "template_creation": 72,
+    "api_reference": 87
+  }
+}

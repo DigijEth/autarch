@@ -1,0 +1,1091 @@
+{% extends "base.html" %}
+{% block title %}Gone Fishing — AUTARCH{% endblock %}
+{% block content %}
+<h1>Gone Fishing Mail Service</h1>
+<div class="card" style="background:var(--bg-input);border-left:4px solid var(--accent);padding:0.75rem 1rem;margin-bottom:1.25rem">
+    <strong>Demo Version</strong> &mdash; This is a demo of the mail module. A full version is available by request and verification of the user's intent.
+</div>
+<p style="color:var(--text-secondary);margin-bottom:1.5rem">
+    Local network phishing simulator &mdash; sender spoofing, campaigns, tracking, certificate generation.
+    <span style="color:var(--danger);font-weight:600">Local network only.</span>
+</p>
+
+<!-- Tabs -->
+<div class="tabs" style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.5rem">
+    <button class="tab-btn active" onclick="switchTab('compose',this)">Compose</button>
+    <button class="tab-btn" onclick="switchTab('campaigns',this)">Campaigns</button>
+    <button class="tab-btn" onclick="switchTab('templates',this)">Templates</button>
+    <button class="tab-btn" onclick="switchTab('landing',this)">Landing Pages</button>
+    <button class="tab-btn" onclick="switchTab('captures',this)">Captures</button>
+    <button class="tab-btn" onclick="switchTab('dkim',this)">DKIM / DNS</button>
+    <button class="tab-btn" onclick="switchTab('evasion',this)">Evasion</button>
+    <button class="tab-btn" onclick="switchTab('server',this)">Server &amp; Certs</button>
+</div>
+
+<!-- ═══════════════════ COMPOSE TAB ═══════════════════ -->
+<div id="tab-compose" class="tab-pane">
+    <div class="card" style="padding:1.25rem">
+        <h3 style="margin-bottom:1rem">Compose Email</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div>
+                <label class="form-label">From Name</label>
+                <input id="c-from-name" class="form-input" value="IT Department" placeholder="Display name">
+            </div>
+            <div>
+                <label class="form-label">From Address</label>
+                <input id="c-from-addr" class="form-input" value="it@company.local" placeholder="sender@domain">
+            </div>
+            <div style="grid-column:span 2">
+                <label class="form-label">To (comma-separated, local network only)</label>
+                <input id="c-to" class="form-input" placeholder="user@192.168.1.10, admin@mail.local">
+                <span id="c-to-status" style="font-size:0.8rem"></span>
+            </div>
+            <div style="grid-column:span 2">
+                <label class="form-label">Subject</label>
+                <input id="c-subject" class="form-input" placeholder="Email subject">
+            </div>
+        </div>
+
+        <!-- Template selector -->
+        <div style="margin:1rem 0 0.5rem">
+            <label class="form-label">Template</label>
+            <select id="c-template" class="form-input" onchange="loadTemplate(this.value)">
+                <option value="">— Custom —</option>
+            </select>
+        </div>
+
+        <!-- Body -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem">
+            <div>
+                <label class="form-label">HTML Body</label>
+                <textarea id="c-html" class="form-input" rows="10" style="font-family:monospace;font-size:0.8rem" placeholder="<html>...</html>"></textarea>
+            </div>
+            <div>
+                <label class="form-label">Preview</label>
+                <div id="c-preview" style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;min-height:200px;background:#fff;color:#333;font-size:0.85rem;overflow:auto;max-height:300px"></div>
+            </div>
+        </div>
+        <div style="margin-top:0.5rem">
+            <label class="form-label">Plain Text Fallback</label>
+            <textarea id="c-text" class="form-input" rows="3" placeholder="Plain text version (optional)"></textarea>
+        </div>
+
+        <!-- SMTP settings -->
+        <details style="margin-top:1rem">
+            <summary style="cursor:pointer;color:var(--text-secondary);font-size:0.85rem">SMTP Settings</summary>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-top:0.5rem">
+                <div>
+                    <label class="form-label">SMTP Host</label>
+                    <input id="c-smtp-host" class="form-input" value="127.0.0.1">
+                </div>
+                <div>
+                    <label class="form-label">SMTP Port</label>
+                    <input id="c-smtp-port" class="form-input" value="25" type="number">
+                </div>
+                <div>
+                    <label class="form-label">TLS</label>
+                    <select id="c-tls" class="form-input">
+                        <option value="0">No TLS</option>
+                        <option value="1">STARTTLS</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Reply-To</label>
+                    <input id="c-reply-to" class="form-input" placeholder="Same as From">
+                </div>
+                <div>
+                    <label class="form-label">X-Mailer</label>
+                    <input id="c-xmailer" class="form-input" value="Microsoft Outlook 16.0">
+                </div>
+                <div>
+                    <label class="form-label">TLS Cert CN</label>
+                    <input id="c-cert-cn" class="form-input" placeholder="For spoofed cert">
+                </div>
+            </div>
+        </details>
+
+        <div style="margin-top:1rem;display:flex;gap:0.75rem;align-items:center">
+            <button class="btn btn-primary" onclick="sendEmail()">Send Email</button>
+            <button class="btn" onclick="validateRecipients()">Validate Recipients</button>
+            <span id="c-status" style="font-size:0.85rem"></span>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ CAMPAIGNS TAB ═══════════════════ -->
+<div id="tab-campaigns" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Create Campaign -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Create Campaign</h3>
+            <label class="form-label">Campaign Name</label>
+            <input id="camp-name" class="form-input" placeholder="Q1 Security Test">
+
+            <label class="form-label" style="margin-top:0.5rem">Template</label>
+            <select id="camp-template" class="form-input"></select>
+
+            <label class="form-label" style="margin-top:0.5rem">Targets (one per line)</label>
+            <textarea id="camp-targets" class="form-input" rows="5" placeholder="user1@mail.local&#10;user2@192.168.1.10&#10;admin@intranet.lan"></textarea>
+            <div style="display:flex;gap:0.5rem;margin-top:0.35rem;align-items:center">
+                <label class="btn btn-small" style="cursor:pointer;margin:0;font-size:0.78rem">
+                    Import CSV
+                    <input type="file" accept=".csv,.txt" style="display:none" onchange="importTargetCSV(this)">
+                </label>
+                <span id="camp-import-status" style="font-size:0.78rem;color:var(--text-muted)"></span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.5rem">
+                <div>
+                    <label class="form-label">From Address</label>
+                    <input id="camp-from-addr" class="form-input" value="it@company.local">
+                </div>
+                <div>
+                    <label class="form-label">From Name</label>
+                    <input id="camp-from-name" class="form-input" value="IT Department">
+                </div>
+            </div>
+            <label class="form-label" style="margin-top:0.5rem">Subject</label>
+            <input id="camp-subject" class="form-input" placeholder="Leave blank to use template subject">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.5rem">
+                <div>
+                    <label class="form-label">SMTP Host</label>
+                    <input id="camp-smtp-host" class="form-input" value="127.0.0.1">
+                </div>
+                <div>
+                    <label class="form-label">SMTP Port</label>
+                    <input id="camp-smtp-port" class="form-input" value="25" type="number">
+                </div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:1rem;width:100%" onclick="createCampaign()">Create Campaign</button>
+        </div>
+
+        <!-- Campaign List -->
+        <div class="card" style="padding:1.25rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Campaigns</h3>
+                <button class="btn btn-small" onclick="loadCampaigns()">Refresh</button>
+            </div>
+            <div id="camp-list" style="font-size:0.85rem">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Campaign Detail (shown when viewing a campaign) -->
+    <div id="camp-detail" class="card" style="padding:1.25rem;margin-top:1.25rem;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 id="camp-detail-name">Campaign Details</h3>
+            <div style="display:flex;gap:0.5rem">
+                <a id="camp-export-link" class="btn btn-small" href="#" target="_blank">Export CSV</a>
+                <button class="btn btn-small" onclick="viewCampaign(_currentCampaign)">Refresh</button>
+            </div>
+        </div>
+        <div id="camp-detail-stats" style="display:flex;gap:1.5rem;margin:1rem 0;font-size:0.9rem"></div>
+        <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border);text-align:left">
+                    <th style="padding:6px">Email</th>
+                    <th style="padding:6px">Status</th>
+                    <th style="padding:6px">Sent</th>
+                    <th style="padding:6px">Opened</th>
+                    <th style="padding:6px">Clicked</th>
+                </tr>
+            </thead>
+            <tbody id="camp-detail-targets"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ═══════════════════ TEMPLATES TAB ═══════════════════ -->
+<div id="tab-templates" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:250px 1fr;gap:1.25rem">
+        <!-- Template list -->
+        <div class="card" style="padding:1rem">
+            <h3 style="margin-bottom:0.75rem">Templates</h3>
+            <div id="tpl-list" style="font-size:0.85rem">Loading...</div>
+            <hr style="border-color:var(--border);margin:0.75rem 0">
+            <label class="form-label">New Template Name</label>
+            <input id="tpl-new-name" class="form-input" placeholder="My Template">
+            <button class="btn btn-primary btn-small" style="margin-top:0.5rem;width:100%" onclick="createTemplate()">Create</button>
+        </div>
+
+        <!-- Template editor -->
+        <div class="card" style="padding:1rem">
+            <h3 id="tpl-editor-title" style="margin-bottom:0.75rem">Select a template</h3>
+            <label class="form-label">Subject</label>
+            <input id="tpl-subject" class="form-input" placeholder="Subject line">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem">
+                <div>
+                    <label class="form-label">HTML Body</label>
+                    <textarea id="tpl-html" class="form-input" rows="14" style="font-family:monospace;font-size:0.78rem"></textarea>
+                </div>
+                <div>
+                    <label class="form-label">Preview</label>
+                    <div id="tpl-preview" style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;min-height:280px;background:#fff;color:#333;font-size:0.85rem;overflow:auto;max-height:350px"></div>
+                </div>
+            </div>
+            <label class="form-label" style="margin-top:0.5rem">Plain Text</label>
+            <textarea id="tpl-text" class="form-input" rows="3" style="font-family:monospace;font-size:0.78rem"></textarea>
+            <div style="margin-top:0.5rem;color:var(--text-muted);font-size:0.78rem">
+                Variables: <code>{{name}}</code> <code>{{email}}</code> <code>{{company}}</code>
+                <code>{{date}}</code> <code>{{link}}</code> <code>{{tracking_pixel}}</code>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+                <button class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+                <button class="btn btn-danger" onclick="deleteTemplate()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ LANDING PAGES TAB ═══════════════════ -->
+<div id="tab-landing" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Create/Edit Landing Page -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Landing Pages</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Credential harvesting pages. When a target clicks a link and submits the form, credentials are captured and logged.
+            </p>
+
+            <label class="form-label">Built-in Templates</label>
+            <select id="lp-builtin" class="form-input" onchange="loadLPTemplate(this.value)">
+                <option value="">— Select Built-in —</option>
+                <option value="Office 365 Login">Office 365 Login</option>
+                <option value="Google Login">Google Login</option>
+                <option value="Generic Login">Generic Login</option>
+                <option value="VPN Login">VPN Login</option>
+            </select>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <label class="form-label">Page Name</label>
+            <input id="lp-name" class="form-input" placeholder="My Phishing Page">
+            <label class="form-label" style="margin-top:0.5rem">Redirect URL (after capture)</label>
+            <input id="lp-redirect" class="form-input" placeholder="https://real-login-page.com (leave blank for generic success)">
+            <label class="form-label" style="margin-top:0.5rem">HTML</label>
+            <textarea id="lp-html" class="form-input" rows="10" style="font-family:monospace;font-size:0.78rem" placeholder="Landing page HTML..."></textarea>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem">
+                Variables: <code>{{campaign_id}}</code> <code>{{target_id}}</code> <code>{{email}}</code>
+            </div>
+
+            <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+                <button class="btn btn-primary" onclick="saveLandingPage()">Save Page</button>
+                <button class="btn" onclick="previewLP()">Preview</button>
+            </div>
+            <div id="lp-status" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Existing Pages -->
+        <div class="card" style="padding:1.25rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3>Saved Pages</h3>
+                <button class="btn btn-small" onclick="loadLandingPages()">Refresh</button>
+            </div>
+            <div id="lp-list" style="font-size:0.85rem">Loading...</div>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <h4>How to Use</h4>
+            <ol style="font-size:0.82rem;color:var(--text-secondary);padding-left:1.2rem;margin-top:0.5rem">
+                <li>Create a landing page above (or use a built-in template)</li>
+                <li>In your email template, set <code>{{link}}</code> to point to:
+                    <code style="display:block;margin:0.25rem 0;padding:0.3rem;background:var(--bg-input);border-radius:3px">/phishmail/lp/PAGE_ID?c=CAMPAIGN_ID&t=TARGET_ID&e=EMAIL</code>
+                </li>
+                <li>When targets submit the form, credentials appear in the <strong>Captures</strong> tab</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ CAPTURES TAB ═══════════════════ -->
+<div id="tab-captures" class="tab-pane" style="display:none">
+    <div class="card" style="padding:1.25rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <h3>Captured Credentials</h3>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+                <select id="cap-filter-campaign" class="form-input" style="width:auto;padding:0.3rem 0.5rem;font-size:0.8rem" onchange="loadCaptures()">
+                    <option value="">All Campaigns</option>
+                </select>
+                <button class="btn btn-small" onclick="loadCaptures()">Refresh</button>
+                <a id="cap-export-link" class="btn btn-small" href="/phishmail/captures/export" target="_blank">Export CSV</a>
+                <button class="btn btn-small btn-danger" onclick="clearCaptures()">Clear All</button>
+            </div>
+        </div>
+        <div id="cap-count" style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem"></div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+                <thead>
+                    <tr style="border-bottom:2px solid var(--border);text-align:left">
+                        <th style="padding:6px">Time</th>
+                        <th style="padding:6px">Page</th>
+                        <th style="padding:6px">Target</th>
+                        <th style="padding:6px">IP</th>
+                        <th style="padding:6px">Credentials</th>
+                        <th style="padding:6px">User Agent</th>
+                    </tr>
+                </thead>
+                <tbody id="cap-table"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ DKIM / DNS TAB ═══════════════════ -->
+<div id="tab-dkim" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- DKIM Key Generation -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.75rem">DKIM Key Generation</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Generate RSA keypairs for DKIM email signing. Adds the public key as a DNS TXT record automatically if the DNS service is running.
+            </p>
+            <label class="form-label">Domain</label>
+            <input id="dkim-domain" class="form-input" placeholder="spoofed-domain.local">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="generateDKIM()">Generate DKIM Keys</button>
+            <div id="dkim-result" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <h4>DKIM Keys</h4>
+            <div id="dkim-list" style="font-size:0.82rem;margin-top:0.5rem">Loading...</div>
+        </div>
+
+        <!-- DNS Auto-Setup -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.75rem">DNS Auto-Setup</h3>
+            <div id="dns-integration-status" style="font-size:0.85rem;margin-bottom:1rem">Checking DNS service...</div>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Auto-create the zone, MX, SPF, DKIM, and DMARC records for a spoofed domain using the AUTARCH DNS service.
+            </p>
+            <label class="form-label">Domain</label>
+            <input id="dns-setup-domain" class="form-input" placeholder="spoofed-domain.com">
+            <label class="form-label" style="margin-top:0.5rem">Mail Server Hostname</label>
+            <input id="dns-setup-mx" class="form-input" placeholder="mail.spoofed-domain.com (auto if blank)">
+            <label class="form-label" style="margin-top:0.5rem">SPF Allow</label>
+            <input id="dns-setup-spf" class="form-input" value="ip4:127.0.0.1" placeholder="ip4:YOUR_IP">
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="setupDNS()">Auto-Configure DNS</button>
+            <div id="dns-setup-result" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <h4>Authentication Records Checklist</h4>
+            <div style="font-size:0.82rem;color:var(--text-secondary)">
+                <div style="padding:3px 0"><strong>MX</strong> — Mail exchange record pointing to your server</div>
+                <div style="padding:3px 0"><strong>SPF</strong> — <code>v=spf1 a mx ip4:YOUR_IP -all</code></div>
+                <div style="padding:3px 0"><strong>DKIM</strong> — Public key TXT record at <code>default._domainkey</code></div>
+                <div style="padding:3px 0"><strong>DMARC</strong> — <code>v=DMARC1; p=none;</code> at <code>_dmarc</code></div>
+                <div style="padding:3px 0"><strong>PTR</strong> — Reverse DNS for your IP (requires ISP cooperation)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ EVASION TAB ═══════════════════ -->
+<div id="tab-evasion" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- Text Evasion -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.75rem">Content Evasion</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Techniques to bypass email content filters and keyword scanners.
+            </p>
+
+            <label class="form-label">Technique</label>
+            <select id="ev-mode" class="form-input">
+                <option value="homoglyph">Unicode Homoglyphs (replaces chars with Cyrillic lookalikes)</option>
+                <option value="zero_width">Zero-Width Characters (breaks keyword matching)</option>
+                <option value="html_entity">HTML Entity Encoding (encodes chars as &#entities)</option>
+            </select>
+
+            <label class="form-label" style="margin-top:0.75rem">Input Text</label>
+            <textarea id="ev-input" class="form-input" rows="4" placeholder="Enter text to transform...">Reset your password immediately to secure your account</textarea>
+
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="previewEvasion()">Transform</button>
+
+            <label class="form-label" style="margin-top:0.75rem">Output</label>
+            <textarea id="ev-output" class="form-input" rows="4" style="font-family:monospace;font-size:0.78rem" readonly></textarea>
+            <button class="btn btn-small" style="margin-top:0.35rem" onclick="navigator.clipboard.writeText(document.getElementById('ev-output').value)">Copy</button>
+        </div>
+
+        <!-- Header Evasion -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:0.75rem">Header Evasion</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                Randomize email headers and generate spoofed Received chains.
+            </p>
+
+            <button class="btn" onclick="randomizeHeaders()">Generate Random Headers</button>
+            <div id="ev-headers" style="margin-top:0.75rem;font-family:monospace;font-size:0.8rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;display:none;white-space:pre-wrap"></div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.5rem">Spoofed Received Chain</h4>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem">
+                Generates fake Received headers to simulate legitimate mail routing.
+            </p>
+            <label class="form-label">From Domain</label>
+            <input id="ev-recv-domain" class="form-input" placeholder="company.com">
+            <label class="form-label" style="margin-top:0.5rem">Hops</label>
+            <input id="ev-recv-hops" class="form-input" type="number" value="2" min="1" max="5">
+            <button class="btn" style="margin-top:0.5rem" onclick="generateReceivedChain()">Generate Chain</button>
+            <div id="ev-recv-output" style="margin-top:0.5rem;font-family:monospace;font-size:0.78rem;display:none;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;white-space:pre-wrap"></div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.5rem">Tips</h4>
+            <ul style="font-size:0.82rem;color:var(--text-secondary);padding-left:1.2rem">
+                <li>Use homoglyphs to bypass keyword filters on "password", "urgent", "click"</li>
+                <li>Zero-width chars break pattern matching without affecting visual appearance</li>
+                <li>Randomize X-Mailer to avoid fingerprinting</li>
+                <li>Spoofed Received headers make emails look like they traversed real mail infrastructure</li>
+                <li>Use DKIM signing + SPF + DMARC to pass authentication checks</li>
+                <li>Generate certs matching the spoofed domain for STARTTLS</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════ SERVER & CERTS TAB ═══════════════════ -->
+<div id="tab-server" class="tab-pane" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <!-- SMTP Relay -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">SMTP Relay Server</h3>
+            <div id="relay-status" style="font-size:0.9rem;margin-bottom:1rem">
+                Status: <span style="color:var(--text-muted)">Checking...</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+                <div>
+                    <label class="form-label">Bind Host</label>
+                    <input id="relay-host" class="form-input" value="0.0.0.0">
+                </div>
+                <div>
+                    <label class="form-label">Port</label>
+                    <input id="relay-port" class="form-input" value="2525" type="number">
+                </div>
+            </div>
+            <div style="margin-top:0.75rem;display:flex;gap:0.5rem">
+                <button class="btn btn-primary" onclick="startRelay()">Start Relay</button>
+                <button class="btn btn-danger" onclick="stopRelay()">Stop Relay</button>
+            </div>
+
+            <hr style="border-color:var(--border);margin:1.25rem 0">
+            <h4 style="margin-bottom:0.75rem">Test SMTP Connection</h4>
+            <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:0.5rem;align-items:end">
+                <div>
+                    <label class="form-label">Host</label>
+                    <input id="test-host" class="form-input" placeholder="mail.local">
+                </div>
+                <div>
+                    <label class="form-label">Port</label>
+                    <input id="test-port" class="form-input" value="25" type="number">
+                </div>
+                <button class="btn" onclick="testSmtp()">Test</button>
+            </div>
+            <div id="test-result" style="font-size:0.82rem;margin-top:0.5rem"></div>
+        </div>
+
+        <!-- Certificate Generator -->
+        <div class="card" style="padding:1.25rem">
+            <h3 style="margin-bottom:1rem">Certificate Generator</h3>
+            <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:0.75rem">
+                Generate spoofed self-signed TLS certificates for STARTTLS.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+                <div>
+                    <label class="form-label">Common Name (CN)</label>
+                    <input id="cert-cn" class="form-input" value="mail.google.com">
+                </div>
+                <div>
+                    <label class="form-label">Organization (O)</label>
+                    <input id="cert-org" class="form-input" value="Google LLC">
+                </div>
+                <div>
+                    <label class="form-label">Org Unit (OU)</label>
+                    <input id="cert-ou" class="form-input" placeholder="Optional">
+                </div>
+                <div>
+                    <label class="form-label">Country (C)</label>
+                    <input id="cert-country" class="form-input" value="US">
+                </div>
+            </div>
+            <button class="btn btn-primary" style="margin-top:0.75rem;width:100%" onclick="generateCert()">Generate Certificate</button>
+            <div id="cert-result" style="font-size:0.82rem;margin-top:0.5rem"></div>
+
+            <hr style="border-color:var(--border);margin:1rem 0">
+            <h4>Generated Certificates</h4>
+            <div id="cert-list" style="font-size:0.82rem;margin-top:0.5rem">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn{padding:0.6rem 1.2rem;background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.9rem;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab-btn:hover{color:var(--text-primary)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.form-label{display:block;font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.25rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.form-input{width:100%;padding:0.5rem 0.65rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:0.85rem}
+.form-input:focus{outline:none;border-color:var(--accent)}
+select.form-input{cursor:pointer}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{opacity:0.85}
+.camp-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:0.5rem}
+.camp-card:hover{border-color:var(--accent)}
+.stat-pill{display:inline-block;padding:0.25rem 0.6rem;border-radius:12px;font-size:0.78rem;font-weight:600}
+.tpl-item{padding:0.5rem 0.65rem;cursor:pointer;border-radius:var(--radius);margin-bottom:2px;font-size:0.85rem}
+.tpl-item:hover{background:var(--bg-input)}
+.tpl-item.active{background:var(--accent);color:#fff}
+</style>
+
+<script>
+let _templates = {};
+let _currentTemplate = '';
+let _currentCampaign = '';
+
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = '';
+    btn.classList.add('active');
+    if (name === 'campaigns') loadCampaigns();
+    if (name === 'templates') loadTemplates();
+    if (name === 'landing') loadLandingPages();
+    if (name === 'captures') loadCaptures();
+    if (name === 'dkim') { loadDKIMKeys(); checkDNSIntegration(); }
+    if (name === 'server') { checkRelay(); loadCerts(); }
+}
+
+// ── Preview updates ──
+document.addEventListener('DOMContentLoaded', function() {
+    const htmlEl = document.getElementById('c-html');
+    if (htmlEl) htmlEl.addEventListener('input', function() {
+        document.getElementById('c-preview').innerHTML = this.value;
+    });
+    const tplHtml = document.getElementById('tpl-html');
+    if (tplHtml) tplHtml.addEventListener('input', function() {
+        document.getElementById('tpl-preview').innerHTML = this.value;
+    });
+    loadTemplateDropdowns();
+});
+
+// ── Template Dropdowns ──
+function loadTemplateDropdowns() {
+    fetch('/phishmail/templates').then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        _templates = d.templates;
+        const sel1 = document.getElementById('c-template');
+        const sel2 = document.getElementById('camp-template');
+        [sel1, sel2].forEach(sel => {
+            if (!sel) return;
+            const first = sel === sel1 ? '<option value="">— Custom —</option>' : '';
+            sel.innerHTML = first + Object.keys(d.templates).map(n =>
+                `<option value="${n}">${n}${d.templates[n].builtin ? ' (built-in)' : ''}</option>`
+            ).join('');
+        });
+    });
+}
+
+function loadTemplate(name) {
+    if (!name || !_templates[name]) return;
+    const t = _templates[name];
+    document.getElementById('c-html').value = t.html || '';
+    document.getElementById('c-text').value = t.text || '';
+    if (t.subject) document.getElementById('c-subject').value = t.subject;
+    document.getElementById('c-preview').innerHTML = t.html || '';
+}
+
+// ── Compose: Send ──
+function sendEmail() {
+    const data = {
+        from_name: document.getElementById('c-from-name').value,
+        from_addr: document.getElementById('c-from-addr').value,
+        to_addrs: document.getElementById('c-to').value,
+        subject: document.getElementById('c-subject').value,
+        html_body: document.getElementById('c-html').value,
+        text_body: document.getElementById('c-text').value,
+        smtp_host: document.getElementById('c-smtp-host').value,
+        smtp_port: parseInt(document.getElementById('c-smtp-port').value),
+        use_tls: document.getElementById('c-tls').value === '1',
+        reply_to: document.getElementById('c-reply-to').value,
+        x_mailer: document.getElementById('c-xmailer').value,
+        cert_cn: document.getElementById('c-cert-cn').value,
+    };
+    const st = document.getElementById('c-status');
+    st.textContent = 'Sending...';
+    st.style.color = 'var(--text-secondary)';
+    fetch('/phishmail/send', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            st.textContent = d.ok ? d.message : d.error;
+            st.style.color = d.ok ? '#4ade80' : 'var(--danger)';
+        }).catch(e => { st.textContent = e.message; st.style.color = 'var(--danger)'; });
+}
+
+function validateRecipients() {
+    const addrs = document.getElementById('c-to').value.split(',').map(a => a.trim()).filter(Boolean);
+    const st = document.getElementById('c-to-status');
+    if (!addrs.length) { st.textContent = 'No addresses'; return; }
+    let results = [];
+    Promise.all(addrs.map(addr =>
+        fetch('/phishmail/validate', {method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({address:addr})}).then(r => r.json()).then(d => {
+            results.push(`${addr}: ${d.ok ? '✓ Local' : '✗ ' + d.message}`);
+        })
+    )).then(() => {
+        st.innerHTML = results.map(r => r.includes('✓')
+            ? `<span style="color:#4ade80">${r}</span>`
+            : `<span style="color:var(--danger)">${r}</span>`
+        ).join('<br>');
+    });
+}
+
+// ── Campaigns ──
+function loadCampaigns() {
+    fetch('/phishmail/campaigns').then(r => r.json()).then(d => {
+        const el = document.getElementById('camp-list');
+        if (!d.ok || !d.campaigns.length) { el.textContent = 'No campaigns'; return; }
+        el.innerHTML = d.campaigns.map(c => {
+            const s = c.stats || {};
+            return `<div class="camp-card">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <strong>${c.name}</strong>
+                    <span class="stat-pill" style="background:${c.status==='sent'?'#22c55e20;color:#22c55e':'var(--bg-card);color:var(--text-secondary)'}">${c.status}</span>
+                </div>
+                <div style="margin-top:0.4rem;color:var(--text-secondary);font-size:0.8rem">
+                    Targets: ${s.total||0} &bull; Sent: ${s.sent||0} &bull; Opened: ${s.opened||0} (${s.open_rate||'0%'}) &bull; Clicked: ${s.clicked||0} (${s.click_rate||'0%'})
+                </div>
+                <div style="margin-top:0.5rem;display:flex;gap:0.4rem">
+                    <button class="btn btn-small btn-primary" onclick="executeCampaign('${c.id}')">Send</button>
+                    <button class="btn btn-small" onclick="viewCampaign('${c.id}')">View</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteCampaign('${c.id}')">Delete</button>
+                </div>
+            </div>`;
+        }).join('');
+    });
+}
+
+function createCampaign() {
+    const data = {
+        name: document.getElementById('camp-name').value,
+        template: document.getElementById('camp-template').value,
+        targets: document.getElementById('camp-targets').value,
+        from_addr: document.getElementById('camp-from-addr').value,
+        from_name: document.getElementById('camp-from-name').value,
+        subject: document.getElementById('camp-subject').value,
+        smtp_host: document.getElementById('camp-smtp-host').value,
+        smtp_port: parseInt(document.getElementById('camp-smtp-port').value),
+    };
+    fetch('/phishmail/campaigns', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            if (d.ok) { loadCampaigns(); document.getElementById('camp-name').value = ''; }
+            else alert(d.error);
+        });
+}
+
+function executeCampaign(cid) {
+    if (!confirm('Send all campaign emails now?')) return;
+    fetch(`/phishmail/campaigns/${cid}/send`, {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({base_url: window.location.origin})})
+        .then(r => r.json()).then(d => {
+            alert(d.ok ? d.message : d.error);
+            loadCampaigns();
+        });
+}
+
+function viewCampaign(cid) {
+    _currentCampaign = cid;
+    document.getElementById('camp-export-link').href = `/phishmail/campaigns/${cid}/export`;
+    fetch(`/phishmail/campaigns/${cid}`).then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        const c = d.campaign;
+        const det = document.getElementById('camp-detail');
+        det.style.display = '';
+        document.getElementById('camp-detail-name').textContent = c.name;
+        const s = c.stats || {};
+        document.getElementById('camp-detail-stats').innerHTML =
+            `<span>Total: <strong>${s.total||0}</strong></span>
+             <span>Sent: <strong>${s.sent||0}</strong></span>
+             <span style="color:#4ade80">Opened: <strong>${s.opened||0}</strong> (${s.open_rate||'0%'})</span>
+             <span style="color:var(--accent)">Clicked: <strong>${s.clicked||0}</strong> (${s.click_rate||'0%'})</span>`;
+        document.getElementById('camp-detail-targets').innerHTML = (c.targets||[]).map(t =>
+            `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:5px">${t.email}</td>
+                <td style="padding:5px"><span class="stat-pill" style="background:${t.status==='sent'?'#22c55e20;color:#22c55e':t.status==='failed'?'#ef444420;color:#ef4444':'var(--bg-card);color:var(--text-muted)'}">${t.status}</span></td>
+                <td style="padding:5px;font-size:0.78rem">${t.sent_at ? new Date(t.sent_at).toLocaleString() : '—'}</td>
+                <td style="padding:5px;font-size:0.78rem">${t.opened_at ? new Date(t.opened_at).toLocaleString() : '—'}</td>
+                <td style="padding:5px;font-size:0.78rem">${t.clicked_at ? new Date(t.clicked_at).toLocaleString() : '—'}</td>
+            </tr>`
+        ).join('');
+    });
+}
+
+function deleteCampaign(cid) {
+    if (!confirm('Delete this campaign?')) return;
+    fetch(`/phishmail/campaigns/${cid}`, {method:'DELETE'}).then(r => r.json()).then(() => loadCampaigns());
+}
+
+// ── Templates ──
+function loadTemplates() {
+    fetch('/phishmail/templates').then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        _templates = d.templates;
+        const el = document.getElementById('tpl-list');
+        el.innerHTML = Object.keys(d.templates).map(n => {
+            const t = d.templates[n];
+            return `<div class="tpl-item ${n===_currentTemplate?'active':''}" onclick="selectTemplate('${n.replace(/'/g,"\\'")}')">
+                ${n} ${t.builtin ? '<span style="opacity:0.5;font-size:0.75rem">(built-in)</span>' : ''}
+            </div>`;
+        }).join('');
+    });
+}
+
+function selectTemplate(name) {
+    _currentTemplate = name;
+    const t = _templates[name];
+    if (!t) return;
+    document.getElementById('tpl-editor-title').textContent = name;
+    document.getElementById('tpl-subject').value = t.subject || '';
+    document.getElementById('tpl-html').value = t.html || '';
+    document.getElementById('tpl-text').value = t.text || '';
+    document.getElementById('tpl-preview').innerHTML = t.html || '';
+    loadTemplates(); // refresh active highlight
+}
+
+function createTemplate() {
+    const name = document.getElementById('tpl-new-name').value.trim();
+    if (!name) return;
+    fetch('/phishmail/templates', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name, html:'', text:'', subject:''})})
+        .then(r => r.json()).then(d => {
+            if (d.ok) { loadTemplates(); loadTemplateDropdowns(); selectTemplate(name); }
+        });
+    document.getElementById('tpl-new-name').value = '';
+}
+
+function saveTemplate() {
+    if (!_currentTemplate) { alert('Select a template first'); return; }
+    const data = {
+        name: _currentTemplate,
+        subject: document.getElementById('tpl-subject').value,
+        html: document.getElementById('tpl-html').value,
+        text: document.getElementById('tpl-text').value,
+    };
+    fetch('/phishmail/templates', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            if (d.ok) { loadTemplates(); loadTemplateDropdowns(); }
+        });
+}
+
+function deleteTemplate() {
+    if (!_currentTemplate) return;
+    if (!confirm(`Delete template "${_currentTemplate}"?`)) return;
+    fetch(`/phishmail/templates/${encodeURIComponent(_currentTemplate)}`, {method:'DELETE'})
+        .then(r => r.json()).then(d => {
+            if (d.ok) { _currentTemplate = ''; loadTemplates(); loadTemplateDropdowns(); }
+            else alert(d.error);
+        });
+}
+
+// ── Server & Certs ──
+function checkRelay() {
+    fetch('/phishmail/server/status').then(r => r.json()).then(d => {
+        const el = document.getElementById('relay-status');
+        if (d.running) {
+            el.innerHTML = `Status: <span style="color:#4ade80;font-weight:600">RUNNING</span> on ${d.host}:${d.port} &bull; Received: ${d.received} messages`;
+        } else {
+            el.innerHTML = 'Status: <span style="color:var(--text-muted);font-weight:600">STOPPED</span>';
+        }
+    });
+}
+
+function startRelay() {
+    const data = {
+        host: document.getElementById('relay-host').value,
+        port: parseInt(document.getElementById('relay-port').value),
+    };
+    fetch('/phishmail/server/start', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => { checkRelay(); if (!d.ok) alert(d.error); });
+}
+
+function stopRelay() {
+    fetch('/phishmail/server/stop', {method:'POST'}).then(() => checkRelay());
+}
+
+function testSmtp() {
+    const host = document.getElementById('test-host').value;
+    const port = parseInt(document.getElementById('test-port').value);
+    const el = document.getElementById('test-result');
+    el.textContent = 'Testing...';
+    fetch('/phishmail/test', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({host, port})})
+        .then(r => r.json()).then(d => {
+            if (d.ok) {
+                el.innerHTML = `<span style="color:#4ade80">✓ ${d.message}</span>` +
+                    (d.banner ? `<br>Banner: <code>${d.banner.substring(0,200)}</code>` : '');
+            } else {
+                el.innerHTML = `<span style="color:var(--danger)">✗ ${d.error}</span>`;
+            }
+        });
+}
+
+function generateCert() {
+    const data = {
+        cn: document.getElementById('cert-cn').value,
+        org: document.getElementById('cert-org').value,
+        ou: document.getElementById('cert-ou').value,
+        country: document.getElementById('cert-country').value,
+    };
+    const el = document.getElementById('cert-result');
+    el.textContent = 'Generating...';
+    fetch('/phishmail/cert/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)})
+        .then(r => r.json()).then(d => {
+            if (d.ok) {
+                el.innerHTML = `<span style="color:#4ade80">✓ ${d.message}</span>`;
+                loadCerts();
+            } else {
+                el.innerHTML = `<span style="color:var(--danger)">✗ ${d.error}</span>`;
+            }
+        });
+}
+
+function loadCerts() {
+    fetch('/phishmail/cert/list').then(r => r.json()).then(d => {
+        const el = document.getElementById('cert-list');
+        if (!d.ok || !d.certs.length) { el.textContent = 'No certificates generated'; return; }
+        el.innerHTML = d.certs.map(c =>
+            `<div style="padding:0.35rem 0;border-bottom:1px solid var(--border)">
+                <strong>${c.name}</strong> &bull; ${c.cert} ${c.has_key ? ' + key' : ''}
+            </div>`
+        ).join('');
+    });
+}
+
+// ── CSV Import ──
+function importTargetCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        fetch('/phishmail/campaigns/import-targets', {method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({csv: reader.result})
+        }).then(r => r.json()).then(d => {
+            if (d.ok && d.emails) {
+                const ta = document.getElementById('camp-targets');
+                const existing = ta.value.trim();
+                ta.value = existing ? existing + '\n' + d.emails.join('\n') : d.emails.join('\n');
+                document.getElementById('camp-import-status').textContent = `Imported ${d.count} targets`;
+            }
+        });
+    };
+    reader.readAsText(file);
+}
+
+// ── Landing Pages ──
+function loadLandingPages() {
+    fetch('/phishmail/landing-pages').then(r => r.json()).then(d => {
+        const el = document.getElementById('lp-list');
+        if (!d.ok) { el.textContent = 'Error loading pages'; return; }
+        const pages = d.pages || {};
+        const entries = Object.entries(pages);
+        if (!entries.length) { el.textContent = 'No landing pages created'; return; }
+        el.innerHTML = entries.map(([name, page]) => {
+            const pid = page.id || name;
+            const tag = page.builtin ? '<span style="opacity:0.5;font-size:0.72rem">(built-in)</span>' : '';
+            const url = `/phishmail/lp/${encodeURIComponent(pid)}`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+                <div>
+                    <strong>${name}</strong> ${tag}
+                    <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace">${url}</div>
+                </div>
+                <div style="display:flex;gap:0.35rem">
+                    <a class="btn btn-small" href="${url}?c=preview&t=preview&e=test@example.com" target="_blank">Preview</a>
+                    ${page.builtin ? '' : `<button class="btn btn-small btn-danger" onclick="deleteLandingPage('${pid}')">Delete</button>`}
+                </div>
+            </div>`;
+        }).join('');
+    });
+}
+
+function loadLPTemplate(name) {
+    if (!name) return;
+    fetch(`/phishmail/landing-pages/${encodeURIComponent(name)}`).then(r => r.json()).then(d => {
+        if (!d.ok) return;
+        document.getElementById('lp-name').value = name + ' (custom)';
+        document.getElementById('lp-html').value = d.page.html || '';
+    });
+}
+
+function saveLandingPage() {
+    const name = document.getElementById('lp-name').value.trim();
+    const html = document.getElementById('lp-html').value;
+    const redirect_url = document.getElementById('lp-redirect').value.trim();
+    if (!name || !html) { document.getElementById('lp-status').innerHTML = '<span style="color:var(--danger)">Name and HTML required</span>'; return; }
+
+    fetch('/phishmail/landing-pages', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name, html, redirect_url})
+    }).then(r => r.json()).then(d => {
+        const el = document.getElementById('lp-status');
+        if (d.ok) {
+            el.innerHTML = `<span style="color:#4ade80">Page saved. URL: <code>/phishmail/lp/${d.id}</code></span>`;
+            loadLandingPages();
+        } else {
+            el.innerHTML = `<span style="color:var(--danger)">${d.error}</span>`;
+        }
+    });
+}
+
+function deleteLandingPage(pid) {
+    if (!confirm('Delete this landing page?')) return;
+    fetch(`/phishmail/landing-pages/${pid}`, {method:'DELETE'}).then(() => loadLandingPages());
+}
+
+function previewLP() {
+    const html = document.getElementById('lp-html').value;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+}
+
+// ── Captures ──
+function loadCaptures() {
+    const campaign = document.getElementById('cap-filter-campaign').value;
+    const params = campaign ? `?campaign=${campaign}` : '';
+    document.getElementById('cap-export-link').href = `/phishmail/captures/export${params}`;
+    fetch(`/phishmail/captures${params}`).then(r => r.json()).then(d => {
+        const captures = d.captures || [];
+        document.getElementById('cap-count').textContent = `${captures.length} captured credentials`;
+        const el = document.getElementById('cap-table');
+        if (!captures.length) {
+            el.innerHTML = '<tr><td colspan="6" style="padding:10px;color:var(--text-muted)">No captures yet</td></tr>';
+            return;
+        }
+        el.innerHTML = captures.slice().reverse().slice(0, 500).map(c => {
+            const creds = c.credentials || {};
+            const credsHtml = Object.entries(creds).map(([k, v]) =>
+                `<span style="background:var(--bg-card);padding:1px 4px;border-radius:3px;margin-right:4px"><strong>${k}:</strong> ${esc(v)}</span>`
+            ).join('');
+            const time = c.timestamp ? new Date(c.timestamp).toLocaleString() : '—';
+            const ua = (c.user_agent || '').substring(0, 50);
+            return `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:5px;font-size:0.78rem;white-space:nowrap">${time}</td>
+                <td style="padding:5px;font-size:0.78rem">${esc(c.page || '—')}</td>
+                <td style="padding:5px;font-family:monospace;font-size:0.78rem">${esc(c.target || '—')}</td>
+                <td style="padding:5px;font-family:monospace;font-size:0.78rem">${esc(c.ip || '—')}</td>
+                <td style="padding:5px;font-size:0.78rem">${credsHtml}</td>
+                <td style="padding:5px;font-size:0.72rem;color:var(--text-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis" title="${esc(c.user_agent || '')}">${esc(ua)}</td>
+            </tr>`;
+        }).join('');
+    });
+}
+
+function clearCaptures() {
+    if (!confirm('Clear all captured credentials?')) return;
+    const campaign = document.getElementById('cap-filter-campaign').value;
+    fetch(`/phishmail/captures?campaign=${campaign}`, {method:'DELETE'}).then(() => loadCaptures());
+}
+
+// ── DKIM / DNS ──
+function generateDKIM() {
+    const domain = document.getElementById('dkim-domain').value.trim();
+    if (!domain) return;
+    const el = document.getElementById('dkim-result');
+    el.innerHTML = '<span style="color:var(--text-muted)">Generating...</span>';
+    fetch('/phishmail/dkim/generate', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({domain})
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            el.innerHTML = `<span style="color:#4ade80">Keys generated for ${domain}</span>
+            <div style="margin-top:0.5rem;font-family:monospace;font-size:0.75rem;background:var(--bg-input);padding:0.5rem;border-radius:var(--radius);word-break:break-all">
+                <strong>DNS TXT Record</strong> (add at <code>default._domainkey.${domain}</code>):<br>${esc(d.dns_record)}
+            </div>`;
+            loadDKIMKeys();
+        } else {
+            el.innerHTML = `<span style="color:var(--danger)">${d.error}</span>`;
+        }
+    });
+}
+
+function loadDKIMKeys() {
+    fetch('/phishmail/dkim/keys').then(r => r.json()).then(d => {
+        const el = document.getElementById('dkim-list');
+        if (!d.ok || !d.keys?.length) { el.textContent = 'No DKIM keys generated'; return; }
+        el.innerHTML = d.keys.map(k =>
+            `<div style="padding:4px 0;border-bottom:1px solid var(--border)">
+                <strong>${k.domain}</strong> ${k.has_pub ? '(pub + priv)' : '(key only)'}
+            </div>`
+        ).join('');
+    });
+}
+
+function checkDNSIntegration() {
+    fetch('/phishmail/dns-status').then(r => r.json()).then(d => {
+        const el = document.getElementById('dns-integration-status');
+        if (d.available && d.running) {
+            el.innerHTML = '<span style="color:#4ade80;font-weight:600">DNS Service: RUNNING</span> — auto-setup available';
+        } else if (d.available) {
+            el.innerHTML = '<span style="color:var(--text-muted)">DNS Service: STOPPED</span> — start it from the DNS page';
+        } else {
+            el.innerHTML = '<span style="color:var(--danger)">DNS Service: NOT AVAILABLE</span>';
+        }
+    });
+}
+
+function setupDNS() {
+    const domain = document.getElementById('dns-setup-domain').value.trim();
+    if (!domain) return;
+    const el = document.getElementById('dns-setup-result');
+    el.innerHTML = '<span style="color:var(--text-muted)">Configuring DNS...</span>';
+    fetch('/phishmail/dns-setup', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+            domain,
+            mail_host: document.getElementById('dns-setup-mx').value.trim(),
+            spf_allow: document.getElementById('dns-setup-spf').value.trim(),
+        })
+    }).then(r => r.json()).then(d => {
+        el.innerHTML = d.ok
+            ? `<span style="color:#4ade80">${d.message || 'DNS configured for ' + domain}</span>`
+            : `<span style="color:var(--danger)">${d.error}</span>`;
+    });
+}
+
+// ── Evasion ──
+function previewEvasion() {
+    const text = document.getElementById('ev-input').value;
+    const mode = document.getElementById('ev-mode').value;
+    fetch('/phishmail/evasion/preview', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text, mode})
+    }).then(r => r.json()).then(d => {
+        document.getElementById('ev-output').value = d.result || '';
+    });
+}
+
+function randomizeHeaders() {
+    fetch('/phishmail/evasion/preview', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:'', mode:'random_headers'})
+    }).then(r => r.json()).then(d => {
+        const el = document.getElementById('ev-headers');
+        el.style.display = '';
+        const h = d.headers || {};
+        el.textContent = Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\n');
+    });
+}
+
+function generateReceivedChain() {
+    const domain = document.getElementById('ev-recv-domain').value.trim();
+    const hops = parseInt(document.getElementById('ev-recv-hops').value) || 2;
+    if (!domain) return;
+    // Client-side generation (mirrors the Python logic)
+    const servers = ['mx', 'relay', 'gateway', 'edge', 'smtp', 'mail', 'mta'];
+    const rnd = (n) => Math.floor(Math.random() * n);
+    let prev = servers[rnd(servers.length)] + '.' + domain;
+    let chain = [];
+    for (let i = 0; i < hops; i++) {
+        const next = servers[rnd(servers.length)] + (i+1) + '.' + domain;
+        const ip = `10.${rnd(255)}.${rnd(255)}.${rnd(254)+1}`;
+        const ts = new Date().toUTCString();
+        chain.push(`Received: from ${prev} (${ip}) by ${next} with ESMTPS; ${ts}`);
+        prev = next;
+    }
+    const el = document.getElementById('ev-recv-output');
+    el.style.display = '';
+    el.textContent = chain.join('\n');
+}
+
+function esc(s) {
+    return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+}
+</script>
+{% endblock %}

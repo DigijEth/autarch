@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Vulnerability Scanner{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div>
+        <h1>Vulnerability Scanner</h1>
+        <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+            Port scanning, CVE matching, default credential checking, header &amp; SSL analysis, Nuclei integration.
+        </p>
+    </div>
+    <a href="{{ url_for('offense.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Offense</a>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="vs" data-tab="scan" onclick="showTab('vs','scan')">Scan</button>
+    <button class="tab" data-tab-group="vs" data-tab="templates" onclick="showTab('vs','templates');vsLoadTemplates()">Templates</button>
+    <button class="tab" data-tab-group="vs" data-tab="results" onclick="showTab('vs','results');vsLoadScans()">Results</button>
+</div>
+
+<!-- ==================== SCAN TAB ==================== -->
+<div class="tab-content active" data-tab-group="vs" data-tab="scan">
+<div class="section">
+    <h2>New Scan</h2>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end;max-width:900px">
+        <div>
+            <div class="form-group" style="margin-bottom:0.75rem">
+                <label>Target (IP / hostname / URL)</label>
+                <input type="text" id="vs-target" class="form-control" placeholder="192.168.1.1 or example.com" onkeypress="if(event.key==='Enter')vsStartScan()">
+            </div>
+            <div style="display:flex;gap:0.75rem;align-items:end;flex-wrap:wrap">
+                <div class="form-group" style="margin:0;min-width:140px">
+                    <label>Profile</label>
+                    <select id="vs-profile" class="form-control" onchange="vsProfileChanged()">
+                        <option value="quick">Quick</option>
+                        <option value="standard" selected>Standard</option>
+                        <option value="full">Full</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;flex:1;min-width:180px">
+                    <label>Ports <span style="color:var(--text-muted);font-size:0.75rem">(optional, overrides profile)</span></label>
+                    <input type="text" id="vs-ports" class="form-control" placeholder="e.g. 1-1024,8080,8443">
+                </div>
+                <button id="vs-start-btn" class="btn btn-primary" onclick="vsStartScan()">Start Scan</button>
+            </div>
+        </div>
+        <div id="vs-profile-desc" style="font-size:0.8rem;color:var(--text-muted);max-width:220px;padding-bottom:4px">
+            Port scan + service detection + CVE matching + headers + SSL
+        </div>
+    </div>
+</div>
+
+<!-- Active Scan Progress -->
+<div id="vs-active-scan" class="section" style="display:none">
+    <h2>Active Scan</h2>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem">
+        <div style="flex:1;background:var(--bg-input);border-radius:6px;height:24px;overflow:hidden">
+            <div id="vs-progress-bar" style="height:100%;background:var(--accent);transition:width 0.3s;width:0%"></div>
+        </div>
+        <span id="vs-progress-pct" style="font-size:0.85rem;font-weight:600;min-width:40px;text-align:right">0%</span>
+    </div>
+    <div id="vs-progress-msg" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem"></div>
+
+    <!-- Severity Summary Badges -->
+    <div id="vs-severity-badges" style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+        <span class="vs-sev-badge" style="background:rgba(239,68,68,0.2);color:var(--danger)">Critical: <strong id="vs-cnt-critical">0</strong></span>
+        <span class="vs-sev-badge" style="background:rgba(230,126,34,0.2);color:#e67e22">High: <strong id="vs-cnt-high">0</strong></span>
+        <span class="vs-sev-badge" style="background:rgba(245,158,11,0.2);color:var(--warning)">Medium: <strong id="vs-cnt-medium">0</strong></span>
+        <span class="vs-sev-badge" style="background:rgba(59,130,246,0.2);color:#3b82f6">Low: <strong id="vs-cnt-low">0</strong></span>
+        <span class="vs-sev-badge" style="background:rgba(139,143,168,0.15);color:var(--text-muted)">Info: <strong id="vs-cnt-info">0</strong></span>
+    </div>
+
+    <!-- Findings Table -->
+    <div style="overflow-x:auto">
+        <table class="data-table" style="font-size:0.82rem">
+            <thead>
+                <tr>
+                    <th style="width:90px">Severity</th>
+                    <th>Finding</th>
+                    <th style="width:140px">Service</th>
+                    <th style="width:60px">Port</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="vs-findings-body"></tbody>
+        </table>
+    </div>
+    <div id="vs-no-findings" style="display:none;color:var(--text-muted);font-size:0.85rem;padding:1rem 0">
+        No findings yet...
+    </div>
+</div>
+
+<!-- Standalone Tools -->
+<div class="section" style="margin-top:1.5rem">
+    <h2>Standalone Checks</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;max-width:900px">
+        <!-- Headers Check -->
+        <div class="card">
+            <h4>Security Headers</h4>
+            <div class="form-group" style="margin-bottom:0.5rem">
+                <input type="text" id="vs-hdr-url" class="form-control" placeholder="https://example.com" onkeypress="if(event.key==='Enter')vsCheckHeaders()">
+            </div>
+            <button class="btn btn-primary btn-small" onclick="vsCheckHeaders()">Check Headers</button>
+            <div id="vs-hdr-results" style="margin-top:0.75rem;font-size:0.82rem"></div>
+        </div>
+        <!-- SSL Check -->
+        <div class="card">
+            <h4>SSL/TLS Analysis</h4>
+            <div style="display:flex;gap:0.5rem">
+                <div class="form-group" style="flex:1;margin-bottom:0.5rem">
+                    <input type="text" id="vs-ssl-host" class="form-control" placeholder="example.com" onkeypress="if(event.key==='Enter')vsCheckSSL()">
+                </div>
+                <div class="form-group" style="width:70px;margin-bottom:0.5rem">
+                    <input type="number" id="vs-ssl-port" class="form-control" value="443" min="1" max="65535">
+                </div>
+            </div>
+            <button class="btn btn-primary btn-small" onclick="vsCheckSSL()">Check SSL</button>
+            <div id="vs-ssl-results" style="margin-top:0.75rem;font-size:0.82rem"></div>
+        </div>
+        <!-- Creds Check -->
+        <div class="card">
+            <h4>Default Credentials</h4>
+            <div class="form-group" style="margin-bottom:0.5rem">
+                <input type="text" id="vs-cred-target" class="form-control" placeholder="192.168.1.1" onkeypress="if(event.key==='Enter')vsCheckCreds()">
+            </div>
+            <button class="btn btn-primary btn-small" onclick="vsCheckCreds()">Check Creds</button>
+            <div id="vs-cred-results" style="margin-top:0.75rem;font-size:0.82rem"></div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ==================== TEMPLATES TAB ==================== -->
+<div class="tab-content" data-tab-group="vs" data-tab="templates">
+<div class="section">
+    <h2>Nuclei Templates</h2>
+    <div id="vs-nuclei-status" style="margin-bottom:1rem;font-size:0.85rem"></div>
+    <div class="form-group" style="max-width:400px;margin-bottom:1rem">
+        <input type="text" id="vs-tmpl-search" class="form-control" placeholder="Search templates..." oninput="vsFilterTemplates()">
+    </div>
+    <div id="vs-templates-list" style="max-height:500px;overflow-y:auto;font-size:0.82rem"></div>
+    <div id="vs-templates-loading" style="color:var(--text-muted);font-size:0.85rem">
+        <div class="spinner-inline"></div> Loading templates...
+    </div>
+</div>
+</div>
+
+<!-- ==================== RESULTS TAB ==================== -->
+<div class="tab-content" data-tab-group="vs" data-tab="results">
+<div class="section">
+    <h2>Scan History</h2>
+    <div class="tool-actions" style="margin-bottom:1rem">
+        <button class="btn btn-primary btn-small" onclick="vsLoadScans()">Refresh</button>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="data-table" style="font-size:0.82rem">
+            <thead>
+                <tr>
+                    <th>Target</th>
+                    <th>Date</th>
+                    <th>Profile</th>
+                    <th>Status</th>
+                    <th>Findings</th>
+                    <th>Severity Breakdown</th>
+                    <th style="width:140px">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="vs-history-body"></tbody>
+        </table>
+    </div>
+    <div id="vs-no-history" style="display:none;color:var(--text-muted);font-size:0.85rem;padding:1rem 0">
+        No scans recorded yet.
+    </div>
+</div>
+
+<!-- Detailed Results Panel (shown when clicking a scan row) -->
+<div id="vs-detail-panel" class="section" style="display:none">
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem">
+        <h2 id="vs-detail-title" style="margin:0">Scan Details</h2>
+        <button class="btn btn-sm" onclick="document.getElementById('vs-detail-panel').style.display='none'">&times; Close</button>
+    </div>
+    <div id="vs-detail-summary" style="margin-bottom:1rem;font-size:0.85rem"></div>
+    <div style="overflow-x:auto">
+        <table class="data-table" style="font-size:0.82rem">
+            <thead>
+                <tr>
+                    <th style="width:90px">Severity</th>
+                    <th>Finding</th>
+                    <th style="width:100px">Type</th>
+                    <th style="width:140px">Service</th>
+                    <th style="width:60px">Port</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="vs-detail-findings"></tbody>
+        </table>
+    </div>
+    <div id="vs-detail-services" style="margin-top:1rem"></div>
+</div>
+</div>
+
+<style>
+.vs-sev-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+}
+.vs-sev-critical { background: var(--danger); color: #fff; }
+.vs-sev-high { background: #e67e22; color: #fff; }
+.vs-sev-medium { background: var(--warning); color: #000; }
+.vs-sev-low { background: #3b82f6; color: #fff; }
+.vs-sev-info { background: var(--bg-input); color: var(--text-muted); }
+.hdr-good { color: #22c55e; }
+.hdr-weak { color: #f59e0b; }
+.hdr-missing { color: var(--danger); }
+.spinner-inline {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg) } }
+.vs-tmpl-item {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: monospace;
+}
+.vs-tmpl-item:hover {
+    background: var(--bg-input);
+}
+.vs-detail-row:hover {
+    background: var(--bg-input);
+    cursor: pointer;
+}
+</style>
+
+<script>
+/* ── State ── */
+let vsActivePoll = null;
+let vsAllTemplates = [];
+
+/* ── Severity Badge Helper ── */
+function vsSevBadge(sev) {
+    sev = (sev || 'info').toLowerCase();
+    const colors = {
+        critical: 'background:var(--danger);color:#fff',
+        high: 'background:#e67e22;color:#fff',
+        medium: 'background:var(--warning);color:#000',
+        low: 'background:#3b82f6;color:#fff',
+        info: 'background:var(--bg-input);color:var(--text-muted)'
+    };
+    return '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;' +
+           (colors[sev] || colors.info) + '">' + sev.toUpperCase() + '</span>';
+}
+
+/* ── Profile description ── */
+const profileDescs = {
+    quick: 'Fast port scan + top service CVEs',
+    standard: 'Port scan + service detection + CVE matching + headers + SSL',
+    full: 'All ports + full CVE + default creds + headers + SSL + nuclei',
+    custom: 'User-defined parameters'
+};
+function vsProfileChanged() {
+    const p = document.getElementById('vs-profile').value;
+    document.getElementById('vs-profile-desc').textContent = profileDescs[p] || '';
+}
+
+/* ── Start Scan ── */
+function vsStartScan() {
+    const target = document.getElementById('vs-target').value.trim();
+    if (!target) return;
+    const profile = document.getElementById('vs-profile').value;
+    const ports = document.getElementById('vs-ports').value.trim();
+    const btn = document.getElementById('vs-start-btn');
+
+    setLoading(btn, true);
+    postJSON('/vuln-scanner/scan', { target, profile, ports })
+    .then(d => {
+        setLoading(btn, false);
+        if (!d.ok) { alert('Error: ' + (d.error || 'Unknown')); return; }
+        document.getElementById('vs-active-scan').style.display = '';
+        document.getElementById('vs-findings-body').innerHTML = '';
+        document.getElementById('vs-no-findings').style.display = '';
+        vsResetCounts();
+        vsCheckScan(d.job_id);
+    })
+    .catch(e => { setLoading(btn, false); alert('Error: ' + e.message); });
+}
+
+function vsResetCounts() {
+    ['critical','high','medium','low','info'].forEach(s => {
+        document.getElementById('vs-cnt-' + s).textContent = '0';
+    });
+}
+
+/* ── Poll Scan ── */
+function vsCheckScan(jobId) {
+    if (vsActivePoll) clearInterval(vsActivePoll);
+    vsActivePoll = setInterval(() => {
+        fetchJSON('/vuln-scanner/scan/' + jobId)
+        .then(d => {
+            if (!d.ok) { clearInterval(vsActivePoll); vsActivePoll = null; return; }
+            // Progress
+            const pct = d.progress || 0;
+            document.getElementById('vs-progress-bar').style.width = pct + '%';
+            document.getElementById('vs-progress-pct').textContent = pct + '%';
+            document.getElementById('vs-progress-msg').textContent = d.progress_message || '';
+
+            // Summary counts
+            const sum = d.summary || {};
+            ['critical','high','medium','low','info'].forEach(s => {
+                document.getElementById('vs-cnt-' + s).textContent = sum[s] || 0;
+            });
+
+            // Findings
+            const findings = d.findings || [];
+            if (findings.length > 0) {
+                document.getElementById('vs-no-findings').style.display = 'none';
+                let html = '';
+                for (const f of findings) {
+                    html += '<tr>' +
+                        '<td>' + vsSevBadge(f.severity) + '</td>' +
+                        '<td>' + esc(f.title || '') + '</td>' +
+                        '<td>' + esc(f.service || '') + '</td>' +
+                        '<td>' + (f.port || '') + '</td>' +
+                        '<td style="font-size:0.78rem;color:var(--text-secondary);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                            esc((f.description || '').substring(0, 150)) + '</td>' +
+                        '</tr>';
+                }
+                document.getElementById('vs-findings-body').innerHTML = html;
+            }
+
+            // Done?
+            if (d.status === 'complete' || d.status === 'error') {
+                clearInterval(vsActivePoll);
+                vsActivePoll = null;
+                if (d.status === 'error') {
+                    document.getElementById('vs-progress-msg').innerHTML =
+                        '<span style="color:var(--danger)">Error: ' + esc(d.error || 'Unknown') + '</span>';
+                } else {
+                    document.getElementById('vs-progress-msg').innerHTML =
+                        '<span style="color:#22c55e">Scan complete</span>';
+                }
+            }
+        })
+        .catch(() => { clearInterval(vsActivePoll); vsActivePoll = null; });
+    }, 2000);
+}
+
+/* ── Load Scans ── */
+function vsLoadScans() {
+    fetchJSON('/vuln-scanner/scans')
+    .then(d => {
+        const scans = d.scans || [];
+        const noHist = document.getElementById('vs-no-history');
+        const body = document.getElementById('vs-history-body');
+        if (!scans.length) {
+            noHist.style.display = '';
+            body.innerHTML = '';
+            return;
+        }
+        noHist.style.display = 'none';
+        let html = '';
+        for (const s of scans) {
+            const sum = s.summary || {};
+            const dateStr = s.started ? new Date(s.started).toLocaleString() : '';
+            const statusColor = s.status === 'complete' ? '#22c55e' : (s.status === 'error' ? 'var(--danger)' : 'var(--warning)');
+            const sevBreak =
+                (sum.critical ? '<span style="color:var(--danger)">' + sum.critical + 'C</span> ' : '') +
+                (sum.high ? '<span style="color:#e67e22">' + sum.high + 'H</span> ' : '') +
+                (sum.medium ? '<span style="color:var(--warning)">' + sum.medium + 'M</span> ' : '') +
+                (sum.low ? '<span style="color:#3b82f6">' + sum.low + 'L</span> ' : '') +
+                (sum.info ? '<span style="color:var(--text-muted)">' + sum.info + 'I</span>' : '');
+            html += '<tr class="vs-detail-row" onclick="vsViewScan(\'' + s.job_id + '\')">' +
+                '<td>' + esc(s.target) + '</td>' +
+                '<td style="font-size:0.78rem">' + esc(dateStr) + '</td>' +
+                '<td>' + esc(s.profile) + '</td>' +
+                '<td style="color:' + statusColor + '">' + esc(s.status) + '</td>' +
+                '<td><strong>' + (s.findings_count || 0) + '</strong></td>' +
+                '<td>' + (sevBreak || '<span style="color:var(--text-muted)">none</span>') + '</td>' +
+                '<td style="white-space:nowrap">' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();vsViewScan(\'' + s.job_id + '\')">View</button> ' +
+                    '<button class="btn btn-sm" onclick="event.stopPropagation();vsExportScan(\'' + s.job_id + '\')">Export</button> ' +
+                    '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();vsDeleteScan(\'' + s.job_id + '\')">Del</button>' +
+                '</td></tr>';
+        }
+        body.innerHTML = html;
+    });
+}
+
+/* ── View Scan Details ── */
+function vsViewScan(jobId) {
+    fetchJSON('/vuln-scanner/scan/' + jobId)
+    .then(d => {
+        if (!d.ok) return;
+        const panel = document.getElementById('vs-detail-panel');
+        panel.style.display = '';
+        document.getElementById('vs-detail-title').textContent = 'Scan: ' + (d.target || jobId);
+
+        const sum = d.summary || {};
+        let sumHtml = '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">' +
+            '<span class="vs-sev-badge" style="background:rgba(239,68,68,0.2);color:var(--danger)">Critical: <strong>' + (sum.critical || 0) + '</strong></span>' +
+            '<span class="vs-sev-badge" style="background:rgba(230,126,34,0.2);color:#e67e22">High: <strong>' + (sum.high || 0) + '</strong></span>' +
+            '<span class="vs-sev-badge" style="background:rgba(245,158,11,0.2);color:var(--warning)">Medium: <strong>' + (sum.medium || 0) + '</strong></span>' +
+            '<span class="vs-sev-badge" style="background:rgba(59,130,246,0.2);color:#3b82f6">Low: <strong>' + (sum.low || 0) + '</strong></span>' +
+            '<span class="vs-sev-badge" style="background:rgba(139,143,168,0.15);color:var(--text-muted)">Info: <strong>' + (sum.info || 0) + '</strong></span>' +
+            '</div>';
+        sumHtml += '<div>Status: <strong>' + esc(d.status || '') + '</strong> | Profile: <strong>' + esc(d.profile || '') + '</strong>';
+        if (d.completed) sumHtml += ' | Completed: ' + new Date(d.completed).toLocaleString();
+        sumHtml += '</div>';
+        document.getElementById('vs-detail-summary').innerHTML = sumHtml;
+
+        const findings = d.findings || [];
+        if (findings.length) {
+            let fhtml = '';
+            for (const f of findings) {
+                fhtml += '<tr>' +
+                    '<td>' + vsSevBadge(f.severity) + '</td>' +
+                    '<td>' + esc(f.title || '') + '</td>' +
+                    '<td>' + esc(f.type || '') + '</td>' +
+                    '<td>' + esc(f.service || '') + '</td>' +
+                    '<td>' + (f.port || '') + '</td>' +
+                    '<td style="font-size:0.78rem;color:var(--text-secondary)">' + esc((f.description || '').substring(0, 200));
+                if (f.reference) fhtml += ' <a href="' + esc(f.reference) + '" target="_blank" style="font-size:0.75rem">[ref]</a>';
+                if (f.cvss) fhtml += ' <span style="color:var(--accent);font-size:0.75rem">CVSS:' + esc(f.cvss) + '</span>';
+                fhtml += '</td></tr>';
+            }
+            document.getElementById('vs-detail-findings').innerHTML = fhtml;
+        } else {
+            document.getElementById('vs-detail-findings').innerHTML =
+                '<tr><td colspan="6" style="color:var(--text-muted);text-align:center">No findings</td></tr>';
+        }
+
+        // Services discovered
+        const services = d.services || [];
+        if (services.length) {
+            let shtml = '<h3 style="margin-top:0.5rem">Discovered Services</h3>' +
+                '<table class="data-table" style="font-size:0.82rem"><thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Version</th></tr></thead><tbody>';
+            for (const s of services) {
+                shtml += '<tr><td>' + s.port + '</td><td>' + esc(s.protocol || 'tcp') + '</td>' +
+                    '<td>' + esc(s.service || '') + '</td><td>' + esc(s.version || '') + '</td></tr>';
+            }
+            shtml += '</tbody></table>';
+            document.getElementById('vs-detail-services').innerHTML = shtml;
+        } else {
+            document.getElementById('vs-detail-services').innerHTML = '';
+        }
+
+        panel.scrollIntoView({ behavior: 'smooth' });
+    });
+}
+
+/* ── Delete Scan ── */
+function vsDeleteScan(jobId) {
+    if (!confirm('Delete this scan?')) return;
+    fetch('/vuln-scanner/scan/' + jobId, { method: 'DELETE' })
+    .then(r => r.json())
+    .then(() => {
+        vsLoadScans();
+        document.getElementById('vs-detail-panel').style.display = 'none';
+    });
+}
+
+/* ── Export Scan ── */
+function vsExportScan(jobId) {
+    window.open('/vuln-scanner/scan/' + jobId + '/export?format=json', '_blank');
+}
+
+/* ── Check Headers ── */
+function vsCheckHeaders() {
+    const url = document.getElementById('vs-hdr-url').value.trim();
+    if (!url) return;
+    const div = document.getElementById('vs-hdr-results');
+    div.innerHTML = '<div class="spinner-inline"></div> Checking...';
+
+    postJSON('/vuln-scanner/headers', { url })
+    .then(d => {
+        if (!d.ok) { div.innerHTML = '<span style="color:var(--danger)">Error: ' + esc(d.error || 'Unknown') + '</span>'; return; }
+        let html = '<div style="margin-bottom:0.5rem">Score: <strong>' + (d.score || 0) + '%</strong>';
+        if (d.server) html += ' | Server: <strong>' + esc(d.server) + '</strong>';
+        html += '</div>';
+        const headers = d.headers || {};
+        for (const [hdr, info] of Object.entries(headers)) {
+            const cls = 'hdr-' + info.rating;
+            const icon = info.present ? '&#10003;' : '&#10007;';
+            html += '<div style="padding:2px 0"><span class="' + cls + '">' + icon + '</span> ' + esc(hdr);
+            if (info.value) html += ' <span style="color:var(--text-muted);font-size:0.75rem">' + esc(info.value).substring(0, 60) + '</span>';
+            html += '</div>';
+        }
+        div.innerHTML = html;
+    })
+    .catch(e => { div.innerHTML = '<span style="color:var(--danger)">' + e.message + '</span>'; });
+}
+
+/* ── Check SSL ── */
+function vsCheckSSL() {
+    const host = document.getElementById('vs-ssl-host').value.trim();
+    if (!host) return;
+    const port = parseInt(document.getElementById('vs-ssl-port').value) || 443;
+    const div = document.getElementById('vs-ssl-results');
+    div.innerHTML = '<div class="spinner-inline"></div> Checking...';
+
+    postJSON('/vuln-scanner/ssl', { host, port })
+    .then(d => {
+        if (!d.ok || d.error) {
+            div.innerHTML = '<span style="color:var(--danger)">Error: ' + esc(d.error || 'Unknown') + '</span>';
+            return;
+        }
+        let html = '<div>Valid: <strong class="' + (d.valid ? 'hdr-good' : 'hdr-missing') + '">' + (d.valid ? 'Yes' : 'No') + '</strong></div>';
+        html += '<div>Protocol: ' + esc(d.protocol || '?') + '</div>';
+        html += '<div>Cipher: ' + esc(d.cipher || '?') + '</div>';
+        if (d.key_size) html += '<div>Key size: ' + d.key_size + ' bits</div>';
+        if (d.expires) html += '<div>Expires: ' + esc(d.expires) + '</div>';
+        if (d.issuer && typeof d.issuer === 'object') {
+            html += '<div>Issuer: ' + esc(d.issuer.organizationName || d.issuer.commonName || JSON.stringify(d.issuer)) + '</div>';
+        }
+        const issues = d.issues || [];
+        for (const issue of issues) {
+            html += '<div class="hdr-missing">[!] ' + esc(issue) + '</div>';
+        }
+        const weak = d.weak_ciphers || [];
+        for (const wc of weak) {
+            html += '<div class="hdr-missing">[!] Weak cipher: ' + esc(wc) + '</div>';
+        }
+        if (!issues.length && !weak.length && d.valid) {
+            html += '<div class="hdr-good" style="margin-top:4px">No issues detected</div>';
+        }
+        div.innerHTML = html;
+    })
+    .catch(e => { div.innerHTML = '<span style="color:var(--danger)">' + e.message + '</span>'; });
+}
+
+/* ── Check Creds ── */
+function vsCheckCreds() {
+    const target = document.getElementById('vs-cred-target').value.trim();
+    if (!target) return;
+    const div = document.getElementById('vs-cred-results');
+    div.innerHTML = '<div class="spinner-inline"></div> Scanning ports & testing credentials...';
+
+    postJSON('/vuln-scanner/creds', { target })
+    .then(d => {
+        if (!d.ok) { div.innerHTML = '<span style="color:var(--danger)">Error: ' + esc(d.error || 'Unknown') + '</span>'; return; }
+        const found = d.found || [];
+        let html = '<div style="margin-bottom:0.5rem">' + (d.services_checked || 0) + ' services checked</div>';
+        if (found.length) {
+            for (const c of found) {
+                html += '<div style="color:var(--danger);padding:2px 0">[!] ' + esc(c.service) + ': <strong>' +
+                    esc(c.username) + ':' + esc(c.password) + '</strong></div>';
+            }
+        } else {
+            html += '<div class="hdr-good">No default credentials found</div>';
+        }
+        div.innerHTML = html;
+    })
+    .catch(e => { div.innerHTML = '<span style="color:var(--danger)">' + e.message + '</span>'; });
+}
+
+/* ── Load Templates ── */
+function vsLoadTemplates() {
+    const list = document.getElementById('vs-templates-list');
+    const loading = document.getElementById('vs-templates-loading');
+    const status = document.getElementById('vs-nuclei-status');
+    loading.style.display = '';
+    list.innerHTML = '';
+
+    fetchJSON('/vuln-scanner/templates')
+    .then(d => {
+        loading.style.display = 'none';
+        if (d.installed) {
+            status.innerHTML = '<span class="hdr-good">&#10003; Nuclei installed</span>' +
+                ' <span style="color:var(--text-muted)">(' + esc(d.nuclei_path) + ')</span>';
+        } else {
+            status.innerHTML = '<span class="hdr-missing">&#10007; Nuclei not installed</span>' +
+                ' <span style="color:var(--text-muted)">Install: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest</span>';
+        }
+
+        vsAllTemplates = d.templates || [];
+        const cats = d.categories || [];
+
+        if (cats.length) {
+            let catHtml = '<div style="margin-bottom:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap">';
+            for (const cat of cats) {
+                const count = vsAllTemplates.filter(t => t.startsWith(cat + '/')).length;
+                catHtml += '<span class="vs-sev-badge" style="background:var(--bg-input);color:var(--accent);cursor:pointer" ' +
+                    'onclick="document.getElementById(\'vs-tmpl-search\').value=\'' + cat + '/\';vsFilterTemplates()">' +
+                    esc(cat) + ' (' + count + ')</span>';
+            }
+            catHtml += '</div>';
+            list.innerHTML = catHtml;
+        }
+
+        vsRenderTemplates(vsAllTemplates.slice(0, 200));
+    })
+    .catch(() => { loading.style.display = 'none'; });
+}
+
+function vsFilterTemplates() {
+    const q = document.getElementById('vs-tmpl-search').value.trim().toLowerCase();
+    const filtered = q ? vsAllTemplates.filter(t => t.toLowerCase().includes(q)) : vsAllTemplates;
+    vsRenderTemplates(filtered.slice(0, 200));
+}
+
+function vsRenderTemplates(templates) {
+    const container = document.getElementById('vs-templates-list');
+    // Preserve category badges if they exist
+    const badges = container.querySelector('div');
+    let html = badges ? badges.outerHTML : '';
+    if (templates.length) {
+        html += '<div style="margin-bottom:0.5rem;color:var(--text-muted)">Showing ' + templates.length +
+            (templates.length >= 200 ? '+ (use search to filter)' : '') + ' templates</div>';
+        for (const t of templates) {
+            html += '<div class="vs-tmpl-item">' + esc(t) + '</div>';
+        }
+    } else {
+        html += '<div style="color:var(--text-muted)">No templates found</div>';
+    }
+    container.innerHTML = html;
+}
+
+/* ── Helpers (use global esc, postJSON, fetchJSON, setLoading, showTab) ── */
+</script>
+{% endblock %}

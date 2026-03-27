@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Autarch BBS</title>
+    <link rel="stylesheet" href="terminal.css">
+</head>
+<body>
+    <div id="terminal">
+        <div id="header">
+            <pre id="banner">
+ ╔══════════════════════════════════════╗
+ ║         AUTARCH BBS v1.0            ║
+ ║    Secured by Veilid Protocol       ║
+ ╚══════════════════════════════════════╝
+            </pre>
+        </div>
+        <div id="output"></div>
+        <div id="input-line">
+            <span class="prompt">&gt;</span>
+            <input type="text" id="cmd-input" autocomplete="off" autocorrect="off"
+                   autocapitalize="off" spellcheck="false" autofocus>
+        </div>
+    </div>
+    <script src="veilid-bridge.js"></script>
+</body>
+</html>

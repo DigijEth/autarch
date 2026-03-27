@@ -1,0 +1,21 @@
+[Unit]
+Description=AUTARCH Privileged Daemon
+Documentation=file:///home/snake/autarch/GUIDE.md
+Before=autarch-web.service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/home/snake/autarch/venv/bin/python /home/snake/autarch/core/daemon.py
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=3
+PIDFile=/var/run/autarch-daemon.pid
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autarch-daemon
+
+[Install]
+WantedBy=multi-user.target

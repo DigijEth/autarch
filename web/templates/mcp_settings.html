@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% block title %}MCP Server - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <h1>MCP Server</h1>
+    <a href="{{ url_for('settings.index') }}" class="btn btn-sm" style="margin-left:auto">&larr; Back to Settings</a>
+</div>
+
+<div class="section">
+    <h2>Model Context Protocol</h2>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+        The <a href="https://modelcontextprotocol.io/docs/getting-started/intro" target="_blank" rel="noopener">Model Context Protocol (MCP)</a>
+        lets AI assistants like Claude Desktop, Claude Code, and other MCP-compatible clients use AUTARCH's security tools directly.
+        When connected, Claude can run nmap scans, look up IPs, capture packets, manage devices, and more &mdash; all through natural conversation.
+    </p>
+
+    <!-- ── Section 1: Server Control ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Server Control</h3>
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem">
+            <button class="btn btn-primary btn-sm" onclick="mcpStart()" id="btn-mcp-start">Start MCP Server</button>
+            <button class="btn btn-sm" onclick="mcpStop()" id="btn-mcp-stop">Stop</button>
+            <div id="mcp-status-dot" style="width:10px;height:10px;border-radius:50%;background:var(--text-muted);flex-shrink:0"></div>
+            <span id="mcp-status-text" style="font-size:0.82rem;color:var(--text-secondary)">Checking...</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;font-size:0.82rem;margin-bottom:0.5rem">
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                <input type="checkbox" id="mcp-auto-start" {{ 'checked' if mcp.auto_start == 'true' }}>
+                Auto-start on launch
+            </label>
+            <span style="color:var(--text-muted)">Transport: <strong id="mcp-transport-display">{{ mcp.transport }}</strong></span>
+        </div>
+        <p style="font-size:0.75rem;color:var(--text-muted);margin:0">
+            SSE endpoint: <code>http://{{ request.host.split(':')[0] }}:{{ mcp.port }}/sse</code>
+        </p>
+    </div>
+
+    <!-- ── Section 2: Transport & Network ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Transport &amp; Network Settings</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;font-size:0.82rem">
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Transport</label>
+                <select id="mcp-transport" style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem">
+                    <option value="sse" {{ 'selected' if mcp.transport == 'sse' }}>SSE (HTTP)</option>
+                    <option value="stdio" {{ 'selected' if mcp.transport == 'stdio' }}>stdio (CLI only)</option>
+                </select>
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Host</label>
+                <input type="text" id="mcp-host" value="{{ mcp.host }}" placeholder="0.0.0.0"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Port</label>
+                <input type="number" id="mcp-port" value="{{ mcp.port }}" placeholder="8081"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">CORS Origins</label>
+                <input type="text" id="mcp-cors-origins" value="{{ mcp.cors_origins }}" placeholder="*"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Section 3: Security ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Security</h3>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.82rem">
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                <input type="checkbox" id="mcp-auth-enabled" {{ 'checked' if mcp.auth_enabled == 'true' }}>
+                Enable authentication
+            </label>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Auth Token</label>
+                <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                    <input type="password" id="mcp-auth-token" value="{{ mcp.auth_token }}" readonly
+                           style="flex:1;min-width:200px;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;font-family:monospace">
+                    <button class="btn btn-sm" onclick="mcpToggleToken()" id="btn-toggle-token" style="font-size:0.75rem">Show</button>
+                    <button class="btn btn-sm" onclick="mcpGenerateToken()" style="font-size:0.75rem">Generate New Token</button>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem">
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Rate Limit</label>
+                    <input type="text" id="mcp-rate-limit" value="{{ mcp.rate_limit }}" placeholder="100/hour"
+                           style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+                </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">
+                <input type="checkbox" id="mcp-mask-errors" {{ 'checked' if mcp.mask_errors == 'true' }}>
+                Mask error details in responses
+            </label>
+            <div style="border-top:1px solid var(--border);padding-top:0.75rem;margin-top:0.25rem">
+                <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin-bottom:0.5rem">
+                    <input type="checkbox" id="mcp-ssl-enabled" {{ 'checked' if mcp.ssl_enabled == 'true' }}>
+                    Enable SSL / TLS
+                </label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.75rem">
+                    <div>
+                        <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">SSL Certificate Path</label>
+                        <input type="text" id="mcp-ssl-cert" value="{{ mcp.ssl_cert }}" placeholder="/path/to/cert.pem"
+                               style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+                    </div>
+                    <div>
+                        <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">SSL Key Path</label>
+                        <input type="text" id="mcp-ssl-key" value="{{ mcp.ssl_key }}" placeholder="/path/to/key.pem"
+                               style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Section 4: Tool Management ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Tool Management</h3>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.75rem">
+            Enable or disable individual MCP tools. Disabled tools will not be exposed to connected clients.
+        </p>
+        <div id="mcp-tools-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.5rem;font-size:0.82rem">
+        </div>
+    </div>
+
+    <!-- ── Section 5: Tool Timeouts ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Tool Timeouts</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;font-size:0.82rem">
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">nmap timeout (s)</label>
+                <input type="number" id="mcp-nmap-timeout" value="{{ mcp.nmap_timeout }}" placeholder="120"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">tcpdump timeout (s)</label>
+                <input type="number" id="mcp-tcpdump-timeout" value="{{ mcp.tcpdump_timeout }}" placeholder="30"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">whois timeout (s)</label>
+                <input type="number" id="mcp-whois-timeout" value="{{ mcp.whois_timeout }}" placeholder="15"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">DNS timeout (s)</label>
+                <input type="number" id="mcp-dns-timeout" value="{{ mcp.dns_timeout }}" placeholder="10"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">GeoIP timeout (s)</label>
+                <input type="number" id="mcp-geoip-timeout" value="{{ mcp.geoip_timeout }}" placeholder="10"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">GeoIP Endpoint URL</label>
+                <input type="text" id="mcp-geoip-endpoint" value="{{ mcp.geoip_endpoint }}" placeholder="http://ip-api.com/json/"
+                       style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Section 6: Advanced ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Advanced</h3>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;font-size:0.82rem">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem">
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Log Level</label>
+                    <select id="mcp-log-level" style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem">
+                        <option value="DEBUG" {{ 'selected' if mcp.log_level == 'DEBUG' }}>DEBUG</option>
+                        <option value="INFO" {{ 'selected' if mcp.log_level == 'INFO' }}>INFO</option>
+                        <option value="WARNING" {{ 'selected' if mcp.log_level == 'WARNING' }}>WARNING</option>
+                        <option value="ERROR" {{ 'selected' if mcp.log_level == 'ERROR' }}>ERROR</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Request Timeout (s)</label>
+                    <input type="number" id="mcp-request-timeout" value="{{ mcp.request_timeout }}" placeholder="30"
+                           style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+                </div>
+                <div>
+                    <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Max Message Size (bytes)</label>
+                    <input type="number" id="mcp-max-message-size" value="{{ mcp.max_message_size }}" placeholder="1048576"
+                           style="width:100%;padding:0.35rem 0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;box-sizing:border-box">
+                </div>
+            </div>
+            <div>
+                <label style="display:block;color:var(--text-secondary);margin-bottom:0.25rem">Server Instructions</label>
+                <textarea id="mcp-instructions" rows="4" placeholder="Instructions sent to MCP clients describing this server's capabilities..."
+                          style="width:100%;padding:0.5rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-main);color:inherit;font-size:0.82rem;font-family:inherit;resize:vertical;box-sizing:border-box">{{ mcp.instructions }}</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Section 7: Integration ── -->
+    <div style="border:1px solid var(--border);background:var(--bg-card);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1.25rem">
+        <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Integration</h3>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem">
+            <strong>Claude Desktop / Claude Code config:</strong> Add this to your
+            <code>claude_desktop_config.json</code> or <code>.claude/settings.json</code>:
+        </p>
+        <div style="position:relative;margin-bottom:1rem">
+            <pre id="mcp-config-block" style="background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius);
+                 padding:0.75rem;font-size:0.78rem;overflow-x:auto;margin:0">Loading...</pre>
+            <button class="btn btn-sm" onclick="mcpCopyConfig()" id="btn-mcp-copy"
+                    style="position:absolute;top:0.4rem;right:0.4rem;font-size:0.7rem">Copy</button>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.5rem"><strong>CLI Commands:</strong></p>
+        <pre style="background:var(--bg-main);border:1px solid var(--border);border-radius:var(--radius);
+             padding:0.75rem;font-size:0.78rem;overflow-x:auto;margin:0"><span style="color:var(--text-muted)"># stdio mode (Claude Desktop / Claude Code)</span>
+python autarch.py --mcp stdio
+
+<span style="color:var(--text-muted)"># SSE mode (remote / web clients)</span>
+python autarch.py --mcp sse --mcp-port {{ mcp.port }}</pre>
+    </div>
+
+    <!-- ── Save Button ── -->
+    <div style="position:sticky;bottom:0;padding:0.75rem 0;background:var(--bg-main);border-top:1px solid var(--border);display:flex;align-items:center;gap:1rem;z-index:10">
+        <button class="btn btn-primary" onclick="mcpSave()" id="btn-mcp-save" style="font-size:0.9rem;padding:0.5rem 1.5rem">
+            Save MCP Settings
+        </button>
+        <span id="mcp-save-status" style="font-size:0.82rem;color:var(--text-muted)"></span>
+    </div>
+</div>
+
+<script>
+// ── Tool definitions ─────────────────────────────────────────────────────────
+var MCP_TOOLS = [
+    {name: 'nmap_scan',        desc: 'Run an nmap network scan'},
+    {name: 'geoip_lookup',     desc: 'GeoIP information for an IP'},
+    {name: 'dns_lookup',       desc: 'DNS record queries'},
+    {name: 'whois_lookup',     desc: 'WHOIS lookup for domain/IP'},
+    {name: 'packet_capture',   desc: 'Capture network packets'},
+    {name: 'wireguard_status', desc: 'WireGuard VPN status'},
+    {name: 'upnp_status',      desc: 'UPnP port mapping status'},
+    {name: 'system_info',      desc: 'System information'},
+    {name: 'llm_chat',         desc: 'Chat with configured LLM'},
+    {name: 'android_devices',  desc: 'List Android devices via ADB'},
+    {name: 'config_get',       desc: 'Read AUTARCH configuration'}
+];
+
+var disabledToolsRaw = {{ mcp.disabled_tools | tojson }};
+
+function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function buildToolGrid() {
+    var disabled = (disabledToolsRaw || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+    var grid = document.getElementById('mcp-tools-grid');
+    grid.innerHTML = '';
+    for (var i = 0; i < MCP_TOOLS.length; i++) {
+        var t = MCP_TOOLS[i];
+        var isEnabled = disabled.indexOf(t.name) === -1;
+        var el = document.createElement('label');
+        el.style.cssText = 'display:flex;align-items:flex-start;gap:0.5rem;padding:0.5rem 0.6rem;border-radius:4px;border:1px solid var(--border);background:var(--bg-main);cursor:pointer';
+        el.innerHTML = '<input type="checkbox" class="mcp-tool-cb" data-tool="' + t.name + '" ' + (isEnabled ? 'checked' : '') + ' style="margin-top:0.15rem">'
+            + '<div><strong style="color:var(--accent)">' + escapeHtml(t.name) + '</strong>'
+            + '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.1rem">' + escapeHtml(t.desc) + '</div></div>';
+        grid.appendChild(el);
+    }
+}
+
+// ── Server Controls ──────────────────────────────────────────────────────────
+function mcpStart() {
+    var btn = document.getElementById('btn-mcp-start');
+    btn.disabled = true; btn.textContent = 'Starting...';
+    fetch('/settings/mcp/start', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Start MCP Server';
+            mcpRefreshStatus();
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Start MCP Server'; alert(e.message); });
+}
+
+function mcpStop() {
+    var btn = document.getElementById('btn-mcp-stop');
+    btn.disabled = true; btn.textContent = 'Stopping...';
+    fetch('/settings/mcp/stop', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            btn.disabled = false; btn.textContent = 'Stop';
+            mcpRefreshStatus();
+        })
+        .catch(function(e) { btn.disabled = false; btn.textContent = 'Stop'; });
+}
+
+function mcpRefreshStatus() {
+    fetch('/settings/mcp/status', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var dot = document.getElementById('mcp-status-dot');
+            var text = document.getElementById('mcp-status-text');
+            if (d.ok && d.status && d.status.running) {
+                dot.style.background = 'var(--success, #34c759)';
+                text.innerHTML = '&#x2713; Running (PID ' + d.status.pid + ')';
+            } else {
+                dot.style.background = 'var(--text-muted)';
+                text.textContent = 'Stopped';
+            }
+        })
+        .catch(function() {
+            document.getElementById('mcp-status-dot').style.background = 'var(--text-muted)';
+            document.getElementById('mcp-status-text').textContent = 'Error checking status';
+        });
+}
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+function mcpSave() {
+    var btn = document.getElementById('btn-mcp-save');
+    var status = document.getElementById('mcp-save-status');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    status.textContent = '';
+
+    // Collect disabled tools
+    var disabledTools = [];
+    var cbs = document.querySelectorAll('.mcp-tool-cb');
+    for (var i = 0; i < cbs.length; i++) {
+        if (!cbs[i].checked) disabledTools.push(cbs[i].getAttribute('data-tool'));
+    }
+
+    var payload = {
+        enabled:          true,
+        auto_start:       document.getElementById('mcp-auto-start').checked,
+        transport:        document.getElementById('mcp-transport').value,
+        host:             document.getElementById('mcp-host').value,
+        port:             document.getElementById('mcp-port').value,
+        cors_origins:     document.getElementById('mcp-cors-origins').value,
+        auth_enabled:     document.getElementById('mcp-auth-enabled').checked,
+        auth_token:       document.getElementById('mcp-auth-token').value,
+        rate_limit:       document.getElementById('mcp-rate-limit').value,
+        mask_errors:      document.getElementById('mcp-mask-errors').checked,
+        ssl_enabled:      document.getElementById('mcp-ssl-enabled').checked,
+        ssl_cert:         document.getElementById('mcp-ssl-cert').value,
+        ssl_key:          document.getElementById('mcp-ssl-key').value,
+        log_level:        document.getElementById('mcp-log-level').value,
+        instructions:     document.getElementById('mcp-instructions').value,
+        request_timeout:  document.getElementById('mcp-request-timeout').value,
+        max_message_size: document.getElementById('mcp-max-message-size').value,
+        disabled_tools:   disabledTools.join(','),
+        nmap_timeout:     document.getElementById('mcp-nmap-timeout').value,
+        tcpdump_timeout:  document.getElementById('mcp-tcpdump-timeout').value,
+        whois_timeout:    document.getElementById('mcp-whois-timeout').value,
+        dns_timeout:      document.getElementById('mcp-dns-timeout').value,
+        geoip_timeout:    document.getElementById('mcp-geoip-timeout').value,
+        geoip_endpoint:   document.getElementById('mcp-geoip-endpoint').value
+    };
+
+    fetch('/settings/mcp/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        btn.disabled = false; btn.textContent = 'Save MCP Settings';
+        if (d.ok) {
+            status.style.color = 'var(--success, #34c759)';
+            status.textContent = 'Settings saved successfully.';
+        } else {
+            status.style.color = 'var(--danger, #ff3b30)';
+            status.textContent = 'Error: ' + (d.error || 'Unknown error');
+        }
+        setTimeout(function() { status.textContent = ''; }, 4000);
+    })
+    .catch(function(e) {
+        btn.disabled = false; btn.textContent = 'Save MCP Settings';
+        status.style.color = 'var(--danger, #ff3b30)';
+        status.textContent = 'Error: ' + e.message;
+    });
+}
+
+// ── Token helpers ────────────────────────────────────────────────────────────
+function mcpGenerateToken() {
+    fetch('/settings/mcp/generate-token', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.ok && d.token) {
+                var input = document.getElementById('mcp-auth-token');
+                input.value = d.token;
+                input.type = 'text';
+                document.getElementById('btn-toggle-token').textContent = 'Hide';
+            }
+        })
+        .catch(function(e) { alert('Failed to generate token: ' + e.message); });
+}
+
+function mcpToggleToken() {
+    var input = document.getElementById('mcp-auth-token');
+    var btn = document.getElementById('btn-toggle-token');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+    } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+    }
+}
+
+// ── Config copy ──────────────────────────────────────────────────────────────
+function mcpCopyConfig() {
+    var block = document.getElementById('mcp-config-block');
+    navigator.clipboard.writeText(block.textContent).then(function() {
+        var btn = document.getElementById('btn-mcp-copy');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+    });
+}
+
+// ── Page load ────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+    buildToolGrid();
+    mcpRefreshStatus();
+    // Fetch config snippet
+    fetch('/settings/mcp/config', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.ok) document.getElementById('mcp-config-block').textContent = d.config;
+        });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Settings - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+</div>
+
+<div class="section">
+    <h2>Change Password</h2>
+    <form method="POST" action="{{ url_for('settings.change_password') }}" class="settings-form">
+        <div class="form-group">
+            <label for="new_password">New Password</label>
+            <input type="password" id="new_password" name="new_password" required>
+        </div>
+        <div class="form-group">
+            <label for="confirm_password">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Password</button>
+    </form>
+</div>
+
+<div class="section">
+    <h2>OSINT Settings</h2>
+    <form method="POST" action="{{ url_for('settings.update_osint') }}" class="settings-form">
+        <div class="form-group">
+            <label for="max_threads">Max Threads</label>
+            <input type="number" id="max_threads" name="max_threads" value="{{ osint.max_threads }}" min="1" max="64">
+        </div>
+        <div class="form-group">
+            <label for="timeout">Timeout (seconds)</label>
+            <input type="number" id="timeout" name="timeout" value="{{ osint.timeout }}" min="1" max="60">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="include_nsfw" {{ 'checked' if osint.include_nsfw }}>
+                Include NSFW sites
+            </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Save OSINT Settings</button>
+    </form>
+</div>
+
+<div class="section">
+    <h2>UPnP Settings</h2>
+    <form method="POST" action="{{ url_for('settings.update_upnp') }}" class="settings-form">
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" name="enabled" {{ 'checked' if upnp.enabled }}>
+                Enabled
+            </label>
+        </div>
+        <div class="form-group">
+            <label for="internal_ip">Internal IP</label>
+            <input type="text" id="internal_ip" name="internal_ip" value="{{ upnp.internal_ip }}">
+        </div>
+        <div class="form-group">
+            <label for="refresh_hours">Refresh Interval (hours)</label>
+            <input type="number" id="refresh_hours" name="refresh_hours" value="{{ upnp.refresh_hours }}" min="1" max="24">
+        </div>
+        <div class="form-group">
+            <label for="mappings">Port Mappings (port:proto, ...)</label>
+            <input type="text" id="mappings" name="mappings" value="{{ upnp.mappings }}" placeholder="443:TCP,51820:UDP,8080:TCP">
+        </div>
+        <button type="submit" class="btn btn-primary">Save UPnP Settings</button>
+    </form>
+</div>
+
+<div class="section">
+    <h2>LLM Configuration</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem">
+        <div>
+            <span style="font-size:0.85rem;color:var(--text-secondary)">Active backend: </span>
+            <span style="font-weight:600;color:var(--accent)">{{ llm_backend }}</span>
+        </div>
+        <a href="{{ url_for('settings.llm_settings') }}" class="btn btn-primary">Open LLM Settings &rarr;</a>
+    </div>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.6rem">
+        Configure local models (GGUF / SafeTensors), Claude, OpenAI, and HuggingFace Inference API.
+    </p>
+</div>
+
+<div class="section">
+    <h2>MCP Server</h2>
+    <p class="text-muted">Model Context Protocol — expose AUTARCH tools to AI clients (Claude Desktop, Claude Code)</p>
+    <div id="mcp-status">
+        <button class="btn btn-primary" onclick="mcpAction('status')">Check Status</button>
+        <button class="btn btn-primary" onclick="mcpAction('start')">Start SSE Server</button>
+        <button class="btn btn-danger" onclick="mcpAction('stop')">Stop SSE Server</button>
+        <button class="btn btn-secondary" onclick="mcpAction('config')">Show Config Snippet</button>
+    </div>
+    <pre id="mcp-output" style="margin-top:1em; padding:1em; background:#111; color:#0f0; display:none; white-space:pre-wrap;"></pre>
+</div>
+
+<div class="section">
+    <h2>Debug Console</h2>
+    <label class="checkbox-label">
+        <input type="checkbox" id="debug-enable-chk" onchange="debugToggle(this.checked)" {% if debug_enabled %}checked{% endif %}>
+        Enable Debug Console
+    </label>
+    <p style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.4rem">Captures all Python logging output into a live debug window available on every page. Useful for troubleshooting LLM, MSF, and tool issues.</p>
+    <div style="display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="debugOpen()">Open Debug Window</button>
+        <button class="btn btn-sm" onclick="debugSendTest()">Send Test Messages</button>
+    </div>
+</div>
+
+<script>
+function debugSendTest() {
+    fetch('/settings/debug/test', {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (d.ok) { debugOpen(); } });
+}
+
+function mcpAction(action) {
+    var out = document.getElementById('mcp-output');
+    out.style.display = 'block';
+    out.textContent = 'Loading...';
+    fetch('/settings/mcp/' + action, {method: 'POST'})
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (action === 'config' && data.ok) {
+                out.textContent = data.config;
+            } else {
+                out.textContent = JSON.stringify(data, null, 2);
+            }
+        })
+        .catch(function(e) { out.textContent = 'Error: ' + e; });
+}
+</script>
+{% endblock %}

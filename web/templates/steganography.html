@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+{% block title %}AUTARCH — Steganography{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Steganography</h1>
+    <p style="margin:0;font-size:0.85rem;color:var(--text-secondary)">
+        Hide data in files, extract hidden messages, and detect steganographic content.
+    </p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+    <button class="tab active" data-tab-group="stego" data-tab="hide" onclick="showTab('stego','hide')">Hide</button>
+    <button class="tab" data-tab-group="stego" data-tab="extract" onclick="showTab('stego','extract')">Extract</button>
+    <button class="tab" data-tab-group="stego" data-tab="detect" onclick="showTab('stego','detect')">Detect</button>
+</div>
+
+<!-- ==================== HIDE TAB ==================== -->
+<div class="tab-content active" data-tab-group="stego" data-tab="hide">
+
+<div class="section">
+    <h2>Hide Message in File</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Embed a hidden message into an image, audio, or video carrier file using LSB steganography.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Carrier File Path</label>
+            <input type="text" id="hide-carrier" placeholder="/path/to/image.png">
+        </div>
+        <div class="form-group">
+            <label>Output File Path</label>
+            <input type="text" id="hide-output" placeholder="/path/to/output.png">
+        </div>
+    </div>
+    <div class="form-group">
+        <label>Message to Hide</label>
+        <textarea id="hide-message" rows="5" placeholder="Enter the secret message to embed..."></textarea>
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="max-width:250px">
+            <label>Password (optional, for encryption)</label>
+            <input type="password" id="hide-password" placeholder="Encryption password">
+        </div>
+        <div class="form-group" style="max-width:180px">
+            <label>Method</label>
+            <select id="hide-method">
+                <option value="lsb">LSB (Least Significant Bit)</option>
+                <option value="dct">DCT (JPEG)</option>
+                <option value="spread">Spread Spectrum</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-hide" class="btn btn-primary" onclick="stegoHide()">Hide Message</button>
+        <button class="btn btn-small" onclick="stegoCapacity()">Check Capacity</button>
+    </div>
+    <pre class="output-panel" id="hide-output-result"></pre>
+</div>
+
+<div class="section">
+    <h2>Whitespace Steganography</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Hide messages using invisible whitespace characters (tabs, spaces, zero-width chars) within text.
+    </p>
+    <div class="form-group">
+        <label>Cover Text</label>
+        <textarea id="ws-cover" rows="4" placeholder="Enter normal-looking cover text here..."></textarea>
+    </div>
+    <div class="form-group">
+        <label>Hidden Message</label>
+        <input type="text" id="ws-hidden" placeholder="Secret message to encode in whitespace">
+    </div>
+    <div class="tool-actions">
+        <button class="btn btn-primary btn-small" onclick="wsEncode()">Encode</button>
+        <button class="btn btn-small" onclick="wsDecode()">Decode</button>
+        <button class="btn btn-small" onclick="wsCopy()">Copy Result</button>
+    </div>
+    <div class="form-group" style="margin-top:12px">
+        <label>Result</label>
+        <textarea id="ws-result" rows="4" readonly style="background:var(--bg-primary)"></textarea>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== EXTRACT TAB ==================== -->
+<div class="tab-content" data-tab-group="stego" data-tab="extract">
+
+<div class="section">
+    <h2>Extract Hidden Data</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Extract embedded messages from steganographic files.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Stego File Path</label>
+            <input type="text" id="extract-file" placeholder="/path/to/stego_image.png">
+        </div>
+        <div class="form-group" style="max-width:250px">
+            <label>Password (if encrypted)</label>
+            <input type="password" id="extract-password" placeholder="Decryption password">
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-group" style="max-width:180px">
+            <label>Method</label>
+            <select id="extract-method">
+                <option value="lsb">LSB</option>
+                <option value="dct">DCT (JPEG)</option>
+                <option value="spread">Spread Spectrum</option>
+                <option value="auto">Auto-detect</option>
+            </select>
+        </div>
+        <div class="form-group" style="max-width:180px">
+            <label>Output Format</label>
+            <select id="extract-format">
+                <option value="text">Text (UTF-8)</option>
+                <option value="hex">Hex Dump</option>
+                <option value="raw">Raw Binary (save)</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-extract" class="btn btn-primary" onclick="stegoExtract()">Extract</button>
+    </div>
+    <div class="form-group" style="margin-top:12px">
+        <label>Extracted Data</label>
+        <div id="extract-result-wrap">
+            <pre class="output-panel scrollable" id="extract-result">No extraction performed yet.</pre>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<!-- ==================== DETECT TAB ==================== -->
+<div class="tab-content" data-tab-group="stego" data-tab="detect">
+
+<div class="section">
+    <h2>Steganalysis</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Analyze a file for signs of steganographic content using statistical methods.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>File Path to Analyze</label>
+            <input type="text" id="detect-file" placeholder="/path/to/suspect_image.png">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-detect" class="btn btn-primary" onclick="stegoDetect()">Analyze</button>
+    </div>
+</div>
+
+<div class="section" id="detect-results" style="display:none">
+    <h2>Analysis Results</h2>
+
+    <!-- Verdict -->
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px">
+        <div class="score-display">
+            <div class="score-value" id="detect-verdict" style="font-size:1.4rem">--</div>
+            <div class="score-label">Verdict</div>
+        </div>
+        <div style="flex:1;min-width:250px">
+            <div style="margin-bottom:12px">
+                <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">
+                    Confidence Score
+                </label>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div style="flex:1;background:var(--bg-input);height:12px;border-radius:6px;overflow:hidden">
+                        <div id="detect-conf-bar" style="height:100%;width:0%;border-radius:6px;transition:width 0.5s"></div>
+                    </div>
+                    <span id="detect-conf-pct" style="font-weight:600;min-width:40px">0%</span>
+                </div>
+            </div>
+            <div>
+                <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:4px">File Info</label>
+                <div id="detect-file-info" style="font-size:0.85rem;color:var(--text-muted)">--</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistical Values -->
+    <h3>Statistical Analysis</h3>
+    <table class="data-table" style="margin-bottom:16px">
+        <thead><tr><th>Test</th><th>Value</th><th>Threshold</th><th>Status</th></tr></thead>
+        <tbody id="detect-stats-table">
+            <tr><td colspan="4" class="empty-state">Run analysis to see results.</td></tr>
+        </tbody>
+    </table>
+
+    <!-- Indicators -->
+    <h3>Indicators</h3>
+    <div id="detect-indicators" style="max-height:300px;overflow-y:auto">
+        <div class="empty-state">No indicators.</div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Batch Scan</h2>
+    <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px">
+        Scan a directory of files for steganographic content.
+    </p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Directory Path</label>
+            <input type="text" id="batch-dir" placeholder="/path/to/directory">
+        </div>
+        <div class="form-group" style="max-width:160px">
+            <label>File Types</label>
+            <select id="batch-types">
+                <option value="images">Images (PNG/JPG/BMP)</option>
+                <option value="audio">Audio (WAV/MP3/FLAC)</option>
+                <option value="all">All supported</option>
+            </select>
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-batch" class="btn btn-primary btn-small" onclick="stegoBatchScan()">Scan Directory</button>
+    </div>
+    <pre class="output-panel scrollable" id="batch-output"></pre>
+</div>
+
+</div>
+
+<script>
+/* ── Steganography ── */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function stegoHide() {
+    var carrier = document.getElementById('hide-carrier').value.trim();
+    var message = document.getElementById('hide-message').value;
+    var output = document.getElementById('hide-output').value.trim();
+    if (!carrier || !message) { alert('Provide a carrier file path and message.'); return; }
+    var btn = document.getElementById('btn-hide');
+    setLoading(btn, true);
+    postJSON('/stego/hide', {
+        carrier: carrier,
+        message: message,
+        output: output,
+        password: document.getElementById('hide-password').value,
+        method: document.getElementById('hide-method').value
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('hide-output-result', 'Error: ' + data.error); return; }
+        var lines = ['Message hidden successfully.'];
+        if (data.output_path) lines.push('Output: ' + data.output_path);
+        if (data.bytes_hidden) lines.push('Bytes embedded: ' + data.bytes_hidden);
+        if (data.capacity_used) lines.push('Capacity used: ' + data.capacity_used + '%');
+        renderOutput('hide-output-result', lines.join('\n'));
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function stegoCapacity() {
+    var carrier = document.getElementById('hide-carrier').value.trim();
+    if (!carrier) { alert('Enter a carrier file path first.'); return; }
+    postJSON('/stego/capacity', {
+        carrier: carrier,
+        method: document.getElementById('hide-method').value
+    }).then(function(data) {
+        if (data.error) { renderOutput('hide-output-result', 'Error: ' + data.error); return; }
+        var lines = ['=== Capacity Report ==='];
+        lines.push('File: ' + (data.filename || carrier));
+        lines.push('File size: ' + (data.file_size || '--'));
+        lines.push('Max payload: ' + (data.max_bytes || '--') + ' bytes');
+        lines.push('Max characters: ~' + (data.max_chars || '--'));
+        if (data.dimensions) lines.push('Dimensions: ' + data.dimensions);
+        renderOutput('hide-output-result', lines.join('\n'));
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    });
+}
+
+/* ── Whitespace Stego ── */
+function wsEncode() {
+    var cover = document.getElementById('ws-cover').value;
+    var hidden = document.getElementById('ws-hidden').value;
+    if (!cover || !hidden) { alert('Enter both cover text and hidden message.'); return; }
+    postJSON('/stego/whitespace/encode', {cover: cover, hidden: hidden}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        document.getElementById('ws-result').value = data.encoded || '';
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    });
+}
+
+function wsDecode() {
+    var text = document.getElementById('ws-result').value || document.getElementById('ws-cover').value;
+    if (!text) { alert('Enter encoded text in the Cover Text or Result field.'); return; }
+    postJSON('/stego/whitespace/decode', {text: text}).then(function(data) {
+        if (data.error) { alert('Error: ' + data.error); return; }
+        document.getElementById('ws-hidden').value = data.decoded || '';
+        document.getElementById('ws-result').value = 'Decoded: ' + (data.decoded || '(empty)');
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    });
+}
+
+function wsCopy() {
+    var el = document.getElementById('ws-result');
+    if (!el.value) return;
+    navigator.clipboard.writeText(el.value).then(function() {
+        alert('Copied to clipboard (including invisible characters).');
+    });
+}
+
+/* ── Extract ── */
+function stegoExtract() {
+    var file = document.getElementById('extract-file').value.trim();
+    if (!file) { alert('Enter a file path.'); return; }
+    var btn = document.getElementById('btn-extract');
+    setLoading(btn, true);
+    postJSON('/stego/extract', {
+        file: file,
+        password: document.getElementById('extract-password').value,
+        method: document.getElementById('extract-method').value,
+        format: document.getElementById('extract-format').value
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('extract-result', 'Error: ' + data.error); return; }
+        if (data.format === 'hex') {
+            renderOutput('extract-result', data.hex || 'No data extracted.');
+        } else if (data.format === 'raw' && data.download_url) {
+            document.getElementById('extract-result').innerHTML =
+                'Binary data extracted. <a href="' + esc(data.download_url)
+                + '" download>Download file</a> (' + esc(data.size || '?') + ' bytes)';
+        } else {
+            renderOutput('extract-result', data.text || data.message || 'No hidden data found.');
+        }
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+/* ── Detect ── */
+function stegoDetect() {
+    var file = document.getElementById('detect-file').value.trim();
+    if (!file) { alert('Enter a file path to analyze.'); return; }
+    var btn = document.getElementById('btn-detect');
+    setLoading(btn, true);
+    postJSON('/stego/detect', {file: file}).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('detect-stats-table', data.error); return; }
+
+        document.getElementById('detect-results').style.display = '';
+
+        // Verdict
+        var verdictEl = document.getElementById('detect-verdict');
+        var verdict = data.verdict || 'unknown';
+        verdictEl.textContent = verdict.toUpperCase();
+        verdictEl.style.color = verdict === 'clean' ? 'var(--success)'
+            : verdict === 'suspicious' ? 'var(--warning)' : 'var(--danger)';
+
+        // Confidence bar
+        var conf = data.confidence || 0;
+        var confBar = document.getElementById('detect-conf-bar');
+        confBar.style.width = conf + '%';
+        confBar.style.background = conf < 30 ? 'var(--success)' : conf < 70 ? 'var(--warning)' : 'var(--danger)';
+        document.getElementById('detect-conf-pct').textContent = conf + '%';
+
+        // File info
+        var info = [];
+        if (data.file_type) info.push('Type: ' + data.file_type);
+        if (data.file_size) info.push('Size: ' + data.file_size);
+        if (data.dimensions) info.push('Dimensions: ' + data.dimensions);
+        document.getElementById('detect-file-info').textContent = info.join(' | ') || '--';
+
+        // Stats table
+        var stats = data.statistics || [];
+        if (stats.length) {
+            var shtml = '';
+            stats.forEach(function(s) {
+                var passed = s.suspicious ? false : true;
+                shtml += '<tr>'
+                    + '<td>' + esc(s.test) + '</td>'
+                    + '<td><code>' + esc(s.value) + '</code></td>'
+                    + '<td>' + esc(s.threshold || '--') + '</td>'
+                    + '<td><span class="badge ' + (passed ? 'badge-pass' : 'badge-fail') + '">'
+                    + (passed ? 'PASS' : 'SUSPICIOUS') + '</span></td></tr>';
+            });
+            document.getElementById('detect-stats-table').innerHTML = shtml;
+        } else {
+            document.getElementById('detect-stats-table').innerHTML =
+                '<tr><td colspan="4" class="empty-state">No statistical tests available for this file type.</td></tr>';
+        }
+
+        // Indicators
+        var indicators = data.indicators || [];
+        var iContainer = document.getElementById('detect-indicators');
+        if (indicators.length) {
+            var ihtml = '';
+            indicators.forEach(function(ind) {
+                var sevCls = ind.severity === 'high' ? 'badge-high'
+                    : ind.severity === 'medium' ? 'badge-medium' : 'badge-low';
+                ihtml += '<div class="threat-item">'
+                    + '<span class="badge ' + sevCls + '">' + esc(ind.severity || 'info') + '</span>'
+                    + '<div><div class="threat-message">' + esc(ind.message) + '</div>'
+                    + '<div class="threat-category">' + esc(ind.detail || '') + '</div>'
+                    + '</div></div>';
+            });
+            iContainer.innerHTML = ihtml;
+        } else {
+            iContainer.innerHTML = '<div class="empty-state">No specific indicators found.</div>';
+        }
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+
+function stegoBatchScan() {
+    var dir = document.getElementById('batch-dir').value.trim();
+    if (!dir) { alert('Enter a directory path.'); return; }
+    var btn = document.getElementById('btn-batch');
+    setLoading(btn, true);
+    renderOutput('batch-output', 'Scanning directory... this may take a while.');
+    postJSON('/stego/batch-scan', {
+        directory: dir,
+        types: document.getElementById('batch-types').value
+    }).then(function(data) {
+        setLoading(btn, false);
+        if (data.error) { renderOutput('batch-output', 'Error: ' + data.error); return; }
+        var results = data.results || [];
+        if (!results.length) {
+            renderOutput('batch-output', 'No files found or no steganographic content detected.');
+            return;
+        }
+        var lines = ['=== Batch Scan Results ===',
+                     'Files scanned: ' + (data.total_scanned || results.length),
+                     'Suspicious: ' + (data.suspicious_count || 0), ''];
+        results.forEach(function(r) {
+            var flag = r.verdict === 'clean' ? '[CLEAN]'
+                     : r.verdict === 'suspicious' ? '[SUSPICIOUS]' : '[LIKELY STEGO]';
+            lines.push(flag + ' ' + r.filename + ' (confidence: ' + (r.confidence || 0) + '%)');
+        });
+        renderOutput('batch-output', lines.join('\n'));
+        halAnalyze('Steganography', JSON.stringify(data, null, 2), 'stego analysis', 'analyze');
+    }).catch(function() { setLoading(btn, false); });
+}
+</script>
+{% endblock %}

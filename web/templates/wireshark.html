@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Wireshark - AUTARCH{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Packet Analysis</h1>
+</div>
+
+<!-- Engine Status -->
+<div class="section">
+    <h2>Engine Status</h2>
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="stat-card">
+            <div class="stat-label">Scapy</div>
+            <div class="stat-value small">
+                <span class="status-dot {{ 'active' if status.scapy else 'inactive' }}"></span>
+                {{ 'Available' if status.scapy else 'Missing' }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">tshark</div>
+            <div class="stat-value small">
+                <span class="status-dot {{ 'active' if status.tshark else 'warning' }}"></span>
+                {{ 'Available' if status.tshark else 'Not found' }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Live Capture</div>
+            <div class="stat-value small">
+                <span class="status-dot {{ 'active' if status.can_capture else 'warning' }}"></span>
+                {{ 'Ready' if status.can_capture else 'Needs root' }}
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value small" id="ws-capture-status">
+                <span class="status-dot inactive"></span>Idle
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Live Capture -->
+<div class="section">
+    <h2>Live Capture</h2>
+    <div class="form-row" style="margin-bottom:12px">
+        <div class="form-group">
+            <label>Interface</label>
+            <select id="ws-interface">
+                <option value="">Loading...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>BPF Filter</label>
+            <input type="text" id="ws-filter" placeholder="e.g., tcp port 80, udp, host 10.0.0.1">
+        </div>
+        <div class="form-group">
+            <label>Duration (sec)</label>
+            <input type="number" id="ws-duration" value="30" min="5" max="300" style="max-width:100px">
+        </div>
+    </div>
+    <div class="tool-actions">
+        <button id="btn-ws-start" class="btn btn-primary" onclick="wsStartCapture()">Start Capture</button>
+        <button id="btn-ws-stop" class="btn btn-stop" onclick="wsStopCapture()" style="display:none">Stop</button>
+    </div>
+    <div class="progress-text" id="ws-progress"></div>
+
+    <!-- Live Packet Stream -->
+    <div id="ws-live-packets" class="output-panel scrollable" style="display:none;max-height:300px;font-size:0.78rem"></div>
+</div>
+
+<!-- PCAP Analysis -->
+<div class="section">
+    <h2>PCAP File Analysis</h2>
+    <div class="input-row">
+        <input type="text" id="ws-pcap-path" placeholder="Path to .pcap file (e.g., /home/snake/capture.pcap)">
+        <button id="btn-ws-pcap" class="btn btn-primary" onclick="wsAnalyzePcap()">Analyze</button>
+    </div>
+    <div id="ws-pcap-info" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px"></div>
+</div>
+
+<!-- Analysis Tabs -->
+<div class="section" id="ws-analysis-section" style="display:none">
+    <h2>Analysis</h2>
+    <div class="tab-bar">
+        <button class="tab active" data-tab-group="ws-analysis" data-tab="packets" onclick="showTab('ws-analysis','packets')">Packets</button>
+        <button class="tab" data-tab-group="ws-analysis" data-tab="protocols" onclick="showTab('ws-analysis','protocols');wsLoadProtocols()">Protocols</button>
+        <button class="tab" data-tab-group="ws-analysis" data-tab="conversations" onclick="showTab('ws-analysis','conversations');wsLoadConversations()">Conversations</button>
+        <button class="tab" data-tab-group="ws-analysis" data-tab="dns" onclick="showTab('ws-analysis','dns');wsLoadDNS()">DNS</button>
+        <button class="tab" data-tab-group="ws-analysis" data-tab="http" onclick="showTab('ws-analysis','http');wsLoadHTTP()">HTTP</button>
+        <button class="tab" data-tab-group="ws-analysis" data-tab="creds" onclick="showTab('ws-analysis','creds');wsLoadCredentials()">Credentials</button>
+    </div>
+
+    <!-- Packets Tab -->
+    <div class="tab-content active" data-tab-group="ws-analysis" data-tab="packets">
+        <div class="tool-actions">
+            <button class="btn btn-small" onclick="wsExport('json')">Export JSON</button>
+            <button class="btn btn-small" onclick="wsExport('csv')">Export CSV</button>
+        </div>
+        <div id="ws-packets-table" class="output-panel scrollable" style="max-height:400px;font-size:0.78rem"></div>
+    </div>
+
+    <!-- Protocols Tab -->
+    <div class="tab-content" data-tab-group="ws-analysis" data-tab="protocols">
+        <div id="ws-protocols"></div>
+    </div>
+
+    <!-- Conversations Tab -->
+    <div class="tab-content" data-tab-group="ws-analysis" data-tab="conversations">
+        <div id="ws-conversations"></div>
+    </div>
+
+    <!-- DNS Tab -->
+    <div class="tab-content" data-tab-group="ws-analysis" data-tab="dns">
+        <div id="ws-dns"></div>
+    </div>
+
+    <!-- HTTP Tab -->
+    <div class="tab-content" data-tab-group="ws-analysis" data-tab="http">
+        <div id="ws-http"></div>
+    </div>
+
+    <!-- Credentials Tab -->
+    <div class="tab-content" data-tab-group="ws-analysis" data-tab="creds">
+        <div id="ws-creds"></div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() { wsLoadInterfaces(); });
+</script>
+{% endblock %}
